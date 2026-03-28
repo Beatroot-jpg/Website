@@ -6,6 +6,7 @@
   "scripts": {
     "build:frontend-config": "node scripts/build-frontend-config.mjs",
     "dev": "node --watch backend/src/server.js",
+    "postinstall": "prisma generate --schema backend/prisma/schema.prisma",
     "start": "node backend/src/server.js",
     "prisma:generate": "prisma generate --schema backend/prisma/schema.prisma",
     "prisma:push": "prisma db push --schema backend/prisma/schema.prisma",
@@ -17,9 +18,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
-    "jsonwebtoken": "^9.0.2"
-  },
-  "devDependencies": {
+    "jsonwebtoken": "^9.0.2",
     "prisma": "^6.6.0"
   }
 }
