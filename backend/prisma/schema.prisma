@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum PermissionKey {
+  DASHBOARD
+  INVENTORY
+  BANK
+  DISTRIBUTION
+  USERS
+}
+
+enum InventoryAdjustmentType {
+  STOCK_IN
+  STOCK_OUT
+  DISTRIBUTED
+  CORRECTION
+}
+
+enum BankTransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum DistributionStatus {
+  ASSIGNED
+  IN_TRANSIT
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id                     String            @id @default(cuid())
+  email                  String            @unique
+  passwordHash           String
+  name                   String
+  role                   Role              @default(USER)
+  active                 Boolean           @default(true)
+  permissions            UserPermission[]
+  createdDistributions   Distribution[]    @relation("DistributionCreatedBy")
+  assignedDistributions  Distribution[]    @relation("DistributionAssignedTo")
+  createdTransactions    BankTransaction[] @relation("BankTransactionCreatedBy")
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+}
+
+model UserPermission {
+  id        String        @id @default(cuid())
+  userId    String
+  key       PermissionKey
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@unique([userId, key])
+}
+
+model InventoryItem {
+  id           String              @id @default(cuid())
+  name         String
+  sku          String?             @unique
+  category     String?
+  unit         String              @default("unit")
+  quantity     Int                 @default(0)
+  reorderLevel Int                 @default(0)
+  notes        String?
+  movements    InventoryMovement[]
+  distributions Distribution[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+}
+
+model InventoryMovement {
+  id            String                  @id @default(cuid())
+  itemId        String
+  quantityDelta Int
+  type          InventoryAdjustmentType
+  reason        String?
+  item          InventoryItem           @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  createdAt     DateTime                @default(now())
+}
+
+model BankTransaction {
+  id             String              @id @default(cuid())
+  amount         Decimal             @db.Decimal(12, 2)
+  type           BankTransactionType
+  sourceSystem   String              @default("manual")
+  description    String?
+  createdById    String?
+  distributionId String?             @unique
+  createdBy      User?               @relation("BankTransactionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  distribution   Distribution?       @relation(fields: [distributionId], references: [id], onDelete: SetNull)
+  createdAt      DateTime            @default(now())
+}
+
+model Distribution {
+  id              String             @id @default(cuid())
+  itemId          String
+  assignedToId    String
+  createdById     String
+  quantity        Int
+  unitPrice       Decimal?           @db.Decimal(12, 2)
+  amountCollected Decimal?           @db.Decimal(12, 2)
+  status          DistributionStatus @default(ASSIGNED)
+  notes           String?
+  item            InventoryItem      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  assignedTo      User               @relation("DistributionAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+  createdBy       User               @relation("DistributionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  bankTransaction BankTransaction?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+}

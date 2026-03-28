@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory</title>
+    <link rel="stylesheet" href="./assets/css/styles.css">
+    <script src="./assets/js/runtime-config.js"></script>
+    <script src="./assets/js/config.js"></script>
+  </head>
+  <body class="app-body">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <img class="brand-logo" src="./assets/images/new_logo.png" alt="YUGO MAFIA logo">
+          <div>
+            <strong>YUGO MAFIA</strong>
+            <span class="muted">Control centre</span>
+          </div>
+        </div>
+        <p class="sidebar-section-title">Sections</p>
+        <nav class="nav-list" id="sidebarNav"></nav>
+        <div class="sidebar-footer">Create items, adjust stock, and watch low-stock states from the same shared UI shell.</div>
+      </aside>
+
+      <main class="workspace">
+        <header class="workspace-header">
+          <div>
+            <p class="eyebrow">Inventory</p>
+            <h1 id="pageTitle"></h1>
+            <p class="muted" id="pageSubtitle"></p>
+          </div>
+          <div class="header-controls">
+            <div class="user-pill" id="userPill"></div>
+            <button class="ghost-button" id="logoutButton" type="button">Log out</button>
+          </div>
+        </header>
+
+        <section class="split-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <h2 id="inventoryFormTitle">Create item</h2>
+              <p id="inventoryFormSubtitle">Add a new inventory item and optional opening stock.</p>
+            </div>
+
+            <form class="stack-form" id="inventoryForm">
+              <input type="hidden" id="inventoryItemId" name="inventoryItemId">
+              <label class="field-stack">
+                <span>Name</span>
+                <input type="text" name="name" placeholder="Product name" required>
+              </label>
+              <div class="field-grid">
+                <label class="field-stack">
+                  <span>SKU</span>
+                  <input type="text" name="sku" placeholder="INV-001">
+                </label>
+                <label class="field-stack">
+                  <span>Category</span>
+                  <input type="text" name="category" placeholder="Consumables">
+                </label>
+              </div>
+              <div class="field-grid">
+                <label class="field-stack">
+                  <span>Unit</span>
+                  <input type="text" name="unit" value="unit">
+                </label>
+                <label class="field-stack">
+                  <span>Starting quantity</span>
+                  <input type="number" min="0" name="quantity" value="0">
+                </label>
+              </div>
+              <label class="field-stack">
+                <span>Reorder level</span>
+                <input type="number" min="0" name="reorderLevel" value="0">
+              </label>
+              <label class="field-stack">
+                <span>Notes</span>
+                <textarea name="notes" placeholder="Optional notes about the item"></textarea>
+              </label>
+              <div class="inline-actions">
+                <button class="primary-button" id="inventorySubmitButton" type="submit">Create item</button>
+                <button class="ghost-button" id="resetInventoryForm" type="button">Reset form</button>
+              </div>
+              <p class="muted" id="inventoryQuantityHint">Starting quantity is only used when creating a new item.</p>
+              <p class="form-error hidden" id="inventoryError"></p>
+            </form>
+
+            <div class="panel-header" style="margin-top: 1.8rem;">
+              <h2 id="adjustFormTitle">Adjust stock</h2>
+              <p id="adjustFormSubtitle">Apply a stock in, stock out, or correction movement to an existing item.</p>
+            </div>
+
+            <form class="stack-form" id="adjustForm">
+              <input type="hidden" id="inventoryMovementId" name="inventoryMovementId">
+              <label class="field-stack">
+                <span>Item</span>
+                <select id="adjustItemId" name="itemId"></select>
+              </label>
+              <div class="field-grid">
+                <label class="field-stack">
+                  <span>Change</span>
+                  <input type="number" name="quantityDelta" placeholder="-4 or 10" required>
+                </label>
+                <label class="field-stack">
+                  <span>Type</span>
+                  <select name="type">
+                    <option value="STOCK_IN">Stock in</option>
+                    <option value="STOCK_OUT">Stock out</option>
+                    <option value="CORRECTION">Correction</option>
+                  </select>
+                </label>
+              </div>
+              <label class="field-stack">
+                <span>Reason</span>
+                <input type="text" name="reason" placeholder="Received new shipment">
+              </label>
+              <div class="inline-actions">
+                <button class="secondary-button" id="adjustSubmitButton" type="submit">Apply adjustment</button>
+                <button class="ghost-button" id="resetAdjustForm" type="button">Reset form</button>
+              </div>
+              <p class="form-error hidden" id="adjustError"></p>
+            </form>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Current inventory</h2>
+              <p>Recent stock movements and live quantities across all stored items.</p>
+            </div>
+            <div class="stack-list" id="recentMovementFeed"></div>
+            <div id="inventoryTable"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast-stack" id="toastStack"></div>
+    <script type="module" src="./assets/js/inventory.js"></script>
+  </body>
+</html>

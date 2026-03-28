@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access denied</title>
+    <link rel="stylesheet" href="./assets/css/styles.css">
+  </head>
+  <body class="auth-body">
+    <div class="auth-shell" style="grid-template-columns: 1fr; max-width: 860px; margin: 0 auto;">
+      <section class="auth-card">
+        <p class="eyebrow">Permission Required</p>
+        <h2>That page is not available for this account.</h2>
+        <p class="muted" id="forbiddenReason">
+          You do not currently have access to the requested page.
+        </p>
+        <div class="helper-row">
+          <a class="primary-button" href="./dashboard.html" id="homeLink">Back to dashboard</a>
+          <a class="ghost-button" href="./index.html">Return to login</a>
+        </div>
+      </section>
+    </div>
+
+    <script type="module" src="./assets/js/forbidden.js"></script>
+  </body>
+</html>

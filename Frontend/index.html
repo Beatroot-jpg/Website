@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YUGO MAFIA Control</title>
+    <link rel="stylesheet" href="./assets/css/styles.css">
+    <script src="./assets/js/runtime-config.js"></script>
+    <script src="./assets/js/config.js"></script>
+  </head>
+  <body class="auth-body">
+    <div class="auth-shell">
+      <section class="auth-panel">
+        <div class="hero-brand">
+          <img class="hero-logo" src="./assets/images/new_logo.png" alt="YUGO MAFIA logo">
+        </div>
+
+        <div>
+          <p class="eyebrow">YUGO MAFIA</p>
+          <h1>Run stock, money, and permissions from one control centre.</h1>
+          <p class="muted">
+            This control system is built for a static Netlify frontend with a Railway-hosted API and PostgreSQL database.
+            Each major tab lives as its own HTML page while sharing the same YUGO MAFIA theme, login flow, and UI system.
+          </p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card">
+            <strong>Inventory</strong>
+            <span class="muted">Track quantity, adjustments, reorder thresholds, and stock movements.</span>
+          </article>
+          <article class="feature-card">
+            <strong>Bank</strong>
+            <span class="muted">Record credits and debits with a running balance and system-linked history.</span>
+          </article>
+          <article class="feature-card">
+            <strong>Access control</strong>
+            <span class="muted">Create users and decide exactly which pages they can open.</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="auth-card">
+        <p class="eyebrow">Sign In</p>
+        <h2>Welcome back</h2>
+        <p class="muted" id="setupHint">
+          Use your admin or user credentials to access the systems you have permission to use.
+        </p>
+
+        <form class="stack-form" id="loginForm">
+          <label class="field-stack">
+            <span>Email</span>
+            <input type="email" name="email" placeholder="admin@example.com" required>
+          </label>
+          <label class="field-stack">
+            <span>Password</span>
+            <input type="password" name="password" placeholder="••••••••" required>
+          </label>
+          <button class="primary-button" type="submit">Log in</button>
+          <p class="form-error hidden" id="loginError"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="toast-stack" id="toastStack"></div>
+    <script type="module" src="./assets/js/login.js"></script>
+  </body>
+</html>

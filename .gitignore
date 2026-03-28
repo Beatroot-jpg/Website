@@ -1,0 +1,7 @@
+node_modules
+.env
+.netlify
+.railway
+backend/generated
+Frontend/assets/js/config.local.js
+Website/

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="./assets/css/styles.css">
+    <script src="./assets/js/runtime-config.js"></script>
+    <script src="./assets/js/config.js"></script>
+  </head>
+  <body class="app-body">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <img class="brand-logo" src="./assets/images/new_logo.png" alt="YUGO MAFIA logo">
+          <div>
+            <strong>YUGO MAFIA</strong>
+            <span class="muted">Control centre</span>
+          </div>
+        </div>
+        <p class="sidebar-section-title">Sections</p>
+        <nav class="nav-list" id="sidebarNav"></nav>
+        <div class="sidebar-footer">Shared styling, static tabs, and Railway-ready APIs all in one foundation.</div>
+      </aside>
+
+      <main class="workspace">
+        <header class="workspace-header">
+          <div>
+            <p class="eyebrow">Overview</p>
+            <h1 id="pageTitle"></h1>
+            <p class="muted" id="pageSubtitle"></p>
+          </div>
+          <div class="header-controls">
+            <div class="user-pill" id="userPill"></div>
+            <button class="ghost-button" id="logoutButton" type="button">Log out</button>
+          </div>
+        </header>
+
+        <section class="metric-grid" id="metricsGrid"></section>
+
+        <section class="feed-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Low stock alerts</h2>
+              <p>Items at or below their reorder threshold.</p>
+            </div>
+            <div class="stack-list" id="lowStockFeed"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Recent activity</h2>
+              <p>A blended feed of stock, bank, and distribution changes.</p>
+            </div>
+            <div class="stack-list" id="activityFeed"></div>
+          </article>
+        </section>
+
+        <section class="feed-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Recent distributions</h2>
+              <p>Latest assignment activity across inventory distribution.</p>
+            </div>
+            <div class="stack-list" id="distributionFeed"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Recent transactions</h2>
+              <p>New credits and debits captured by the bank ledger.</p>
+            </div>
+            <div class="stack-list" id="transactionFeed"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast-stack" id="toastStack"></div>
+    <script type="module" src="./assets/js/dashboard.js"></script>
+  </body>
+</html>
