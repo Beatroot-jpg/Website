@@ -14,6 +14,7 @@ import dashboardRoutes from "./routes/dashboard.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
+const host = "0.0.0.0";
 
 const allowedOrigins = (process.env.FRONTEND_URL || "")
   .split(",")
@@ -55,11 +56,16 @@ app.use((error, _req, res, _next) => {
 });
 
 async function startServer() {
+  console.log("Connecting to PostgreSQL with Prisma...");
   await prisma.$connect();
-  await ensureInitialAdmin();
+  console.log("Database connection established.");
 
-  app.listen(port, () => {
-    console.log(`API listening on port ${port}.`);
+  console.log("Checking bootstrap admin account...");
+  await ensureInitialAdmin();
+  console.log("Bootstrap check complete.");
+
+  app.listen(port, host, () => {
+    console.log(`API listening on http://${host}:${port}.`);
   });
 }
 
