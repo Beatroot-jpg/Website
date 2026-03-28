@@ -3,20 +3,21 @@ import "dotenv/config";
 import { prisma } from "../src/db.js";
 import { APP_PERMISSIONS, DEFAULT_USER_PERMISSIONS } from "../src/constants.js";
 import { hashPassword } from "../src/services/auth.js";
+import { normalizeUsername } from "../src/validators.js";
 
 async function seed() {
-  const adminEmail = (process.env.ADMIN_EMAIL || "admin@example.com").toLowerCase();
+  const adminUsername = normalizeUsername(process.env.ADMIN_USERNAME || process.env.ADMIN_EMAIL || "admin");
   const adminPassword = process.env.ADMIN_PASSWORD || "ChangeMe123!";
 
   const admin = await prisma.user.upsert({
-    where: { email: adminEmail },
+    where: { email: adminUsername },
     update: {
       name: process.env.ADMIN_NAME || "Primary Admin",
       role: "ADMIN",
       active: true
     },
     create: {
-      email: adminEmail,
+      email: adminUsername,
       name: process.env.ADMIN_NAME || "Primary Admin",
       passwordHash: await hashPassword(adminPassword),
       role: "ADMIN",
@@ -27,13 +28,13 @@ async function seed() {
     include: { permissions: true }
   });
 
-  const staffEmail = "operator@example.com";
-  const existingStaff = await prisma.user.findUnique({ where: { email: staffEmail } });
+  const staffUsername = "operator";
+  const existingStaff = await prisma.user.findUnique({ where: { email: staffUsername } });
 
   if (!existingStaff) {
     await prisma.user.create({
       data: {
-        email: staffEmail,
+        email: staffUsername,
         name: "Operations User",
         passwordHash: await hashPassword("ChangeMe123!"),
         permissions: {

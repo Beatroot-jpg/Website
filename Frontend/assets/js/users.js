@@ -169,7 +169,7 @@ function fillForm(user) {
   userIdField.value = user.id;
   formTitle.textContent = `Editing ${user.name}`;
   userForm.elements.name.value = user.name;
-  userForm.elements.email.value = user.email;
+  userForm.elements.username.value = user.username;
   userForm.elements.role.value = user.role;
   userForm.elements.active.checked = user.active;
   userForm.elements.password.value = "";
@@ -216,7 +216,7 @@ function getVisibleUsers(users) {
   if (searchQuery) {
     visibleUsers = visibleUsers.filter((user) => [
       user.name,
-      user.email,
+      user.username,
       user.role
     ].some((value) => `${value || ""}`.toLowerCase().includes(searchQuery)));
   }
@@ -305,7 +305,7 @@ function renderToolbar(users) {
       "users-export.csv",
       [
         { label: "Name", value: (user) => user.name },
-        { label: "Email", value: (user) => user.email },
+        { label: "Username", value: (user) => user.username },
         { label: "Role", value: (user) => user.role },
         { label: "Active", value: (user) => user.active }
       ],
@@ -336,7 +336,7 @@ function renderToolbar(users) {
       "users-selected.csv",
       [
         { label: "Name", value: (user) => user.name },
-        { label: "Email", value: (user) => user.email },
+        { label: "Username", value: (user) => user.username },
         { label: "Role", value: (user) => user.role },
         { label: "Active", value: (user) => user.active }
       ],
@@ -422,7 +422,7 @@ function renderUsers(users) {
               </td>
               <td>
                 <strong>${user.name}</strong>
-                <div class="subtle-row">${user.email}</div>
+                <div class="subtle-row">${user.username}</div>
               </td>
               <td>${roleBadge(user.role)}</td>
               <td><div class="badge-group">${permissionBadges(user.permissions)}</div></td>
@@ -546,7 +546,7 @@ userForm?.addEventListener("submit", async (event) => {
   const permissions = formData.getAll("permissions");
   const payload = {
     name: formData.get("name"),
-    email: formData.get("email"),
+    username: formData.get("username"),
     role: formData.get("role"),
     active: formData.get("active") === "on",
     permissions

@@ -34,6 +34,7 @@ export function getEffectivePermissions(user) {
 export function serializeUser(user) {
   return {
     id: user.id,
+    username: user.email,
     email: user.email,
     name: user.name,
     role: user.role,

@@ -19,7 +19,7 @@ Create a GitHub repository, then push the project so Railway and Netlify can bot
    - `DATABASE_URL` to the PostgreSQL service `DATABASE_URL` reference
    - `JWT_SECRET` to a long random secret
    - `FRONTEND_URL` to your Netlify site URL
-   - `ADMIN_EMAIL` to your first admin login email
+   - `ADMIN_USERNAME` to your first admin login username
    - `ADMIN_NAME` to your first admin display name
    - `ADMIN_PASSWORD` to your first admin password
 

@@ -11,6 +11,19 @@ export function requireString(value, fieldName) {
   return normalized;
 }
 
+export function normalizeUsername(value, fieldName = "Username") {
+  const normalized = requireString(value, fieldName).toLowerCase();
+
+  if (!/^[a-z0-9._@-]{3,64}$/.test(normalized)) {
+    throw createError(
+      400,
+      `${fieldName} must be 3-64 characters and use only letters, numbers, dots, @ signs, hyphens, or underscores.`
+    );
+  }
+
+  return normalized;
+}
+
 export function normalizeOptionalString(value) {
   const normalized = `${value ?? ""}`.trim();
   return normalized || null;

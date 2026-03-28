@@ -4,29 +4,29 @@ import { prisma } from "../db.js";
 import { asyncHandler, createError } from "../http.js";
 import { authenticateToken } from "../middleware/auth.js";
 import { serializeUser, signUserToken, verifyPassword } from "../services/auth.js";
-import { requireString } from "../validators.js";
+import { normalizeUsername, requireString } from "../validators.js";
 
 const router = Router();
 
 router.post(
   "/login",
   asyncHandler(async (req, res) => {
-    const email = requireString(req.body.email, "Email").toLowerCase();
+    const username = normalizeUsername(req.body.username ?? req.body.email);
     const password = requireString(req.body.password, "Password");
 
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: username },
       include: { permissions: true }
     });
 
     if (!user || !user.active) {
-      throw createError(401, "Invalid email or password.");
+      throw createError(401, "Invalid username or password.");
     }
 
     const validPassword = await verifyPassword(password, user.passwordHash);
 
     if (!validPassword) {
-      throw createError(401, "Invalid email or password.");
+      throw createError(401, "Invalid username or password.");
     }
 
     res.json({

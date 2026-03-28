@@ -15,7 +15,7 @@ async function loadSetupStatus() {
     const { needsSetup } = await api("/meta/bootstrap-status", { auth: false });
 
     if (needsSetup) {
-      setupHint.textContent = "No users exist yet. Set ADMIN_EMAIL and ADMIN_PASSWORD in Railway or your local .env before logging in.";
+      setupHint.textContent = "No users exist yet. Set ADMIN_USERNAME and ADMIN_PASSWORD in Railway or your local .env before logging in.";
     }
   } catch (_error) {
     setupHint.textContent = "Unable to reach the live API. Check the deployed frontend API configuration and Railway CORS settings.";

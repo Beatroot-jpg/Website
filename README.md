@@ -30,7 +30,7 @@ Inventory management starter with:
 ## Local setup
 
 1. Copy [`\.env.example`](/C:/Users/User/Desktop/Website/.env.example) to `.env`.
-2. Set `DATABASE_URL`, `JWT_SECRET`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`.
+2. Set `DATABASE_URL`, `JWT_SECRET`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD`.
 3. Install dependencies:
 
 ```powershell
@@ -67,7 +67,7 @@ npm.cmd run dev
 4. Set these remaining Railway variables on the API service:
    - `JWT_SECRET`
    - `FRONTEND_URL`
-   - `ADMIN_EMAIL`
+   - `ADMIN_USERNAME`
    - `ADMIN_NAME`
    - `ADMIN_PASSWORD`
 5. Railway will use [`railway.json`](/C:/Users/User/Desktop/Website/railway.json) to:

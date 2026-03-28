@@ -183,7 +183,10 @@ router.get(
 
     res.json({
       permissions: listPermissionMetadata(),
-      users
+      users: users.map((user) => ({
+        ...user,
+        username: user.email
+      }))
     });
   })
 );

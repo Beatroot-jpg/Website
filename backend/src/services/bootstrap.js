@@ -1,6 +1,7 @@
 import { prisma } from "../db.js";
 import { APP_PERMISSIONS } from "../constants.js";
 import { hashPassword } from "./auth.js";
+import { normalizeUsername } from "../validators.js";
 
 export async function ensureInitialAdmin() {
   const userCount = await prisma.user.count();
@@ -9,16 +10,19 @@ export async function ensureInitialAdmin() {
     return;
   }
 
-  if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
-    console.warn("No users found and ADMIN_EMAIL / ADMIN_PASSWORD are not configured yet.");
+  const adminIdentity = process.env.ADMIN_USERNAME || process.env.ADMIN_EMAIL;
+
+  if (!adminIdentity || !process.env.ADMIN_PASSWORD) {
+    console.warn("No users found and ADMIN_USERNAME / ADMIN_PASSWORD are not configured yet.");
     return;
   }
 
   const passwordHash = await hashPassword(process.env.ADMIN_PASSWORD);
+  const username = normalizeUsername(adminIdentity, "Admin username");
 
   await prisma.user.create({
     data: {
-      email: process.env.ADMIN_EMAIL.toLowerCase(),
+      email: username,
       name: process.env.ADMIN_NAME || "Primary Admin",
       passwordHash,
       role: "ADMIN",
@@ -28,5 +32,5 @@ export async function ensureInitialAdmin() {
     }
   });
 
-  console.log(`Bootstrapped admin user ${process.env.ADMIN_EMAIL}.`);
+  console.log(`Bootstrapped admin user ${username}.`);
 }

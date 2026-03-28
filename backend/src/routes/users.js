@@ -5,6 +5,7 @@ import { asyncHandler, createError } from "../http.js";
 import { authenticateToken, requireAdmin } from "../middleware/auth.js";
 import { hashPassword, serializeUser } from "../services/auth.js";
 import {
+  normalizeUsername,
   requireIdList,
   normalizePermissions,
   requireString
@@ -29,21 +30,21 @@ router.get(
 router.post(
   "/",
   asyncHandler(async (req, res) => {
-    const email = requireString(req.body.email, "Email").toLowerCase();
+    const username = normalizeUsername(req.body.username ?? req.body.email);
     const password = requireString(req.body.password, "Password");
     const name = requireString(req.body.name, "Name");
     const role = req.body.role === "ADMIN" ? "ADMIN" : "USER";
     const permissions = normalizePermissions(req.body.permissions, role);
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findUnique({ where: { email: username } });
 
     if (existingUser) {
-      throw createError(409, "A user with that email already exists.");
+      throw createError(409, "A user with that username already exists.");
     }
 
     const user = await prisma.user.create({
       data: {
-        email,
+        email: username,
         name,
         passwordHash: await hashPassword(password),
         role,
@@ -118,7 +119,9 @@ router.patch(
     );
 
     const data = {
-      email: req.body.email ? requireString(req.body.email, "Email").toLowerCase() : existingUser.email,
+      email: req.body.username !== undefined || req.body.email !== undefined
+        ? normalizeUsername(req.body.username ?? req.body.email)
+        : existingUser.email,
       name: req.body.name ? requireString(req.body.name, "Name") : existingUser.name,
       role: nextRole,
       active: typeof req.body.active === "boolean" ? req.body.active : existingUser.active
@@ -127,7 +130,7 @@ router.patch(
     if (data.email !== existingUser.email) {
       const duplicate = await prisma.user.findUnique({ where: { email: data.email } });
       if (duplicate) {
-        throw createError(409, "A user with that email already exists.");
+        throw createError(409, "A user with that username already exists.");
       }
     }
 
