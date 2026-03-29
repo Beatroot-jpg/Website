@@ -51,7 +51,7 @@ function renderInventoryOverview(items) {
       <article class="activity-card">
         <div>
           <strong>${item.name}</strong>
-          <p>${item.quantity} ${item.unit} on hand${item.category ? ` - ${item.category}` : ""}</p>
+          <p><span class="emphasis-inline">${item.quantity} ${item.unit}</span> on hand${item.category ? ` - ${item.category}` : ""}</p>
         </div>
         <div class="activity-meta">
           ${badge("Inventory", "neutral")}
@@ -129,7 +129,7 @@ function renderTransactionFeed(items) {
       <article class="activity-card">
         <div>
           <strong>${item.moneyType} Money</strong>
-          <p>${item.createdBy?.name || "System"} - ${item.description || "Manual entry"}</p>
+          <p>${item.createdBy?.name || "System"} - ${item.description || "Manual entry"} <span class="emphasis-inline">${formatCurrency(item.amount)}</span></p>
         </div>
         <div class="activity-meta">
           ${badge(`${item.entryType} ${formatCurrency(item.amount)}`, item.entryType === "SUBTRACT" ? "danger" : item.moneyType === "DIRTY" ? "accent" : "good")}

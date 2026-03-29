@@ -2,7 +2,7 @@ import { api } from "./api.js";
 import { NAV_ITEMS, PERMISSION_LABELS, QUICK_ACTIONS } from "./constants.js";
 import { clearSession, hasPermission, requireAuth } from "./session.js";
 
-export function initProtectedPage({ pageKey, title, subtitle }) {
+export function initProtectedPage({ pageKey, title, subtitle, showQuickActions = pageKey === "DASHBOARD" }) {
   const user = requireAuth(pageKey);
 
   const titleElement = document.querySelector("#pageTitle");
@@ -42,12 +42,12 @@ export function initProtectedPage({ pageKey, title, subtitle }) {
     });
   }
 
-  mountWorkspaceTools();
+  mountWorkspaceTools({ showQuickActions });
 
   return user;
 }
 
-function mountWorkspaceTools() {
+function mountWorkspaceTools({ showQuickActions = false } = {}) {
   const header = document.querySelector(".workspace-header");
   const workspace = document.querySelector(".workspace");
 
@@ -59,7 +59,9 @@ function mountWorkspaceTools() {
   tools.className = "workspace-tools";
   tools.id = "workspaceTools";
 
-  const actions = QUICK_ACTIONS.filter((action) => hasPermission(action.permission));
+  const actions = showQuickActions
+    ? QUICK_ACTIONS.filter((action) => hasPermission(action.permission))
+    : [];
 
   tools.innerHTML = `
     <div class="global-search-panel">
@@ -74,19 +76,21 @@ function mountWorkspaceTools() {
       </div>
       <div class="search-results hidden" id="searchResults"></div>
     </div>
-    <div class="quick-actions-panel">
-      <p class="tool-label">Quick actions</p>
-      <div class="quick-actions-list">
-        ${actions.length
-          ? actions.map((action) => `
-            <a class="quick-action" href="${action.href}">
-              <strong>${action.label}</strong>
-              <small>${action.description}</small>
-            </a>
-          `).join("")
-          : "<div class='search-empty'>No actions available for this user.</div>"}
+    ${showQuickActions ? `
+      <div class="quick-actions-panel">
+        <p class="tool-label">Quick actions</p>
+        <div class="quick-actions-list">
+          ${actions.length
+            ? actions.map((action) => `
+              <a class="quick-action" href="${action.href}">
+                <strong>${action.label}</strong>
+                <small>${action.description}</small>
+              </a>
+            `).join("")
+            : "<div class='search-empty'>No actions available for this user.</div>"}
+        </div>
       </div>
-    </div>
+    ` : ""}
   `;
 
   header.insertAdjacentElement("afterend", tools);

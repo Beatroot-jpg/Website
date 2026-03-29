@@ -297,7 +297,7 @@ function renderRecentMovementFeed(items) {
         <article class="activity-card ${requestedMovementEditId === movement.id ? "editing-card" : ""}">
           <div>
             <strong>${movement.itemName}</strong>
-            <p>${formatMovementType(movement.type)} ${Math.abs(movement.quantityDelta)} ${movement.itemUnit}</p>
+            <p>${formatMovementType(movement.type)} <span class="emphasis-inline">${Math.abs(movement.quantityDelta)} ${movement.itemUnit}</span></p>
           </div>
           <div class="activity-meta">
             ${badge(editable ? "Edit log" : "Source-linked", editable ? "accent" : "neutral")}

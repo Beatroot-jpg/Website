@@ -687,6 +687,36 @@ router.patch(
   })
 );
 
+router.delete(
+  "/collections/:id",
+  asyncHandler(async (req, res) => {
+    const existingCollection = await prisma.distributionCollection.findUnique({
+      where: { id: req.params.id }
+    });
+
+    if (!existingCollection) {
+      throw createError(404, "Collection entry not found.");
+    }
+
+    if (existingCollection.status === "DEPOSITED") {
+      throw createError(400, "Deposited ledger entries must be reverted from the bank ledger.");
+    }
+
+    await prisma.$transaction(async (transaction) => {
+      await transaction.distributionCollection.delete({
+        where: { id: existingCollection.id }
+      });
+
+      await refreshDistributionState(transaction, existingCollection.distributionId);
+    });
+
+    res.json({
+      reverted: true,
+      distributionId: existingCollection.distributionId
+    });
+  })
+);
+
 router.post(
   "/deposits",
   asyncHandler(async (req, res) => {

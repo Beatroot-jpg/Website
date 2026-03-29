@@ -85,7 +85,7 @@ function resetTransactionForm({ clearDraftState = false, clearUrl = true } = {})
   transactionForm.reset();
   transactionIdField.value = "";
   transactionFormTitle.textContent = "Add transaction";
-  transactionFormSubtitle.textContent = "Choose the money type and whether this is a correction or a subtract entry.";
+  transactionFormSubtitle.textContent = "Record the transaction first, then review the running ledger directly underneath it.";
   transactionSubmitButton.textContent = "Record transaction";
   transactionForm.elements.moneyType.value = "CLEAN";
   transactionForm.elements.entryType.value = "CORRECTION";
@@ -164,7 +164,7 @@ function renderSummary(balances, recentTransactions) {
 
 function buildTransactionSourceHref(transaction) {
   if (transaction.sourceSystem === "distribution_deposit") {
-    return "./bank.html?view=dirty#transactionTable";
+    return "./distribution.html#distributionLedgerTable";
   }
 
   if (transaction.distributionId) {
@@ -176,6 +176,19 @@ function buildTransactionSourceHref(transaction) {
   }
 
   return "";
+}
+
+function describeSource(transaction) {
+  if (transaction.sourceSystem === "distribution_deposit") {
+    const linkedCount = transaction.depositedCollections?.length || 0;
+    return linkedCount ? `Distribution deposit - ${linkedCount} ledger ${linkedCount === 1 ? "entry" : "entries"}` : "Distribution deposit";
+  }
+
+  if (transaction.sourceSystem === "manual") {
+    return "Manual entry";
+  }
+
+  return transaction.sourceSystem;
 }
 
 function getSelectedTransactions(transactions = transactionsCache) {
@@ -387,14 +400,22 @@ function renderTransactions(transactions, pagination) {
                 </div>
               </td>
               <td>${transaction.createdBy?.name || "System"}</td>
-              <td>${transaction.sourceSystem}</td>
+              <td>${describeSource(transaction)}</td>
               <td>${transaction.description || "No description"}</td>
               <td>
                 <div class="inline-table-actions">
                   ${transaction.sourceSystem === "manual" && !transaction.distributionId
-                    ? `<button class="mini-action" type="button" data-edit-transaction="${transaction.id}">Edit</button>`
-                    : buildTransactionSourceHref(transaction)
-                      ? `<a class="mini-action" href="${buildTransactionSourceHref(transaction)}">${transaction.sourceSystem === "distribution_deposit" ? "Open ledger" : "View entry"}</a>`
+                    ? `
+                      <button class="mini-action" type="button" data-edit-transaction="${transaction.id}">Edit</button>
+                      <button class="mini-action danger-action" type="button" data-revert-transaction="${transaction.id}">Revert</button>
+                    `
+                    : transaction.sourceSystem === "distribution_deposit"
+                      ? `
+                        <a class="mini-action" href="${buildTransactionSourceHref(transaction)}">Open distribution</a>
+                        <button class="mini-action danger-action" type="button" data-revert-transaction="${transaction.id}">Revert deposit</button>
+                      `
+                      : buildTransactionSourceHref(transaction)
+                        ? `<a class="mini-action" href="${buildTransactionSourceHref(transaction)}">${transaction.sourceSystem === "distribution_deposit" ? "Open ledger" : "View entry"}</a>`
                       : `<span class="badge neutral">System entry</span>`}
                 </div>
               </td>
@@ -415,6 +436,48 @@ function renderTransactions(transactions, pagination) {
       if (transaction) {
         fillTransactionForm(transaction);
         transactionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  });
+
+  tableContainer.querySelectorAll("[data-revert-transaction]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const transaction = transactionsCache.find((entry) => entry.id === button.dataset.revertTransaction);
+
+      if (!transaction) {
+        return;
+      }
+
+      const isDeposit = transaction.sourceSystem === "distribution_deposit";
+      const confirmed = window.confirm(
+        isDeposit
+          ? "Revert this dirty money deposit and move its ledger entries back into the distribution ledger?"
+          : "Revert this manual bank entry?"
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        await api(`/bank/transactions/${transaction.id}/revert`, {
+          method: "POST"
+        });
+
+        if (requestedTransactionEditId === transaction.id || transactionIdField.value === transaction.id) {
+          resetTransactionForm({ clearDraftState: true });
+        }
+
+        currentPage = 1;
+        updateUrlParams({ page: "1", editTransaction: "" }, ["editTransaction"]);
+        await loadBank();
+        announceMutation(isDeposit ? ["bank", "distribution"] : ["bank"]);
+        showToast(
+          isDeposit ? "Deposit reverted. Those ledger entries are editable again from Distribution." : "Bank entry reverted.",
+          "success"
+        );
+      } catch (error) {
+        showToast(error.message, "error");
       }
     });
   });

@@ -214,7 +214,7 @@ function resetRunnerForm({ clearDraftState = false, clearUrl = true } = {}) {
   runnerForm.reset();
   runnerIdField.value = "";
   runnerFormTitle.textContent = "Create runner";
-  runnerFormSubtitle.textContent = "Save a runner with their name and number so you can assign stock fast.";
+  runnerFormSubtitle.textContent = "Enter the runner first, then review the active runner list directly underneath it.";
   runnerSubmitButton.textContent = "Save runner";
   runnerForm.elements.active.checked = true;
   mountFormError(runnerError, "");
@@ -233,7 +233,7 @@ function resetDistributionForm({ clearDraftState = false, clearUrl = true } = {}
   distributionForm.reset();
   distributionIdField.value = "";
   distributionFormTitle.textContent = "Create distribution";
-  distributionFormSubtitle.textContent = "Hand product out to a runner and lock in what they owe back.";
+  distributionFormSubtitle.textContent = "Hand product out here, then review the active distributions in the same section below.";
   distributionSubmitButton.textContent = "Save distribution";
   setDistributionLock(false);
   populateDistributionOptions();
@@ -254,7 +254,7 @@ function resetCollectionForm({ clearDraftState = false, clearUrl = true } = {}) 
   collectionForm.reset();
   collectionEntryIdField.value = "";
   collectionFormTitle.textContent = "Collect payment";
-  collectionFormSubtitle.textContent = "Log what comes back, clear the run, or close it as faulty.";
+  collectionFormSubtitle.textContent = "Log what comes back first, then work through the active ledger entries underneath.";
   collectionSubmitButton.textContent = "Save ledger entry";
   populateCollectionOptions();
   if (collectionDistributionSelect.options.length) {
@@ -740,6 +740,7 @@ function renderLedgerEntries() {
                 <td>
                   <div class="inline-table-actions">
                     <button class="mini-action" type="button" data-edit-entry="${entry.id}">Edit</button>
+                    <button class="mini-action danger-action" type="button" data-revert-entry="${entry.id}">Revert</button>
                     <button class="mini-action" type="button" data-open-distribution="${entry.distributionId}">Open run</button>
                   </div>
                 </td>
@@ -786,6 +787,39 @@ function renderLedgerEntries() {
         fillCollectionForm(entry);
         window.location.hash = "collectionForm";
         collectionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  });
+
+  ledgerTable.querySelectorAll("[data-revert-entry]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const entry = ledgerCache.find((item) => item.id === button.dataset.revertEntry);
+
+      if (!entry) {
+        return;
+      }
+
+      const confirmed = window.confirm("Revert this ledger entry and remove it from the active collection ledger?");
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        await api(`/distribution/collections/${entry.id}`, {
+          method: "DELETE"
+        });
+
+        if (requestedCollectionEditId === entry.id || collectionEntryIdField.value === entry.id) {
+          resetCollectionForm({ clearDraftState: true });
+        }
+
+        selectedLedgerIds.delete(entry.id);
+        await loadPage();
+        announceMutation(["distribution"]);
+        showToast("Ledger entry reverted.", "success");
+      } catch (error) {
+        showToast(error.message, "error");
       }
     });
   });

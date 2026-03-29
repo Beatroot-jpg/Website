@@ -97,6 +97,14 @@ function transactionInclude() {
           }
         }
       }
+    },
+    depositedCollections: {
+      select: {
+        id: true,
+        distributionId: true,
+        amount: true,
+        status: true
+      }
     }
   };
 }
@@ -221,6 +229,70 @@ router.patch(
       transaction: withEntryType(updatedTransaction),
       balances: await getBankBalances()
     });
+  })
+);
+
+router.post(
+  "/transactions/:id/revert",
+  asyncHandler(async (req, res) => {
+    const transaction = await prisma.bankTransaction.findUnique({
+      where: { id: req.params.id },
+      include: {
+        depositedCollections: {
+          select: {
+            id: true
+          }
+        }
+      }
+    });
+
+    if (!transaction) {
+      throw createError(404, "Bank transaction not found.");
+    }
+
+    if (transaction.sourceSystem === "manual" && !transaction.distributionId) {
+      await prisma.bankTransaction.delete({
+        where: { id: transaction.id }
+      });
+
+      return res.json({
+        reverted: true,
+        revertType: "manual",
+        balances: await getBankBalances()
+      });
+    }
+
+    if (transaction.sourceSystem === "distribution_deposit") {
+      if (!transaction.depositedCollections.length) {
+        throw createError(400, "No deposited ledger entries were linked to this bank transaction.");
+      }
+
+      await prisma.$transaction(async (dbTransaction) => {
+        await dbTransaction.distributionCollection.updateMany({
+          where: {
+            bankTransactionId: transaction.id
+          },
+          data: {
+            status: "PENDING",
+            bankTransactionId: null,
+            depositedAt: null
+          }
+        });
+
+        await dbTransaction.bankTransaction.delete({
+          where: { id: transaction.id }
+        });
+      });
+
+      return res.json({
+        reverted: true,
+        revertType: "distribution_deposit",
+        restoredEntries: transaction.depositedCollections.length,
+        balances: await getBankBalances()
+      });
+    }
+
+    throw createError(400, "This transaction must be changed from its source system.");
   })
 );
 
