@@ -36,13 +36,11 @@
           </div>
         </header>
 
-        <section class="metric-grid" id="rosterSummary"></section>
-
-        <section class="split-grid">
+        <section class="workflow-stack">
           <article class="panel">
             <div class="panel-header">
               <h2 id="rosterFormTitle">Add roster member</h2>
-              <p id="rosterFormSubtitle">Create a new entry with rank, status, join date, and lineup order.</p>
+              <p id="rosterFormSubtitle">Add or edit a member first, then review the roster summary and full lineup below.</p>
             </div>
 
             <form class="stack-form" id="rosterForm">
@@ -91,10 +89,14 @@
 
               <p class="form-error hidden" id="rosterError"></p>
             </form>
-          </article>
 
-          <article class="panel">
-            <div class="panel-header">
+            <div class="panel-header section-divider">
+              <h2>Roster overview</h2>
+              <p>The key roster counts sit here first so the table makes sense before you scan the full lineup.</p>
+            </div>
+            <div class="metric-grid" id="rosterSummary"></div>
+
+            <div class="panel-header section-divider">
               <h2>Roster lineup</h2>
               <p>Every entry can be reopened and edited after saving, including status and order.</p>
             </div>

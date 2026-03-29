@@ -216,29 +216,29 @@ textarea:focus {
 }
 
 .workflow-stack {
-  gap: 1.7rem;
+  gap: 2rem;
 }
 
 .workflow-pair {
-  grid-template-columns: minmax(360px, 0.92fr) minmax(0, 1.28fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 1rem;
+  gap: 1.35rem;
 }
 
 .auth-shell {
   min-height: calc(100vh - 2rem);
-  grid-template-columns: 1.15fr 0.82fr;
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
 }
 
 .app-shell {
   min-height: calc(100vh - 2rem);
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 250px minmax(0, 1fr);
   align-items: start;
 }
 
 .split-grid {
-  grid-template-columns: minmax(360px, 0.92fr) minmax(0, 1.28fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .action-grid {
@@ -256,20 +256,20 @@ textarea:focus {
 }
 
 .feed-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .metric-grid {
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .field-grid,
 .permission-list {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .feature-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .auth-panel,
@@ -336,7 +336,7 @@ textarea:focus {
 .workspace-header,
 .panel,
 .sidebar {
-  padding: 1.4rem;
+  padding: 1.5rem;
 }
 
 .panel {
@@ -424,7 +424,7 @@ label span,
 
 .workspace {
   align-content: start;
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 
 .field-stack {
@@ -607,8 +607,9 @@ label span,
 }
 
 .workspace-tools {
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
+  gap: 1.1rem;
 }
 
 .tool-label {
@@ -688,7 +689,7 @@ label span,
 }
 
 .quick-actions-list {
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .quick-action {
@@ -856,7 +857,7 @@ label span,
 
 .panel-header {
   margin-bottom: 0;
-  padding-bottom: 0.75rem;
+  padding-bottom: 0.9rem;
   border-bottom: 2px solid var(--line);
 }
 
@@ -938,13 +939,14 @@ label span,
   border: 2px solid var(--line);
   background: rgba(14, 16, 20, 0.98);
   box-shadow: var(--shadow-soft);
+  width: 100%;
 }
 
 .data-table {
   width: 100%;
   min-width: 100%;
   border-collapse: collapse;
-  table-layout: auto;
+  table-layout: fixed;
 }
 
 .data-table th,
@@ -1009,8 +1011,8 @@ label span,
 }
 
 .section-divider {
-  margin-top: 0.2rem;
-  padding-top: 1rem;
+  margin-top: 0.55rem;
+  padding-top: 1.15rem;
   border-top: 2px solid var(--line);
 }
 
@@ -1300,5 +1302,9 @@ label span,
 
   .brand-logo {
     width: 64px;
+  }
+
+  .app-shell {
+    grid-template-columns: 1fr;
   }
 }

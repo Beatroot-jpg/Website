@@ -36,13 +36,19 @@
           </div>
         </header>
 
-        <section class="metric-grid" id="bankSummary"></section>
+        <section class="workflow-stack">
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Bank overview</h2>
+              <p>Keep the running balances as a simple stacked overview before working in the ledger.</p>
+            </div>
+            <div class="metric-grid" id="bankSummary"></div>
+          </article>
 
-        <section class="split-grid">
           <article class="panel">
             <div class="panel-header">
               <h2 id="transactionFormTitle">Add transaction</h2>
-              <p id="transactionFormSubtitle">Choose the money type and whether this is a correction or a subtract entry.</p>
+              <p id="transactionFormSubtitle">Record the transaction first, then review the running ledger directly underneath it.</p>
             </div>
 
             <form class="stack-form" id="transactionForm">
@@ -77,12 +83,10 @@
               </div>
               <p class="form-error hidden" id="transactionError"></p>
             </form>
-          </article>
 
-          <article class="panel">
-            <div class="panel-header">
+            <div class="panel-header section-divider">
               <h2>Transaction history</h2>
-              <p>Manual and system-linked ledger entries with clean and dirty money tracked separately.</p>
+              <p>Keep the live ledger directly under the entry form so people can record and confirm in one place.</p>
             </div>
             <div id="transactionTable"></div>
             <div class="pager" id="transactionPagination"></div>
