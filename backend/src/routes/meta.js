@@ -26,6 +26,7 @@ router.get(
 
     const allowed = new Set(req.user.permissions);
     const canViewInventory = allowed.has("INVENTORY") || req.user.role === "ADMIN";
+    const canViewRoster = allowed.has("ROSTER") || req.user.role === "ADMIN";
     const canViewBank = allowed.has("BANK") || req.user.role === "ADMIN";
     const canViewDistribution = allowed.has("DISTRIBUTION") || req.user.role === "ADMIN";
     const canViewUsers = allowed.has("USERS") || req.user.role === "ADMIN";
@@ -58,6 +59,35 @@ router.get(
           subtitle: `${item.sku || "No SKU"} - ${item.quantity} ${item.unit}`,
           href: `./inventory.html?editItem=${item.id}#inventoryForm`,
           tone: item.quantity <= 0 ? "warn" : "accent",
+          sortAt: item.updatedAt
+        })))
+        : [],
+      canViewRoster
+        ? prisma.rosterMember.findMany({
+          where: {
+            OR: [
+              { name: containsFilter },
+              { discordName: containsFilter },
+              { rank: containsFilter }
+            ]
+          },
+          orderBy: [{ displayOrder: "asc" }, { updatedAt: "desc" }],
+          take: 4,
+          select: {
+            id: true,
+            name: true,
+            discordName: true,
+            rank: true,
+            status: true,
+            updatedAt: true
+          }
+        }).then((items) => items.map((item) => ({
+          id: `roster-${item.id}`,
+          group: "Roster",
+          title: item.name,
+          subtitle: `${item.rank} - ${item.discordName} - ${item.status}`,
+          href: `./roster.html?editMember=${item.id}#rosterForm`,
+          tone: item.status === "ACTIVE" ? "good" : item.status === "LOA" ? "warn" : "neutral",
           sortAt: item.updatedAt
         })))
         : [],

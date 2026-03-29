@@ -11,6 +11,7 @@ import inventoryRoutes from "./routes/inventory.js";
 import bankRoutes from "./routes/bank.js";
 import distributionRoutes from "./routes/distribution.js";
 import dashboardRoutes from "./routes/dashboard.js";
+import rosterRoutes from "./routes/roster.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -45,6 +46,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/bank", bankRoutes);
 app.use("/api/distribution", distributionRoutes);
+app.use("/api/roster", rosterRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 
 app.use((error, _req, res, _next) => {

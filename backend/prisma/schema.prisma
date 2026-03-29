@@ -14,6 +14,7 @@ enum Role {
 
 enum PermissionKey {
   DASHBOARD
+  ROSTER
   INVENTORY
   BANK
   DISTRIBUTION
@@ -37,6 +38,12 @@ enum DistributionStatus {
   IN_TRANSIT
   COMPLETED
   CANCELLED
+}
+
+enum RosterStatus {
+  ACTIVE
+  LOA
+  INACTIVE
 }
 
 model User {
@@ -118,4 +125,18 @@ model Distribution {
   bankTransaction BankTransaction?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
+}
+
+model RosterMember {
+  id          String       @id @default(cuid())
+  name        String
+  discordName String
+  rank        String
+  status      RosterStatus @default(ACTIVE)
+  dateJoined  DateTime
+  displayOrder Int
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([displayOrder])
 }

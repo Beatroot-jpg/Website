@@ -6,6 +6,12 @@ export const NAV_ITEMS = [
     description: "Overview"
   },
   {
+    key: "ROSTER",
+    label: "Roster",
+    href: "./roster.html",
+    description: "Team lineup"
+  },
+  {
     key: "INVENTORY",
     label: "Inventory",
     href: "./inventory.html",
@@ -32,6 +38,12 @@ export const NAV_ITEMS = [
 ];
 
 export const QUICK_ACTIONS = [
+  {
+    permission: "ROSTER",
+    label: "Add member",
+    href: "./roster.html#rosterForm",
+    description: "Update lineup"
+  },
   {
     permission: "INVENTORY",
     label: "Add item",
@@ -66,6 +78,7 @@ export const QUICK_ACTIONS = [
 
 export const PERMISSION_LABELS = {
   DASHBOARD: "Dashboard",
+  ROSTER: "Roster",
   INVENTORY: "Inventory",
   BANK: "Bank",
   DISTRIBUTION: "Distribution",
@@ -76,21 +89,21 @@ export const PERMISSION_PRESETS = [
   {
     key: "INVENTORY_STAFF",
     label: "Inventory Staff",
-    permissions: ["DASHBOARD", "INVENTORY"]
+    permissions: ["DASHBOARD", "ROSTER", "INVENTORY"]
   },
   {
     key: "FINANCE",
     label: "Finance",
-    permissions: ["DASHBOARD", "BANK"]
+    permissions: ["DASHBOARD", "ROSTER", "BANK"]
   },
   {
     key: "DISTRIBUTOR",
     label: "Distributor",
-    permissions: ["DASHBOARD", "INVENTORY", "DISTRIBUTION"]
+    permissions: ["DASHBOARD", "ROSTER", "INVENTORY", "DISTRIBUTION"]
   },
   {
     key: "OPERATIONS",
     label: "Operations",
-    permissions: ["DASHBOARD", "INVENTORY", "BANK", "DISTRIBUTION"]
+    permissions: ["DASHBOARD", "ROSTER", "INVENTORY", "BANK", "DISTRIBUTION"]
   }
 ];

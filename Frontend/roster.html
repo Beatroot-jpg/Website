@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Distribution</title>
+    <title>Roster</title>
     <link rel="stylesheet" href="./assets/css/styles.css">
     <script src="./assets/js/runtime-config.js"></script>
     <script src="./assets/js/config.js"></script>
@@ -20,13 +20,13 @@
         </div>
         <p class="sidebar-section-title">Sections</p>
         <nav class="nav-list" id="sidebarNav"></nav>
-        <div class="sidebar-footer">Assign stock clearly, track progress, and capture cash collection in one flow.</div>
+        <div class="sidebar-footer">Keep names, ranks, statuses, and lineup order easy to manage from one roster page.</div>
       </aside>
 
       <main class="workspace">
         <header class="workspace-header">
           <div>
-            <p class="eyebrow">Distribution</p>
+            <p class="eyebrow">Roster</p>
             <h1 id="pageTitle"></h1>
             <p class="muted" id="pageSubtitle"></p>
           </div>
@@ -36,72 +36,75 @@
           </div>
         </header>
 
+        <section class="metric-grid" id="rosterSummary"></section>
+
         <section class="split-grid">
           <article class="panel">
             <div class="panel-header">
-              <h2 id="distributionFormTitle">Create assignment</h2>
-              <p id="distributionFormSubtitle">Allocate inventory to a person and log any incoming cash at the same time.</p>
+              <h2 id="rosterFormTitle">Add roster member</h2>
+              <p id="rosterFormSubtitle">Create a new entry with rank, status, join date, and lineup order.</p>
             </div>
 
-            <form class="stack-form" id="distributionForm">
-              <input type="hidden" id="distributionId" name="distributionId">
+            <form class="stack-form" id="rosterForm">
+              <input type="hidden" id="rosterMemberId" name="rosterMemberId">
+
               <label class="field-stack">
-                <span>Item</span>
-                <select id="distributionItemId" name="itemId"></select>
+                <span>Name</span>
+                <input type="text" name="name" placeholder="Full name" required>
               </label>
+
               <label class="field-stack">
-                <span>Assign to</span>
-                <select id="distributionAssignedToId" name="assignedToId"></select>
+                <span>Discord name</span>
+                <input type="text" name="discordName" placeholder="username#0001" required>
               </label>
+
               <div class="field-grid">
                 <label class="field-stack">
-                  <span>Quantity</span>
-                  <input type="number" min="1" name="quantity" required>
+                  <span>Rank</span>
+                  <input type="text" name="rank" placeholder="Associate" required>
                 </label>
                 <label class="field-stack">
                   <span>Status</span>
                   <select name="status">
-                    <option value="ASSIGNED">Assigned</option>
-                    <option value="IN_TRANSIT">In transit</option>
-                    <option value="COMPLETED">Completed</option>
-                    <option value="CANCELLED">Cancelled</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="LOA">LOA</option>
+                    <option value="INACTIVE">Inactive</option>
                   </select>
                 </label>
               </div>
+
               <div class="field-grid">
                 <label class="field-stack">
-                  <span>Unit price</span>
-                  <input type="number" min="0" step="0.01" name="unitPrice" placeholder="Optional">
+                  <span>Date joined</span>
+                  <input type="date" name="dateJoined" required>
                 </label>
                 <label class="field-stack">
-                  <span>Amount collected</span>
-                  <input type="number" min="0" step="0.01" name="amountCollected" placeholder="Optional">
+                  <span>Order</span>
+                  <input type="number" min="1" name="displayOrder" placeholder="1" required>
                 </label>
               </div>
-              <label class="field-stack">
-                <span>Notes</span>
-                <textarea name="notes" placeholder="Optional notes about this assignment"></textarea>
-              </label>
+
               <div class="inline-actions">
-                <button class="primary-button" id="distributionSubmitButton" type="submit">Save distribution</button>
-                <button class="ghost-button" id="resetDistributionForm" type="button">Reset form</button>
+                <button class="primary-button" id="rosterSubmitButton" type="submit">Save member</button>
+                <button class="ghost-button" id="resetRosterForm" type="button">Reset form</button>
               </div>
-              <p class="form-error hidden" id="distributionError"></p>
+
+              <p class="form-error hidden" id="rosterError"></p>
             </form>
           </article>
 
           <article class="panel">
             <div class="panel-header">
-              <h2>Distribution history</h2>
-              <p>Assignments are listed here with linked bank activity where relevant.</p>
+              <h2>Roster lineup</h2>
+              <p>Every entry can be reopened and edited after saving, including status and order.</p>
             </div>
-            <div id="distributionTable"></div>
+            <div id="rosterTable"></div>
           </article>
         </section>
       </main>
     </div>
 
     <div class="toast-stack" id="toastStack"></div>
-    <script type="module" src="./assets/js/distribution.js"></script>
+    <script type="module" src="./assets/js/roster.js"></script>
   </body>
 </html>

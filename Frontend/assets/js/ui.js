@@ -68,7 +68,7 @@ function mountWorkspaceTools() {
         <input
           type="search"
           id="globalSearchInput"
-          placeholder="Search inventory, distributions, bank records, or users"
+          placeholder="Search roster, inventory, distributions, bank records, or users"
           autocomplete="off"
         >
       </div>
@@ -235,6 +235,16 @@ export function formatDate(value) {
   }).format(new Date(value));
 }
 
+export function formatDateOnly(value) {
+  if (!value) {
+    return "Not available";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium"
+  }).format(new Date(value));
+}
+
 export function badge(label, tone = "neutral") {
   return `<span class="badge ${tone}">${label}</span>`;
 }
@@ -252,6 +262,17 @@ export function distributionStatusBadge(status) {
       : normalized === "IN_TRANSIT"
         ? "warn"
         : "accent";
+
+  return badge(humanizeStatus(normalized), tone);
+}
+
+export function rosterStatusBadge(status) {
+  const normalized = `${status || ""}`.toUpperCase();
+  const tone = normalized === "ACTIVE"
+    ? "good"
+    : normalized === "LOA"
+      ? "warn"
+      : "neutral";
 
   return badge(humanizeStatus(normalized), tone);
 }
