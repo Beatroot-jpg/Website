@@ -20,7 +20,7 @@
         </div>
         <p class="sidebar-section-title">Sections</p>
         <nav class="nav-list" id="sidebarNav"></nav>
-        <div class="sidebar-footer">Assign stock clearly, track progress, and capture cash collection in one flow.</div>
+        <div class="sidebar-footer">Create runners, hand out product, log collections, and push dirty cash into the bank when it is ready.</div>
       </aside>
 
       <main class="workspace">
@@ -36,22 +36,50 @@
           </div>
         </header>
 
+        <section class="metric-grid" id="distributionSummary"></section>
+
         <section class="split-grid">
           <article class="panel">
             <div class="panel-header">
-              <h2 id="distributionFormTitle">Create assignment</h2>
-              <p id="distributionFormSubtitle">Allocate inventory to a person and log any incoming cash at the same time.</p>
+              <h2 id="runnerFormTitle">Create runner</h2>
+              <p id="runnerFormSubtitle">Save a runner with their name and number so you can assign stock fast.</p>
+            </div>
+
+            <form class="stack-form" id="runnerForm">
+              <input type="hidden" id="distributorId" name="distributorId">
+              <label class="field-stack">
+                <span>Name</span>
+                <input type="text" name="name" placeholder="Runner name" required>
+              </label>
+              <label class="field-stack">
+                <span>Number</span>
+                <input type="text" name="number" placeholder="0400 000 000" required>
+              </label>
+              <label class="permission-option">
+                <input type="checkbox" name="active" checked>
+                <span>Active runner</span>
+              </label>
+              <div class="inline-actions">
+                <button class="primary-button" id="runnerSubmitButton" type="submit">Save runner</button>
+                <button class="ghost-button" id="resetRunnerForm" type="button">Reset form</button>
+              </div>
+              <p class="form-error hidden" id="runnerError"></p>
+            </form>
+
+            <div class="panel-header section-divider">
+              <h2 id="distributionFormTitle">Create distribution</h2>
+              <p id="distributionFormSubtitle">Hand product out to a runner and lock in what they owe back.</p>
             </div>
 
             <form class="stack-form" id="distributionForm">
               <input type="hidden" id="distributionId" name="distributionId">
               <label class="field-stack">
-                <span>Item</span>
-                <select id="distributionItemId" name="itemId"></select>
+                <span>Runner</span>
+                <select id="distributionRunnerId" name="distributorId"></select>
               </label>
               <label class="field-stack">
-                <span>Assign to</span>
-                <select id="distributionAssignedToId" name="assignedToId"></select>
+                <span>Item</span>
+                <select id="distributionItemId" name="itemId"></select>
               </label>
               <div class="field-grid">
                 <label class="field-stack">
@@ -59,28 +87,14 @@
                   <input type="number" min="1" name="quantity" required>
                 </label>
                 <label class="field-stack">
-                  <span>Status</span>
-                  <select name="status">
-                    <option value="ASSIGNED">Assigned</option>
-                    <option value="IN_TRANSIT">In transit</option>
-                    <option value="COMPLETED">Completed</option>
-                    <option value="CANCELLED">Cancelled</option>
-                  </select>
+                  <span>Value per item</span>
+                  <input type="number" min="0" step="0.01" name="unitValue" placeholder="0.00" required>
                 </label>
               </div>
-              <div class="field-grid">
-                <label class="field-stack">
-                  <span>Unit price</span>
-                  <input type="number" min="0" step="0.01" name="unitPrice" placeholder="Optional">
-                </label>
-                <label class="field-stack">
-                  <span>Amount collected</span>
-                  <input type="number" min="0" step="0.01" name="amountCollected" placeholder="Optional">
-                </label>
-              </div>
+              <p class="muted" id="distributionTotalHint">Total owed will calculate here.</p>
               <label class="field-stack">
                 <span>Notes</span>
-                <textarea name="notes" placeholder="Optional notes about this assignment"></textarea>
+                <textarea name="notes" placeholder="Optional notes about this run"></textarea>
               </label>
               <div class="inline-actions">
                 <button class="primary-button" id="distributionSubmitButton" type="submit">Save distribution</button>
@@ -88,14 +102,70 @@
               </div>
               <p class="form-error hidden" id="distributionError"></p>
             </form>
+
+            <div class="panel-header section-divider" id="collectionForm">
+              <h2 id="collectionFormTitle">Collect payment</h2>
+              <p id="collectionFormSubtitle">Log what comes back, clear the run, or close it as faulty.</p>
+            </div>
+
+            <form class="stack-form" id="collectionEntryForm">
+              <input type="hidden" id="collectionEntryId" name="collectionEntryId">
+              <label class="field-stack">
+                <span>Active distribution</span>
+                <select id="collectionDistributionId" name="distributionId"></select>
+              </label>
+              <p class="muted" id="collectionBalanceHint">Select an active distribution to see what is still owed.</p>
+              <div class="field-grid">
+                <label class="field-stack">
+                  <span>Amount returned</span>
+                  <input type="number" min="0" step="0.01" name="amount" placeholder="0.00" required>
+                </label>
+                <label class="field-stack">
+                  <span>Action</span>
+                  <select name="action">
+                    <option value="PARTIAL_PAYMENT">Partial payment</option>
+                    <option value="FULL_CLEAR">Full clear</option>
+                    <option value="FAULTY_CLEAR">Faulty clear</option>
+                  </select>
+                </label>
+              </div>
+              <label class="field-stack">
+                <span>Note</span>
+                <textarea name="note" placeholder="Optional collection note"></textarea>
+              </label>
+              <div class="inline-actions">
+                <button class="secondary-button" id="collectionSubmitButton" type="submit">Save ledger entry</button>
+                <button class="ghost-button" id="resetCollectionForm" type="button">Reset form</button>
+              </div>
+              <p class="form-error hidden" id="collectionError"></p>
+            </form>
           </article>
 
           <article class="panel">
             <div class="panel-header">
-              <h2>Distribution history</h2>
-              <p>Assignments are listed here with linked bank activity where relevant.</p>
+              <h2>Active distributions</h2>
+              <p>Track who has what, what they owe, and what is still outstanding.</p>
             </div>
             <div id="distributionTable"></div>
+          </article>
+        </section>
+
+        <section class="feed-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Runners</h2>
+              <p>Saved distributor contacts you can reuse for future product handouts.</p>
+            </div>
+            <div id="distributorTable"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Collection ledger</h2>
+              <p>Pending cash stays here until you select it and deposit it into Dirty Money.</p>
+            </div>
+            <div id="ledgerToolbar"></div>
+            <div id="distributionLedgerTable"></div>
           </article>
         </section>
       </main>

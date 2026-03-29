@@ -255,11 +255,11 @@ function humanizeStatus(status) {
 
 export function distributionStatusBadge(status) {
   const normalized = `${status || ""}`.toUpperCase();
-  const tone = normalized === "COMPLETED"
+  const tone = normalized === "COMPLETED" || normalized === "CLEARED"
     ? "good"
-    : normalized === "CANCELLED"
+    : normalized === "CANCELLED" || normalized === "FAULTY"
       ? "danger"
-      : normalized === "IN_TRANSIT"
+      : normalized === "IN_TRANSIT" || normalized === "PARTIAL"
         ? "warn"
         : "accent";
 

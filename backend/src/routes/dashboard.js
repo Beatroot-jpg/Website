@@ -179,10 +179,16 @@ router.get(
     }
 
     if (canViewDistribution) {
-      const [distributionCount, distributionItems] = await Promise.all([
-        prisma.distribution.count(),
-        prisma.distribution.findMany({
-          orderBy: { createdAt: "desc" },
+      const [distributionCount, distributionItems, pendingCollections] = await Promise.all([
+        prisma.runnerDistribution.count({
+          where: {
+            status: {
+              in: ["ACTIVE", "PARTIAL"]
+            }
+          }
+        }),
+        prisma.runnerDistribution.findMany({
+          orderBy: { updatedAt: "desc" },
           take: 5,
           include: {
             item: {
@@ -190,41 +196,61 @@ router.get(
                 name: true
               }
             },
-            assignedTo: {
+            distributor: {
               select: {
-                name: true
+                name: true,
+                number: true
               }
             }
+          }
+        }),
+        prisma.distributionCollection.findMany({
+          where: {
+            status: "PENDING"
+          },
+          select: {
+            amount: true
           }
         })
       ]);
 
       recentDistributions = distributionItems;
+      const pendingDirtyCash = pendingCollections.reduce((sum, entry) => sum + Number(entry.amount), 0);
 
-      metrics.push({
-        label: "Distributions",
-        value: distributionCount,
-        tone: "neutral",
-        note: "View assignments",
-        href: "./distribution.html?view=open#distributionTable"
-      });
+      metrics.push(
+        {
+          label: "Active distributions",
+          value: distributionCount,
+          tone: "neutral",
+          note: "View active runs",
+          href: "./distribution.html?view=active#distributionTable"
+        },
+        {
+          label: "Pending dirty cash",
+          value: pendingDirtyCash,
+          tone: "accent",
+          currency: true,
+          note: "Deposit from ledger",
+          href: "./distribution.html?view=ledger-pending#distributionLedgerTable"
+        }
+      );
 
       recentActivity.push(
         ...distributionItems.map((distribution) => ({
           id: `distribution-${distribution.id}`,
           category: "Distribution",
           title: distribution.item.name,
-          detail: `${distribution.quantity} units assigned to ${distribution.assignedTo.name}`,
+          detail: `${distribution.quantity} units to ${distribution.distributor.name} for $${Number(distribution.totalOwed).toFixed(2)}`,
           badgeLabel: distribution.status,
-          tone: distribution.status === "CANCELLED"
+          tone: distribution.status === "FAULTY"
             ? "danger"
-            : distribution.status === "COMPLETED"
+            : distribution.status === "CLEARED"
               ? "good"
-              : distribution.status === "IN_TRANSIT"
+              : distribution.status === "PARTIAL"
                 ? "warn"
                 : "accent",
-          createdAt: distribution.createdAt,
-          href: `./distribution.html?editDistribution=${distribution.id}#distributionForm`
+          createdAt: distribution.updatedAt,
+          href: `./distribution.html?editDistribution=${distribution.id}#collectionForm`
         }))
       );
     }

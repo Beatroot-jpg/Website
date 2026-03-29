@@ -66,7 +66,7 @@ export const QUICK_ACTIONS = [
     permission: "DISTRIBUTION",
     label: "New distribution",
     href: "./distribution.html#distributionForm",
-    description: "Assign stock"
+    description: "Create run"
   },
   {
     permission: "USERS",

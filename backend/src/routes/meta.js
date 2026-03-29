@@ -98,15 +98,16 @@ router.get(
         })))
         : [],
       canViewDistribution
-        ? prisma.distribution.findMany({
+        ? prisma.runnerDistribution.findMany({
           where: {
             OR: [
               { item: { name: containsFilter } },
-              { assignedTo: { name: containsFilter } },
+              { distributor: { name: containsFilter } },
+              { distributor: { number: containsFilter } },
               { notes: containsFilter }
             ]
           },
-          orderBy: { createdAt: "desc" },
+          orderBy: { updatedAt: "desc" },
           take: 4,
           include: {
             item: {
@@ -115,9 +116,10 @@ router.get(
                 name: true
               }
             },
-            assignedTo: {
+            distributor: {
               select: {
-                name: true
+                name: true,
+                number: true
               }
             }
           }
@@ -125,10 +127,10 @@ router.get(
           id: `distribution-${item.id}`,
           group: "Distribution",
           title: item.item.name,
-          subtitle: `${item.quantity} units for ${item.assignedTo.name}`,
-          href: `./distribution.html?editDistribution=${item.id}#distributionForm`,
-          tone: item.status === "COMPLETED" ? "good" : item.status === "CANCELLED" ? "danger" : "accent",
-          sortAt: item.createdAt
+          subtitle: `${item.quantity} units for ${item.distributor.name} - ${item.status}`,
+          href: `./distribution.html?editDistribution=${item.id}#collectionForm`,
+          tone: item.status === "CLEARED" ? "good" : item.status === "FAULTY" ? "danger" : item.status === "PARTIAL" ? "warn" : "accent",
+          sortAt: item.updatedAt
         })))
         : [],
       canViewBank

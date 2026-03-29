@@ -87,20 +87,20 @@ function renderActivity(items) {
 
 function renderDistributionFeed(items) {
   if (!items.length) {
-    distributionFeed.innerHTML = renderEmptyState("No distributions yet", "Assignments will show up here after the first distribution is created.");
+    distributionFeed.innerHTML = renderEmptyState("No distributions yet", "Active runner distributions will show up here after the first one is created.");
     return;
   }
 
   distributionFeed.innerHTML = items.map((item) => `
-    <a class="activity-link" href="./distribution.html?editDistribution=${item.id}#distributionForm">
+    <a class="activity-link" href="./distribution.html?editDistribution=${item.id}#collectionForm">
       <article class="activity-card">
         <div>
           <strong>${item.item.name}</strong>
-          <p>${item.quantity} units assigned to ${item.assignedTo.name}</p>
+          <p>${item.quantity} units with ${item.distributor.name} (${item.distributor.number})</p>
         </div>
         <div class="activity-meta">
           ${distributionStatusBadge(item.status)}
-          <small>${formatDate(item.createdAt)}</small>
+          <small>${formatDate(item.updatedAt || item.createdAt)}</small>
         </div>
       </article>
     </a>
@@ -114,7 +114,7 @@ function renderTransactionFeed(items) {
   }
 
   transactionFeed.innerHTML = items.map((item) => `
-    <a class="activity-link" href="${item.distribution?.id && hasPermission("DISTRIBUTION") ? `./distribution.html?editDistribution=${item.distribution.id}#distributionForm` : `./bank.html${item.distribution?.id ? `?search=${encodeURIComponent(item.description || item.moneyType)}#transactionTable` : `?editTransaction=${item.id}#transactionForm`}`}">
+    <a class="activity-link" href="${item.distribution?.id && hasPermission("DISTRIBUTION") ? `./distribution.html?editDistribution=${item.distribution.id}#collectionForm` : `./bank.html${item.distribution?.id ? `?search=${encodeURIComponent(item.description || item.moneyType)}#transactionTable` : `?editTransaction=${item.id}#transactionForm`}`}">
       <article class="activity-card">
         <div>
           <strong>${item.moneyType} Money</strong>
