@@ -36,101 +36,103 @@
           </div>
         </header>
 
-        <section class="action-grid">
-          <article class="panel">
-            <div class="panel-header">
-              <h2 id="inventoryFormTitle">Create item</h2>
-              <p id="inventoryFormSubtitle">Add a new inventory item and optional opening stock.</p>
-            </div>
+        <section class="workflow-stack">
+          <div class="workflow-pair">
+            <article class="panel">
+              <div class="panel-header">
+                <h2 id="inventoryFormTitle">Create item</h2>
+                <p id="inventoryFormSubtitle">Add a new inventory item and optional opening stock.</p>
+              </div>
 
-            <form class="stack-form" id="inventoryForm">
-              <input type="hidden" id="inventoryItemId" name="inventoryItemId">
-              <label class="field-stack">
-                <span>Name</span>
-                <input type="text" name="name" placeholder="Product name" required>
-              </label>
-              <label class="field-stack">
-                <span>Category</span>
-                <input type="text" name="category" placeholder="Consumables">
-              </label>
-              <div class="field-grid">
+              <form class="stack-form" id="inventoryForm">
+                <input type="hidden" id="inventoryItemId" name="inventoryItemId">
                 <label class="field-stack">
-                  <span>Unit</span>
-                  <input type="text" name="unit" value="unit">
+                  <span>Name</span>
+                  <input type="text" name="name" placeholder="Product name" required>
                 </label>
                 <label class="field-stack">
-                  <span>Starting quantity</span>
-                  <input type="number" min="0" name="quantity" value="0">
+                  <span>Category</span>
+                  <input type="text" name="category" placeholder="Consumables">
                 </label>
-              </div>
-              <label class="field-stack">
-                <span>Notes</span>
-                <textarea name="notes" placeholder="Optional notes about the item"></textarea>
-              </label>
-              <div class="inline-actions">
-                <button class="primary-button" id="inventorySubmitButton" type="submit">Create item</button>
-                <button class="ghost-button" id="resetInventoryForm" type="button">Reset form</button>
-              </div>
-              <p class="muted" id="inventoryQuantityHint">Starting quantity is only used when creating a new item.</p>
-              <p class="form-error hidden" id="inventoryError"></p>
-            </form>
-          </article>
-
-          <article class="panel">
-            <div class="panel-header">
-              <h2 id="adjustFormTitle">Adjust stock</h2>
-              <p id="adjustFormSubtitle">Apply an add, subtract, or correction movement to an existing item.</p>
-            </div>
-
-            <form class="stack-form" id="adjustForm">
-              <input type="hidden" id="inventoryMovementId" name="inventoryMovementId">
-              <label class="field-stack">
-                <span>Item</span>
-                <select id="adjustItemId" name="itemId"></select>
-              </label>
-              <div class="field-grid">
+                <div class="field-grid">
+                  <label class="field-stack">
+                    <span>Unit</span>
+                    <input type="text" name="unit" value="unit">
+                  </label>
+                  <label class="field-stack">
+                    <span>Starting quantity</span>
+                    <input type="number" min="0" name="quantity" value="0">
+                  </label>
+                </div>
                 <label class="field-stack">
-                  <span>Change</span>
-                  <input type="number" name="quantityDelta" placeholder="-4 or 10" required>
+                  <span>Notes</span>
+                  <textarea name="notes" placeholder="Optional notes about the item"></textarea>
                 </label>
+                <div class="inline-actions">
+                  <button class="primary-button" id="inventorySubmitButton" type="submit">Create item</button>
+                  <button class="ghost-button" id="resetInventoryForm" type="button">Reset form</button>
+                </div>
+                <p class="muted" id="inventoryQuantityHint">Starting quantity is only used when creating a new item.</p>
+                <p class="form-error hidden" id="inventoryError"></p>
+              </form>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <h2>Current inventory</h2>
+                <p>See the live stock list beside the create form so new entries make sense immediately.</p>
+              </div>
+              <div id="inventoryTable"></div>
+            </article>
+          </div>
+
+          <div class="workflow-pair">
+            <article class="panel">
+              <div class="panel-header">
+                <h2 id="adjustFormTitle">Adjust stock</h2>
+                <p id="adjustFormSubtitle">Apply an add, subtract, or correction movement to an existing item.</p>
+              </div>
+
+              <form class="stack-form" id="adjustForm">
+                <input type="hidden" id="inventoryMovementId" name="inventoryMovementId">
                 <label class="field-stack">
-                  <span>Type</span>
-                  <select name="type">
-                    <option value="STOCK_IN">Add</option>
-                    <option value="STOCK_OUT">Subtract</option>
-                    <option value="CORRECTION">Correction</option>
-                  </select>
+                  <span>Item</span>
+                  <select id="adjustItemId" name="itemId"></select>
                 </label>
-              </div>
-              <label class="field-stack">
-                <span>Reason</span>
-                <input type="text" name="reason" placeholder="Received new shipment">
-              </label>
-              <div class="inline-actions">
-                <button class="secondary-button" id="adjustSubmitButton" type="submit">Apply adjustment</button>
-                <button class="ghost-button" id="resetAdjustForm" type="button">Reset form</button>
-              </div>
-              <p class="form-error hidden" id="adjustError"></p>
-            </form>
-          </article>
-        </section>
+                <div class="field-grid">
+                  <label class="field-stack">
+                    <span>Change</span>
+                    <input type="number" name="quantityDelta" placeholder="-4 or 10" required>
+                  </label>
+                  <label class="field-stack">
+                    <span>Type</span>
+                    <select name="type">
+                      <option value="STOCK_IN">Add</option>
+                      <option value="STOCK_OUT">Subtract</option>
+                      <option value="CORRECTION">Correction</option>
+                    </select>
+                  </label>
+                </div>
+                <label class="field-stack">
+                  <span>Reason</span>
+                  <input type="text" name="reason" placeholder="Received new shipment">
+                </label>
+                <div class="inline-actions">
+                  <button class="secondary-button" id="adjustSubmitButton" type="submit">Apply adjustment</button>
+                  <button class="ghost-button" id="resetAdjustForm" type="button">Reset form</button>
+                </div>
+                <p class="form-error hidden" id="adjustError"></p>
+              </form>
+            </article>
 
-        <section class="content-grid">
-          <article class="panel">
-            <div class="panel-header">
-              <h2>Current inventory</h2>
-              <p>Live quantities across all stored items.</p>
-            </div>
-            <div id="inventoryTable"></div>
-          </article>
-
-          <article class="panel">
-            <div class="panel-header">
-              <h2>Recent stock activity</h2>
-              <p>Latest adds, subtracts, and corrections across your items.</p>
-            </div>
-            <div class="stack-list" id="recentMovementFeed"></div>
-          </article>
+            <article class="panel">
+              <div class="panel-header">
+                <h2>Recent stock activity</h2>
+                <p>Keep the latest adds, subtracts, and corrections right beside the adjustment workflow.</p>
+              </div>
+              <div class="stack-list" id="recentMovementFeed"></div>
+            </article>
+          </div>
         </section>
       </main>
     </div>

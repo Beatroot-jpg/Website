@@ -193,6 +193,8 @@ textarea:focus {
 
 .auth-shell,
 .app-shell,
+.workflow-stack,
+.workflow-pair,
 .split-grid,
 .action-grid,
 .content-grid,
@@ -209,8 +211,18 @@ textarea:focus {
 .auth-shell,
 .app-shell {
   width: 100%;
-  max-width: 100%;
+  max-width: 1780px;
   margin: 0 auto;
+}
+
+.workflow-stack {
+  gap: 1.7rem;
+}
+
+.workflow-pair {
+  grid-template-columns: minmax(360px, 0.92fr) minmax(0, 1.28fr);
+  align-items: start;
+  gap: 1rem;
 }
 
 .auth-shell {
@@ -226,7 +238,7 @@ textarea:focus {
 }
 
 .split-grid {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 0.92fr) minmax(0, 1.28fr);
 }
 
 .action-grid {
@@ -244,20 +256,20 @@ textarea:focus {
 }
 
 .feed-grid {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .metric-grid {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
 .field-grid,
 .permission-list {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .feature-grid {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .auth-panel,
@@ -595,7 +607,7 @@ label span,
 }
 
 .workspace-tools {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
   align-items: start;
 }
 
@@ -676,7 +688,7 @@ label span,
 }
 
 .quick-actions-list {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .quick-action {
@@ -932,7 +944,7 @@ label span,
   width: 100%;
   min-width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
 }
 
 .data-table th,
@@ -1246,6 +1258,7 @@ label span,
 @media (max-width: 1180px) {
   .auth-shell,
   .app-shell,
+  .workflow-pair,
   .split-grid,
   .action-grid,
   .content-grid,
