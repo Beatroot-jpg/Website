@@ -2,6 +2,7 @@ import { api } from "./api.js";
 import { announceMutation, subscribeToMutations } from "./live.js";
 import { hasPermission } from "./session.js";
 import {
+  bankMoneyBadge,
   bankTransactionBadge,
   formatCurrency,
   formatDate,
@@ -25,11 +26,12 @@ import {
 initProtectedPage({
   pageKey: "BANK",
   title: "Bank ledger",
-  subtitle: "Monitor balance changes and log manual credits or debits."
+  subtitle: "Track clean and dirty money with simple correction and subtract entries."
 });
 
 const summaryGrid = document.querySelector("#bankSummary");
 const tableContainer = document.querySelector("#transactionTable");
+const paginationContainer = document.querySelector("#transactionPagination");
 const transactionForm = document.querySelector("#transactionForm");
 const transactionError = document.querySelector("#transactionError");
 const transactionIdField = document.querySelector("#transactionId");
@@ -41,8 +43,10 @@ const toolbarHost = document.createElement("div");
 const initialParams = new URLSearchParams(window.location.search);
 const searchQuery = (initialParams.get("search") || "").trim().toLowerCase();
 const activeView = initialParams.get("view") || "";
+let currentPage = Number.parseInt(initialParams.get("page") || "1", 10);
 let requestedTransactionEditId = initialParams.get("editTransaction") || "";
 const transactionDraft = bindDraftForm(transactionForm, "bank-transaction");
+const pageSize = 12;
 
 toolbarHost.className = "collection-tools";
 tableContainer.before(toolbarHost);
@@ -50,6 +54,11 @@ tableContainer.before(toolbarHost);
 let hasShownFilterMessage = false;
 let transactionsCache = [];
 let selectedTransactionIds = new Set();
+let paginationState = { page: 1, totalPages: 1, total: 0, pageSize };
+
+if (!Number.isFinite(currentPage) || currentPage < 1) {
+  currentPage = 1;
+}
 
 if (transactionDraft.restored) {
   showToast("Restored saved bank transaction draft.", "info");
@@ -77,8 +86,10 @@ function resetTransactionForm({ clearDraftState = false, clearUrl = true } = {})
   transactionForm.reset();
   transactionIdField.value = "";
   transactionFormTitle.textContent = "Add transaction";
-  transactionFormSubtitle.textContent = "Use this for manual deposits, withdrawals, or corrections.";
+  transactionFormSubtitle.textContent = "Choose the money type and whether this is a correction or a subtract entry.";
   transactionSubmitButton.textContent = "Record transaction";
+  transactionForm.elements.moneyType.value = "CLEAN";
+  transactionForm.elements.entryType.value = "CORRECTION";
   mountFormError(transactionError, "");
 
   if (clearDraftState) {
@@ -94,9 +105,10 @@ function resetTransactionForm({ clearDraftState = false, clearUrl = true } = {})
 function fillTransactionForm(transaction) {
   transactionIdField.value = transaction.id;
   transactionFormTitle.textContent = "Edit transaction";
-  transactionFormSubtitle.textContent = "Update this manual ledger entry and the live balance will recalculate.";
+  transactionFormSubtitle.textContent = "Update this manual ledger entry and the live clean/dirty balances will recalculate.";
   transactionSubmitButton.textContent = "Save transaction";
-  transactionForm.elements.type.value = transaction.type;
+  transactionForm.elements.moneyType.value = transaction.moneyType || "CLEAN";
+  transactionForm.elements.entryType.value = transaction.entryType || "CORRECTION";
   transactionForm.elements.amount.value = transaction.amount;
   transactionForm.elements.description.value = transaction.description || "";
 }
@@ -111,7 +123,7 @@ function maybeOpenRequestedEdit() {
   if (!transaction) {
     requestedTransactionEditId = "";
     updateUrlParams({ editTransaction: "" }, ["editTransaction"]);
-    showToast("That bank transaction could not be found.", "error");
+    showToast("That bank transaction could not be found on this page.", "error");
     return;
   }
 
@@ -126,54 +138,29 @@ function maybeOpenRequestedEdit() {
   transactionForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function renderSummary(balance, recentTransactions) {
+function renderSummary(balances, recentTransactions) {
   summaryGrid.innerHTML = `
     <article class="metric-card good">
-      <p>Current balance</p>
-      <strong>${formatCurrency(balance)}</strong>
-      <small>Live across all recorded transactions</small>
+      <p>Clean money</p>
+      <strong>${formatCurrency(balances.clean)}</strong>
+      <small>Running clean balance</small>
+    </article>
+    <article class="metric-card accent">
+      <p>Dirty money</p>
+      <strong>${formatCurrency(balances.dirty)}</strong>
+      <small>Running dirty balance</small>
+    </article>
+    <article class="metric-card neutral">
+      <p>Total on hand</p>
+      <strong>${formatCurrency(balances.overall)}</strong>
+      <small>Combined live balance</small>
     </article>
     <article class="metric-card neutral">
       <p>Recent transaction count</p>
       <strong>${recentTransactions.length}</strong>
-      <small>Last 5 entries</small>
+      <small>Latest 5 entries</small>
     </article>
   `;
-}
-
-function getVisibleTransactions(transactions) {
-  let visibleTransactions = [...transactions];
-
-  if (activeView === "credits") {
-    visibleTransactions = visibleTransactions.filter((transaction) => transaction.type === "CREDIT");
-  }
-
-  if (activeView === "debits") {
-    visibleTransactions = visibleTransactions.filter((transaction) => transaction.type === "DEBIT");
-  }
-
-  if (searchQuery) {
-    visibleTransactions = visibleTransactions.filter((transaction) => [
-      transaction.type,
-      transaction.description,
-      transaction.sourceSystem,
-      transaction.amount
-    ].some((value) => `${value || ""}`.toLowerCase().includes(searchQuery)));
-  }
-
-  return visibleTransactions;
-}
-
-function currentViewLabel() {
-  if (activeView === "credits") {
-    return searchQuery ? `Credits / ${searchQuery}` : "Credits";
-  }
-
-  if (activeView === "debits") {
-    return searchQuery ? `Debits / ${searchQuery}` : "Debits";
-  }
-
-  return searchQuery ? `Search / ${searchQuery}` : "All transactions";
 }
 
 function getSelectedTransactions(transactions = transactionsCache) {
@@ -184,20 +171,62 @@ function getSelectedTransactions(transactions = transactionsCache) {
 
 function rerenderBankViews() {
   renderToolbar(transactionsCache);
-  renderTransactions(transactionsCache);
+  renderTransactions(transactionsCache, paginationState);
+  renderPagination(paginationState);
+}
+
+function currentViewLabel() {
+  if (activeView === "clean") {
+    return searchQuery ? `Clean / ${searchQuery}` : "Clean money";
+  }
+
+  if (activeView === "dirty") {
+    return searchQuery ? `Dirty / ${searchQuery}` : "Dirty money";
+  }
+
+  if (activeView === "subtract") {
+    return searchQuery ? `Subtract / ${searchQuery}` : "Subtract entries";
+  }
+
+  return searchQuery ? `Search / ${searchQuery}` : "All transactions";
+}
+
+function buildQuery() {
+  const params = new URLSearchParams({
+    page: `${currentPage}`,
+    pageSize: `${pageSize}`
+  });
+
+  if (searchQuery) {
+    params.set("q", searchQuery);
+  }
+
+  if (activeView === "clean") {
+    params.set("moneyType", "CLEAN");
+  }
+
+  if (activeView === "dirty") {
+    params.set("moneyType", "DIRTY");
+  }
+
+  if (activeView === "subtract") {
+    params.set("entryType", "SUBTRACT");
+  }
+
+  return params.toString();
 }
 
 function renderToolbar(transactions) {
-  const visibleTransactions = getVisibleTransactions(transactions);
   const selectedTransactions = getSelectedTransactions(transactions);
   const selectedNet = selectedTransactions.reduce((sum, transaction) => (
-    transaction.type === "DEBIT" ? sum - Number(transaction.amount) : sum + Number(transaction.amount)
+    transaction.entryType === "SUBTRACT" ? sum - Number(transaction.amount) : sum + Number(transaction.amount)
   ), 0);
   const savedView = loadSavedView("bank");
   const filterLinks = [
     { label: "All", href: buildPageHref("./bank.html", { hash: "transactionTable" }), active: !activeView },
-    { label: "Credits", href: buildPageHref("./bank.html", { view: "credits", hash: "transactionTable" }), active: activeView === "credits" },
-    { label: "Debits", href: buildPageHref("./bank.html", { view: "debits", hash: "transactionTable" }), active: activeView === "debits" }
+    { label: "Clean", href: buildPageHref("./bank.html", { view: "clean", hash: "transactionTable" }), active: activeView === "clean" },
+    { label: "Dirty", href: buildPageHref("./bank.html", { view: "dirty", hash: "transactionTable" }), active: activeView === "dirty" },
+    { label: "Subtract", href: buildPageHref("./bank.html", { view: "subtract", hash: "transactionTable" }), active: activeView === "subtract" }
   ];
 
   toolbarHost.innerHTML = `
@@ -208,7 +237,7 @@ function renderToolbar(transactions) {
       ${savedView ? `<a class="filter-chip saved" href="${savedView.href}">Saved: ${savedView.label}</a>` : ""}
     </div>
     <div class="toolbar-actions">
-      <span class="toolbar-meta">${visibleTransactions.length} shown</span>
+      <span class="toolbar-meta">${paginationState.total} total</span>
       <button class="ghost-button toolbar-button" type="button" data-action="save-view">Save view</button>
       ${savedView ? `<button class="ghost-button toolbar-button" type="button" data-action="clear-view">Clear saved</button>` : ""}
       <button class="ghost-button toolbar-button" type="button" data-action="export">Export CSV</button>
@@ -246,13 +275,15 @@ function renderToolbar(transactions) {
     downloadCsv(
       "bank-transactions.csv",
       [
-        { label: "Type", value: (transaction) => transaction.type },
+        { label: "Money Type", value: (transaction) => transaction.moneyType },
+        { label: "Function", value: (transaction) => transaction.entryType },
         { label: "Amount", value: (transaction) => transaction.amount },
+        { label: "User", value: (transaction) => transaction.createdBy?.name || "System" },
         { label: "Source", value: (transaction) => transaction.sourceSystem },
         { label: "Description", value: (transaction) => transaction.description || "" },
         { label: "Created At", value: (transaction) => formatDate(transaction.createdAt) }
       ],
-      visibleTransactions
+      transactions
     );
     showToast("Bank CSV exported.", "success");
   });
@@ -261,8 +292,10 @@ function renderToolbar(transactions) {
     downloadCsv(
       "bank-selected-transactions.csv",
       [
-        { label: "Type", value: (transaction) => transaction.type },
+        { label: "Money Type", value: (transaction) => transaction.moneyType },
+        { label: "Function", value: (transaction) => transaction.entryType },
         { label: "Amount", value: (transaction) => transaction.amount },
+        { label: "User", value: (transaction) => transaction.createdBy?.name || "System" },
         { label: "Source", value: (transaction) => transaction.sourceSystem },
         { label: "Description", value: (transaction) => transaction.description || "" },
         { label: "Created At", value: (transaction) => formatDate(transaction.createdAt) }
@@ -278,17 +311,16 @@ function renderToolbar(transactions) {
   });
 }
 
-function renderTransactions(transactions) {
-  const visibleTransactions = getVisibleTransactions(transactions);
-  const allVisibleSelected = visibleTransactions.length
-    && visibleTransactions.every((transaction) => selectedTransactionIds.has(transaction.id));
+function renderTransactions(transactions, pagination) {
+  const allVisibleSelected = transactions.length
+    && transactions.every((transaction) => selectedTransactionIds.has(transaction.id));
 
-  if (!visibleTransactions.length) {
+  if (!transactions.length) {
     tableContainer.innerHTML = renderEmptyState(
-      transactions.length ? "No matching transactions" : "No transactions yet",
-      transactions.length
-        ? "Try a broader search from the dashboard or header search."
-        : "Use the form on this page to add your first credit or debit."
+      pagination.total ? "No matching transactions on this page" : "No transactions yet",
+      pagination.total
+        ? "Try another page or a broader filter."
+        : "Use the form on this page to add the first clean or dirty money entry."
     );
     return;
   }
@@ -296,12 +328,8 @@ function renderTransactions(transactions) {
   if (!hasShownFilterMessage && (searchQuery || activeView)) {
     const filterParts = [];
 
-    if (activeView === "credits") {
-      filterParts.push("credits");
-    }
-
-    if (activeView === "debits") {
-      filterParts.push("debits");
+    if (activeView) {
+      filterParts.push(activeView);
     }
 
     if (searchQuery) {
@@ -320,8 +348,10 @@ function renderTransactions(transactions) {
             <th class="table-select-cell">
               <input class="table-check" type="checkbox" data-select-all ${allVisibleSelected ? "checked" : ""}>
             </th>
-            <th>Type</th>
+            <th>Money type</th>
+            <th>Function</th>
             <th>Amount</th>
+            <th>User</th>
             <th>Source</th>
             <th>Description</th>
             <th>Action</th>
@@ -329,13 +359,19 @@ function renderTransactions(transactions) {
           </tr>
         </thead>
         <tbody>
-          ${visibleTransactions.map((transaction) => `
+          ${transactions.map((transaction) => `
             <tr class="${selectedTransactionIds.has(transaction.id) ? "selected-row" : ""} ${requestedTransactionEditId === transaction.id ? "editing-row" : ""}">
               <td class="table-select-cell">
                 <input class="table-check" type="checkbox" data-select-transaction="${transaction.id}" ${selectedTransactionIds.has(transaction.id) ? "checked" : ""}>
               </td>
-              <td>${bankTransactionBadge(transaction.type)}</td>
-              <td>${formatCurrency(transaction.amount)}</td>
+              <td>${bankMoneyBadge(transaction.moneyType)}</td>
+              <td>${bankTransactionBadge(transaction.entryType, transaction.entryType === "SUBTRACT" ? "Subtract" : "Correction")}</td>
+              <td>
+                <div class="ledger-row">
+                  <strong class="ledger-amount">${formatCurrency(transaction.amount)}</strong>
+                </div>
+              </td>
+              <td>${transaction.createdBy?.name || "System"}</td>
               <td>${transaction.sourceSystem}</td>
               <td>${transaction.description || "No description"}</td>
               <td>
@@ -372,9 +408,9 @@ function renderTransactions(transactions) {
 
   tableContainer.querySelector("[data-select-all]")?.addEventListener("change", (event) => {
     if (event.target.checked) {
-      visibleTransactions.forEach((transaction) => selectedTransactionIds.add(transaction.id));
+      transactions.forEach((transaction) => selectedTransactionIds.add(transaction.id));
     } else {
-      visibleTransactions.forEach((transaction) => selectedTransactionIds.delete(transaction.id));
+      transactions.forEach((transaction) => selectedTransactionIds.delete(transaction.id));
     }
 
     rerenderBankViews();
@@ -393,24 +429,71 @@ function renderTransactions(transactions) {
   });
 }
 
+function renderPagination(pagination) {
+  if (!paginationContainer) {
+    return;
+  }
+
+  if (pagination.totalPages <= 1) {
+    paginationContainer.innerHTML = pagination.total
+      ? `<span class="pager-label">${pagination.total} total entries</span>`
+      : "";
+    return;
+  }
+
+  paginationContainer.innerHTML = `
+    <span class="pager-label">Page ${pagination.page} of ${pagination.totalPages}</span>
+    <button class="ghost-button pager-button" type="button" data-page="${pagination.page - 1}" ${pagination.page <= 1 ? "disabled" : ""}>Prev</button>
+    <button class="ghost-button pager-button" type="button" data-page="${pagination.page + 1}" ${pagination.page >= pagination.totalPages ? "disabled" : ""}>Next</button>
+  `;
+
+  paginationContainer.querySelectorAll("[data-page]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const nextPage = Number(button.dataset.page);
+
+      if (!Number.isFinite(nextPage) || nextPage < 1 || nextPage > pagination.totalPages) {
+        return;
+      }
+
+      currentPage = nextPage;
+      updateUrlParams({ page: `${currentPage}` });
+      await loadBank();
+    });
+  });
+}
+
 async function loadBank() {
-  summaryGrid.innerHTML = renderMetricSkeleton(2);
-  tableContainer.innerHTML = renderTableSkeleton(7, 6);
+  summaryGrid.innerHTML = renderMetricSkeleton(4);
+  tableContainer.innerHTML = renderTableSkeleton(9, 6);
+  if (paginationContainer) {
+    paginationContainer.innerHTML = "";
+  }
 
   try {
-    const [{ balance, recentTransactions }, { transactions }] = await Promise.all([
+    const [{ balances, recentTransactions }, { transactions, pagination }] = await Promise.all([
       api("/bank/summary"),
-      api("/bank/transactions")
+      api(`/bank/transactions?${buildQuery()}`)
     ]);
 
-    transactionsCache = transactions;
+    if (pagination && currentPage > pagination.totalPages) {
+      currentPage = pagination.totalPages;
+      updateUrlParams({ page: `${currentPage}` });
+      await loadBank();
+      return;
+    }
+
+    transactionsCache = transactions || [];
+    paginationState = pagination || paginationState;
     getSelectedTransactions(transactionsCache);
-    renderSummary(balance, recentTransactions);
+    renderSummary(balances, recentTransactions || []);
     rerenderBankViews();
     maybeOpenRequestedEdit();
   } catch (error) {
     summaryGrid.innerHTML = renderEmptyState("Unable to load bank summary", error.message);
     tableContainer.innerHTML = "";
+    if (paginationContainer) {
+      paginationContainer.innerHTML = "";
+    }
     showToast(error.message, "error");
   }
 }
@@ -422,7 +505,8 @@ transactionForm?.addEventListener("submit", async (event) => {
   const editingTransactionId = transactionIdField.value;
   const formData = new FormData(transactionForm);
   const payload = {
-    type: formData.get("type"),
+    moneyType: formData.get("moneyType"),
+    entryType: formData.get("entryType"),
     amount: Number(formData.get("amount") || 0),
     description: formData.get("description")
   };
@@ -442,6 +526,8 @@ transactionForm?.addEventListener("submit", async (event) => {
       showToast("Bank transaction recorded.", "success");
     }
 
+    currentPage = 1;
+    updateUrlParams({ page: "1", editTransaction: "" }, ["editTransaction"]);
     resetTransactionForm({ clearDraftState: true });
     await loadBank();
     announceMutation(["bank"]);

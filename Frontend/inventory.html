@@ -49,16 +49,10 @@
                 <span>Name</span>
                 <input type="text" name="name" placeholder="Product name" required>
               </label>
-              <div class="field-grid">
-                <label class="field-stack">
-                  <span>SKU</span>
-                  <input type="text" name="sku" placeholder="INV-001">
-                </label>
-                <label class="field-stack">
-                  <span>Category</span>
-                  <input type="text" name="category" placeholder="Consumables">
-                </label>
-              </div>
+              <label class="field-stack">
+                <span>Category</span>
+                <input type="text" name="category" placeholder="Consumables">
+              </label>
               <div class="field-grid">
                 <label class="field-stack">
                   <span>Unit</span>
@@ -69,10 +63,6 @@
                   <input type="number" min="0" name="quantity" value="0">
                 </label>
               </div>
-              <label class="field-stack">
-                <span>Reorder level</span>
-                <input type="number" min="0" name="reorderLevel" value="0">
-              </label>
               <label class="field-stack">
                 <span>Notes</span>
                 <textarea name="notes" placeholder="Optional notes about the item"></textarea>
@@ -85,9 +75,9 @@
               <p class="form-error hidden" id="inventoryError"></p>
             </form>
 
-            <div class="panel-header" style="margin-top: 1.8rem;">
+            <div class="panel-header section-divider">
               <h2 id="adjustFormTitle">Adjust stock</h2>
-              <p id="adjustFormSubtitle">Apply a stock in, stock out, or correction movement to an existing item.</p>
+              <p id="adjustFormSubtitle">Apply an add, subtract, or correction movement to an existing item.</p>
             </div>
 
             <form class="stack-form" id="adjustForm">
@@ -104,8 +94,8 @@
                 <label class="field-stack">
                   <span>Type</span>
                   <select name="type">
-                    <option value="STOCK_IN">Stock in</option>
-                    <option value="STOCK_OUT">Stock out</option>
+                    <option value="STOCK_IN">Add</option>
+                    <option value="STOCK_OUT">Subtract</option>
                     <option value="CORRECTION">Correction</option>
                   </select>
                 </label>
@@ -125,10 +115,14 @@
           <article class="panel">
             <div class="panel-header">
               <h2>Current inventory</h2>
-              <p>Recent stock movements and live quantities across all stored items.</p>
+              <p>Live quantities across all stored items.</p>
+            </div>
+            <div id="inventoryTable"></div>
+            <div class="panel-header section-divider">
+              <h2>Recent stock activity</h2>
+              <p>Latest adds, subtracts, and corrections across your items.</p>
             </div>
             <div class="stack-list" id="recentMovementFeed"></div>
-            <div id="inventoryTable"></div>
           </article>
         </section>
       </main>

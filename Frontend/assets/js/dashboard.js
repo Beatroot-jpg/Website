@@ -3,7 +3,6 @@ import { subscribeToMutations } from "./live.js";
 import { hasPermission } from "./session.js";
 import {
   badge,
-  bankTransactionBadge,
   distributionStatusBadge,
   formatCurrency,
   formatDate,
@@ -16,7 +15,7 @@ import {
 initProtectedPage({
   pageKey: "DASHBOARD",
   title: "Operations dashboard",
-  subtitle: "Your live snapshot across stock, funds, and distribution activity."
+  subtitle: "Your live snapshot across stock, money, and distribution activity."
 });
 
 const metricsGrid = document.querySelector("#metricsGrid");
@@ -42,9 +41,9 @@ function renderMetrics(metrics) {
   `).join("");
 }
 
-function renderLowStock(items) {
+function renderInventoryOverview(items) {
   if (!items.length) {
-    lowStockFeed.innerHTML = renderEmptyState("No low stock alerts", "Items with reorder thresholds will show here when they need attention.");
+    lowStockFeed.innerHTML = renderEmptyState("No inventory yet", "Items you create will show here with their current stock on hand.");
     return;
   }
 
@@ -53,10 +52,10 @@ function renderLowStock(items) {
       <article class="activity-card">
         <div>
           <strong>${item.name}</strong>
-          <p>${item.quantity} ${item.unit} on hand against reorder level ${item.reorderLevel}</p>
+          <p>${item.quantity} ${item.unit} on hand${item.category ? ` - ${item.category}` : ""}</p>
         </div>
         <div class="activity-meta">
-          ${badge("Low stock", "warn")}
+          ${badge("Inventory", "neutral")}
           <small>${formatDate(item.updatedAt)}</small>
         </div>
       </article>
@@ -110,19 +109,19 @@ function renderDistributionFeed(items) {
 
 function renderTransactionFeed(items) {
   if (!items.length) {
-    transactionFeed.innerHTML = renderEmptyState("No bank transactions yet", "When new credits or debits land, they will show here.");
+    transactionFeed.innerHTML = renderEmptyState("No bank transactions yet", "When new clean or dirty money entries land, they will show here.");
     return;
   }
 
   transactionFeed.innerHTML = items.map((item) => `
-    <a class="activity-link" href="${item.distribution?.id && hasPermission("DISTRIBUTION") ? `./distribution.html?editDistribution=${item.distribution.id}#distributionForm` : `./bank.html${item.distribution?.id ? `?search=${encodeURIComponent(item.description || item.type)}#transactionTable` : `?editTransaction=${item.id}#transactionForm`}`}">
+    <a class="activity-link" href="${item.distribution?.id && hasPermission("DISTRIBUTION") ? `./distribution.html?editDistribution=${item.distribution.id}#distributionForm` : `./bank.html${item.distribution?.id ? `?search=${encodeURIComponent(item.description || item.moneyType)}#transactionTable` : `?editTransaction=${item.id}#transactionForm`}`}">
       <article class="activity-card">
         <div>
-          <strong>${item.type}</strong>
-          <p>${item.description || "Manual entry"}</p>
+          <strong>${item.moneyType} Money</strong>
+          <p>${item.createdBy?.name || "System"} - ${item.description || "Manual entry"}</p>
         </div>
         <div class="activity-meta">
-          ${bankTransactionBadge(item.type, formatCurrency(item.amount))}
+          ${badge(`${item.entryType} ${formatCurrency(item.amount)}`, item.entryType === "SUBTRACT" ? "danger" : item.moneyType === "DIRTY" ? "accent" : "good")}
           <small>${formatDate(item.createdAt)}</small>
         </div>
       </article>
@@ -131,7 +130,7 @@ function renderTransactionFeed(items) {
 }
 
 async function loadDashboard() {
-  metricsGrid.innerHTML = renderMetricSkeleton(4);
+  metricsGrid.innerHTML = renderMetricSkeleton(5);
   lowStockFeed.innerHTML = "<div class='activity-card skeleton-card'></div><div class='activity-card skeleton-card'></div>";
   activityFeed.innerHTML = "<div class='activity-card skeleton-card'></div><div class='activity-card skeleton-card'></div>";
   distributionFeed.innerHTML = "<div class='activity-card skeleton-card'></div><div class='activity-card skeleton-card'></div>";
@@ -140,7 +139,7 @@ async function loadDashboard() {
   try {
     const data = await api("/dashboard/summary");
     renderMetrics(data.metrics || []);
-    renderLowStock(data.lowStockItems || []);
+    renderInventoryOverview(data.lowStockItems || []);
     renderActivity(data.recentActivity || []);
     renderDistributionFeed(data.recentDistributions || []);
     renderTransactionFeed(data.recentTransactions || []);

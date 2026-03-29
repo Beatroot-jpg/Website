@@ -364,12 +364,12 @@ function renderDistributions(distributions) {
               </td>
               <td>
                 <strong>${distribution.item.name}</strong>
-                <div class="subtle-row">${distribution.item.sku || "No SKU"}</div>
+                <span class="subtle-row">${distribution.item.unit}</span>
               </td>
               <td>${distribution.assignedTo.name}</td>
               <td>${distribution.quantity}</td>
               <td>${distributionStatusBadge(distribution.status)}</td>
-              <td>${distribution.bankTransaction ? formatCurrency(distribution.bankTransaction.amount) : "Not recorded"}</td>
+              <td>${distribution.bankTransaction ? `${formatCurrency(distribution.bankTransaction.amount)} dirty` : "Not recorded"}</td>
               <td>
                 <div class="inline-table-actions">
                   <button class="mini-action" type="button" data-edit-distribution="${distribution.id}">Edit</button>

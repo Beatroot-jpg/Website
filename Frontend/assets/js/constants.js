@@ -60,7 +60,7 @@ export const QUICK_ACTIONS = [
     permission: "BANK",
     label: "Record payment",
     href: "./bank.html#transactionForm",
-    description: "Credit or debit"
+    description: "Clean or dirty money"
   },
   {
     permission: "DISTRIBUTION",

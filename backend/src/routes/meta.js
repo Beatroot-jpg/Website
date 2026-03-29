@@ -31,6 +31,12 @@ router.get(
     const canViewDistribution = allowed.has("DISTRIBUTION") || req.user.role === "ADMIN";
     const canViewUsers = allowed.has("USERS") || req.user.role === "ADMIN";
     const containsFilter = { contains: query, mode: "insensitive" };
+    const normalizedQuery = query.toUpperCase();
+    const bankMoneyTypeFilter = normalizedQuery.startsWith("DIR")
+      ? "DIRTY"
+      : normalizedQuery.startsWith("CLE")
+        ? "CLEAN"
+        : null;
 
     const resultSets = await Promise.all([
       canViewInventory
@@ -38,8 +44,8 @@ router.get(
           where: {
             OR: [
               { name: containsFilter },
-              { sku: containsFilter },
-              { category: containsFilter }
+              { category: containsFilter },
+              { unit: containsFilter }
             ]
           },
           orderBy: { updatedAt: "desc" },
@@ -47,7 +53,7 @@ router.get(
           select: {
             id: true,
             name: true,
-            sku: true,
+            category: true,
             quantity: true,
             unit: true,
             updatedAt: true
@@ -56,7 +62,7 @@ router.get(
           id: `inventory-${item.id}`,
           group: "Inventory",
           title: item.name,
-          subtitle: `${item.sku || "No SKU"} - ${item.quantity} ${item.unit}`,
+          subtitle: `${item.quantity} ${item.unit}${item.category ? ` - ${item.category}` : ""}`,
           href: `./inventory.html?editItem=${item.id}#inventoryForm`,
           tone: item.quantity <= 0 ? "warn" : "accent",
           sortAt: item.updatedAt
@@ -130,7 +136,8 @@ router.get(
           where: {
             OR: [
               { description: containsFilter },
-              { sourceSystem: containsFilter }
+              { sourceSystem: containsFilter },
+              ...(bankMoneyTypeFilter ? [{ moneyType: bankMoneyTypeFilter }] : [])
             ]
           },
           orderBy: { createdAt: "desc" },
@@ -139,6 +146,7 @@ router.get(
             id: true,
             description: true,
             type: true,
+            moneyType: true,
             sourceSystem: true,
             amount: true,
             distributionId: true,
@@ -147,12 +155,12 @@ router.get(
         }).then((items) => items.map((item) => ({
           id: `bank-${item.id}`,
           group: "Bank",
-          title: item.description || `${item.type} transaction`,
-          subtitle: `${item.sourceSystem} - ${item.amount}`,
+          title: item.description || `${item.moneyType} ${item.type === "DEBIT" ? "subtract" : "correction"}`,
+          subtitle: `${item.moneyType} money - ${item.sourceSystem} - ${item.amount}`,
           href: item.distributionId && canViewDistribution
             ? `./distribution.html?editDistribution=${item.distributionId}#distributionForm`
             : item.distributionId
-              ? `./bank.html?search=${encodeURIComponent(item.description || item.type)}#transactionTable`
+              ? `./bank.html?search=${encodeURIComponent(item.description || item.moneyType)}#transactionTable`
               : `./bank.html?editTransaction=${item.id}#transactionForm`,
           tone: item.type === "DEBIT" ? "danger" : "good",
           sortAt: item.createdAt

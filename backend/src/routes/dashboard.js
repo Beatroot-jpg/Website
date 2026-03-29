@@ -3,11 +3,26 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { asyncHandler } from "../http.js";
 import { authenticateToken, requirePermission } from "../middleware/auth.js";
-import { getBankBalance } from "../services/bank.js";
+import { getBankBalances, getEntryTypeFromTransaction } from "../services/bank.js";
 
 const router = Router();
 
 router.use(authenticateToken, requirePermission("DASHBOARD"));
+
+function formatMovementType(type) {
+  switch (`${type || ""}`.toUpperCase()) {
+    case "STOCK_IN":
+      return "Add";
+    case "STOCK_OUT":
+      return "Subtract";
+    case "CORRECTION":
+      return "Correction";
+    case "DISTRIBUTED":
+      return "Distributed";
+    default:
+      return type;
+  }
+}
 
 router.get(
   "/summary",
@@ -23,16 +38,18 @@ router.get(
     let recentTransactions = [];
 
     if (canViewInventory) {
-      const [itemCount, itemsForAlerts, quantityAggregate, recentMovements] = await Promise.all([
+      const [itemCount, inventoryHighlights, quantityAggregate, recentMovements] = await Promise.all([
         prisma.inventoryItem.count(),
         prisma.inventoryItem.findMany({
+          orderBy: [{ updatedAt: "desc" }, { quantity: "desc" }],
+          take: 5,
           select: {
             id: true,
             name: true,
             quantity: true,
-            reorderLevel: true,
             unit: true,
-            updatedAt: true
+            updatedAt: true,
+            category: true
           }
         }),
         prisma.inventoryItem.aggregate({
@@ -54,11 +71,8 @@ router.get(
           }
         })
       ]);
-      lowStockItems = itemsForAlerts
-        .filter((item) => item.reorderLevel > 0 && item.quantity <= item.reorderLevel)
-        .sort((left, right) => left.quantity - right.quantity || right.reorderLevel - left.reorderLevel)
-        .slice(0, 5);
-      const lowStockCount = lowStockItems.length;
+
+      lowStockItems = inventoryHighlights;
 
       metrics.push(
         {
@@ -69,16 +83,9 @@ router.get(
           href: "./inventory.html#inventoryTable"
         },
         {
-          label: "Low stock alerts",
-          value: lowStockCount,
-          tone: lowStockCount > 0 ? "warn" : "good",
-          note: lowStockCount > 0 ? "Open low-stock view" : "All thresholds healthy",
-          href: "./inventory.html?view=low-stock#inventoryTable"
-        },
-        {
           label: "Units on hand",
           value: quantityAggregate._sum.quantity || 0,
-          tone: "neutral",
+          tone: "good",
           note: "Review inventory",
           href: "./inventory.html#inventoryTable"
         }
@@ -89,8 +96,8 @@ router.get(
           id: `movement-${movement.id}`,
           category: "Inventory",
           title: movement.item.name,
-          detail: `${movement.type.replaceAll("_", " ")} ${Math.abs(movement.quantityDelta)} ${movement.item.unit}`,
-          badgeLabel: movement.type.replaceAll("_", " "),
+          detail: `${formatMovementType(movement.type)} ${Math.abs(movement.quantityDelta)} ${movement.item.unit}`,
+          badgeLabel: formatMovementType(movement.type),
           tone: movement.quantityDelta < 0 ? "warn" : "good",
           createdAt: movement.createdAt,
           href: movement.type === "DISTRIBUTED"
@@ -101,12 +108,19 @@ router.get(
     }
 
     if (canViewBank) {
-      const [balance, bankTransactions] = await Promise.all([
-        getBankBalance(),
+      const [balances, bankTransactions] = await Promise.all([
+        getBankBalances(),
         prisma.bankTransaction.findMany({
           orderBy: { createdAt: "desc" },
           take: 5,
           include: {
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            },
             distribution: {
               select: {
                 id: true,
@@ -122,30 +136,43 @@ router.get(
         })
       ]);
 
-      recentTransactions = bankTransactions;
+      recentTransactions = bankTransactions.map((transaction) => ({
+        ...transaction,
+        entryType: getEntryTypeFromTransaction(transaction)
+      }));
 
-      metrics.push({
-        label: "Bank balance",
-        value: balance,
-        tone: "good",
-        currency: true,
-        note: "Open ledger",
-        href: "./bank.html#transactionTable"
-      });
+      metrics.push(
+        {
+          label: "Clean money",
+          value: balances.clean,
+          tone: "good",
+          currency: true,
+          note: "View clean ledger",
+          href: "./bank.html?view=clean#transactionTable"
+        },
+        {
+          label: "Dirty money",
+          value: balances.dirty,
+          tone: "accent",
+          currency: true,
+          note: "View dirty ledger",
+          href: "./bank.html?view=dirty#transactionTable"
+        }
+      );
 
       recentActivity.push(
-        ...bankTransactions.map((transaction) => ({
+        ...recentTransactions.map((transaction) => ({
           id: `transaction-${transaction.id}`,
           category: "Bank",
-          title: transaction.description || `${transaction.type} transaction`,
-          detail: `${transaction.sourceSystem} source`,
-          badgeLabel: transaction.type,
-          tone: transaction.type === "DEBIT" ? "danger" : "good",
+          title: transaction.description || `${transaction.moneyType} ${transaction.entryType}`,
+          detail: `${transaction.createdBy?.name || "System"} - ${transaction.moneyType} money`,
+          badgeLabel: transaction.entryType,
+          tone: transaction.entryType === "SUBTRACT" ? "danger" : transaction.moneyType === "DIRTY" ? "accent" : "good",
           createdAt: transaction.createdAt,
           href: transaction.distributionId && canViewDistribution
             ? `./distribution.html?editDistribution=${transaction.distributionId}#distributionForm`
             : transaction.distributionId
-              ? `./bank.html?search=${encodeURIComponent(transaction.description || transaction.type)}#transactionTable`
+              ? `./bank.html?search=${encodeURIComponent(transaction.description || transaction.moneyType)}#transactionTable`
               : `./bank.html?editTransaction=${transaction.id}#transactionForm`
         }))
       );

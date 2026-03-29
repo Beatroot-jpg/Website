@@ -22,7 +22,7 @@ import {
 initProtectedPage({
   pageKey: "INVENTORY",
   title: "Inventory control",
-  subtitle: "Track stock levels, receive new items, and log corrections."
+  subtitle: "Track stock levels, add new items, and keep movement logs simple."
 });
 
 const createForm = document.querySelector("#inventoryForm");
@@ -89,6 +89,21 @@ function populateItemSelect(items) {
   adjustForm.querySelector("button").disabled = items.length === 0;
 }
 
+function formatMovementType(type) {
+  switch (`${type || ""}`.toUpperCase()) {
+    case "STOCK_IN":
+      return "Add";
+    case "STOCK_OUT":
+      return "Subtract";
+    case "CORRECTION":
+      return "Correction";
+    case "DISTRIBUTED":
+      return "Distributed";
+    default:
+      return type;
+  }
+}
+
 function resetItemForm({ clearDraftState = false, clearUrl = true } = {}) {
   createForm.reset();
   inventoryItemIdField.value = "";
@@ -96,6 +111,7 @@ function resetItemForm({ clearDraftState = false, clearUrl = true } = {}) {
   inventoryFormSubtitle.textContent = "Add a new inventory item and optional opening stock.";
   inventorySubmitButton.textContent = "Create item";
   inventoryQuantityHint.textContent = "Starting quantity is only used when creating a new item.";
+
   if (quantityField) {
     quantityField.disabled = false;
     quantityField.value = "0";
@@ -116,16 +132,15 @@ function resetItemForm({ clearDraftState = false, clearUrl = true } = {}) {
 function fillItemForm(item) {
   inventoryItemIdField.value = item.id;
   inventoryFormTitle.textContent = `Edit ${item.name}`;
-  inventoryFormSubtitle.textContent = "Update item details. Use stock adjustment below to change quantity.";
+  inventoryFormSubtitle.textContent = "Update item details here. Use the stock form below to change quantity.";
   inventorySubmitButton.textContent = "Save item";
-  inventoryQuantityHint.textContent = `Current stock is ${item.quantity} ${item.unit}. Quantity changes stay in the adjustment log.`;
+  inventoryQuantityHint.textContent = `Current stock is ${item.quantity} ${item.unit}.`;
   createForm.elements.name.value = item.name;
-  createForm.elements.sku.value = item.sku || "";
   createForm.elements.category.value = item.category || "";
   createForm.elements.unit.value = item.unit;
   createForm.elements.quantity.value = item.quantity;
-  createForm.elements.reorderLevel.value = item.reorderLevel;
   createForm.elements.notes.value = item.notes || "";
+
   if (quantityField) {
     quantityField.disabled = true;
   }
@@ -135,7 +150,7 @@ function resetAdjustmentForm({ clearDraftState = false, clearUrl = true } = {}) 
   adjustForm.reset();
   movementIdField.value = "";
   adjustFormTitle.textContent = "Adjust stock";
-  adjustFormSubtitle.textContent = "Apply a stock in, stock out, or correction movement to an existing item.";
+  adjustFormSubtitle.textContent = "Apply an add, subtract, or correction movement to an existing item.";
   adjustSubmitButton.textContent = "Apply adjustment";
   mountFormError(adjustError, "");
 
@@ -209,10 +224,6 @@ function maybeOpenRequestedEdit() {
 function getVisibleItems(items) {
   let visibleItems = [...items];
 
-  if (activeView === "low-stock") {
-    visibleItems = visibleItems.filter((item) => item.reorderLevel > 0 && item.quantity <= item.reorderLevel);
-  }
-
   if (activeView === "recent") {
     visibleItems = visibleItems
       .slice()
@@ -223,9 +234,9 @@ function getVisibleItems(items) {
   if (searchQuery) {
     visibleItems = visibleItems.filter((item) => [
       item.name,
-      item.sku,
       item.category,
-      item.unit
+      item.unit,
+      item.notes
     ].some((value) => `${value || ""}`.toLowerCase().includes(searchQuery)));
   }
 
@@ -233,10 +244,6 @@ function getVisibleItems(items) {
 }
 
 function currentViewLabel() {
-  if (activeView === "low-stock") {
-    return searchQuery ? `Low stock / ${searchQuery}` : "Low stock";
-  }
-
   if (activeView === "recent") {
     return searchQuery ? `Recent / ${searchQuery}` : "Recent updates";
   }
@@ -252,8 +259,8 @@ function getSelectedItems(items = itemsCache) {
 
 function rerenderCollection() {
   renderToolbar(itemsCache);
-  renderRecentMovementFeed(itemsCache);
   renderTable(itemsCache);
+  renderRecentMovementFeed(itemsCache);
 }
 
 function renderRecentMovementFeed(items) {
@@ -274,7 +281,7 @@ function renderRecentMovementFeed(items) {
   if (!recentMovements.length) {
     recentMovementFeed.innerHTML = renderEmptyState(
       "No recent stock logs",
-      "New stock-ins, stock-outs, and corrections will appear here."
+      "New adds, subtracts, and corrections will appear here."
     );
     return;
   }
@@ -290,7 +297,7 @@ function renderRecentMovementFeed(items) {
         <article class="activity-card ${requestedMovementEditId === movement.id ? "editing-card" : ""}">
           <div>
             <strong>${movement.itemName}</strong>
-            <p>${movement.type.replaceAll("_", " ")} ${Math.abs(movement.quantityDelta)} ${movement.itemUnit}</p>
+            <p>${formatMovementType(movement.type)} ${Math.abs(movement.quantityDelta)} ${movement.itemUnit}</p>
           </div>
           <div class="activity-meta">
             ${badge(editable ? "Edit log" : "Source-linked", editable ? "accent" : "neutral")}
@@ -308,7 +315,6 @@ function renderToolbar(items) {
   const savedView = loadSavedView("inventory");
   const filterLinks = [
     { label: "All", href: buildPageHref("./inventory.html", { hash: "inventoryTable" }), active: !activeView },
-    { label: "Low stock", href: buildPageHref("./inventory.html", { view: "low-stock", hash: "inventoryTable" }), active: activeView === "low-stock" },
     { label: "Recent", href: buildPageHref("./inventory.html", { view: "recent", hash: "inventoryTable" }), active: activeView === "recent" }
   ];
 
@@ -361,11 +367,10 @@ function renderToolbar(items) {
       "inventory-export.csv",
       [
         { label: "Name", value: (item) => item.name },
-        { label: "SKU", value: (item) => item.sku || "" },
         { label: "Category", value: (item) => item.category || "" },
         { label: "Unit", value: (item) => item.unit },
         { label: "Quantity", value: (item) => item.quantity },
-        { label: "Reorder Level", value: (item) => item.reorderLevel }
+        { label: "Notes", value: (item) => item.notes || "" }
       ],
       visibleItems
     );
@@ -394,11 +399,10 @@ function renderToolbar(items) {
       "inventory-selected.csv",
       [
         { label: "Name", value: (item) => item.name },
-        { label: "SKU", value: (item) => item.sku || "" },
         { label: "Category", value: (item) => item.category || "" },
         { label: "Unit", value: (item) => item.unit },
         { label: "Quantity", value: (item) => item.quantity },
-        { label: "Reorder Level", value: (item) => item.reorderLevel }
+        { label: "Notes", value: (item) => item.notes || "" }
       ],
       selectedItems
     );
@@ -442,7 +446,7 @@ function renderTable(items) {
     tableContainer.innerHTML = renderEmptyState(
       items.length ? "No matching inventory items" : "No inventory items yet",
       items.length
-        ? "Try a broader search or remove the active dashboard filter."
+        ? "Try a broader search or remove the current filter."
         : "Create your first item with the form on the left."
     );
     return;
@@ -450,10 +454,6 @@ function renderTable(items) {
 
   if (!hasShownFilterMessage && (searchQuery || activeView)) {
     const filterParts = [];
-
-    if (activeView === "low-stock") {
-      filterParts.push("low stock");
-    }
 
     if (activeView === "recent") {
       filterParts.push("recent updates");
@@ -476,9 +476,9 @@ function renderTable(items) {
               <input class="table-check" type="checkbox" data-select-all ${allVisibleSelected ? "checked" : ""}>
             </th>
             <th>Item</th>
-            <th>Stock</th>
+            <th>Stock on hand</th>
             <th>Category</th>
-            <th>Latest movement</th>
+            <th>Latest activity</th>
             <th>Quick adjust</th>
             <th>Action</th>
             <th>Updated</th>
@@ -487,7 +487,6 @@ function renderTable(items) {
         <tbody>
           ${visibleItems.map((item) => {
             const latestMovement = item.movements?.[0];
-            const lowStock = item.quantity <= item.reorderLevel;
             const canEditMovement = latestMovement && editableMovementTypes().has(latestMovement.type);
             const isEditingItem = requestedItemEditId === item.id;
             const isEditingMovement = (item.movements || []).some((movement) => movement.id === requestedMovementEditId);
@@ -499,13 +498,19 @@ function renderTable(items) {
                 </td>
                 <td>
                   <strong>${item.name}</strong>
-                  <div class="subtle-row">${item.sku || "No SKU"} - ${item.unit}</div>
+                  <span class="subtle-row">${item.unit}</span>
                 </td>
-                <td>${badge(`${item.quantity} on hand`, lowStock ? "warn" : "good")}</td>
+                <td>
+                  <div class="stock-readout">
+                    <span class="stock-number">${item.quantity}</span>
+                    <span class="stock-unit">${item.unit}</span>
+                  </div>
+                </td>
                 <td>${item.category || "Uncategorised"}</td>
                 <td>
-                  ${latestMovement ? `${latestMovement.type} (${latestMovement.quantityDelta})` : "No movements yet"}
-                  ${canEditMovement ? `<div class="subtle-row">Editable recent log</div>` : ""}
+                  ${latestMovement
+                    ? `<div class="stock-summary"><strong>${formatMovementType(latestMovement.type)}</strong><span class="muted">${Math.abs(latestMovement.quantityDelta)} ${item.unit}</span></div>`
+                    : "No activity yet"}
                 </td>
                 <td>
                   <div class="inline-table-actions">
@@ -623,10 +628,8 @@ createForm?.addEventListener("submit", async (event) => {
   const formData = new FormData(createForm);
   const payload = {
     name: formData.get("name"),
-    sku: formData.get("sku"),
     category: formData.get("category"),
     unit: formData.get("unit"),
-    reorderLevel: Number(formData.get("reorderLevel") || 0),
     notes: formData.get("notes")
   };
 

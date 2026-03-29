@@ -148,6 +148,7 @@ router.post(
           data: {
             amount: amountCollected,
             type: "CREDIT",
+            moneyType: "DIRTY",
             sourceSystem: "distribution",
             description: `Collection recorded for ${item.name}`,
             distributionId: createdDistribution.id,
@@ -341,6 +342,7 @@ router.patch(
             data: {
               amount: nextAmountCollected,
               type: "CREDIT",
+              moneyType: "DIRTY",
               sourceSystem: "distribution",
               description: `Collection recorded for ${nextItem.name}`,
               createdById: req.user.id
@@ -351,6 +353,7 @@ router.patch(
             data: {
               amount: nextAmountCollected,
               type: "CREDIT",
+              moneyType: "DIRTY",
               sourceSystem: "distribution",
               description: `Collection recorded for ${nextItem.name}`,
               distributionId: existingDistribution.id,

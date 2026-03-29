@@ -33,6 +33,11 @@ enum BankTransactionType {
   DEBIT
 }
 
+enum BankMoneyType {
+  CLEAN
+  DIRTY
+}
+
 enum DistributionStatus {
   ASSIGNED
   IN_TRANSIT
@@ -100,6 +105,7 @@ model BankTransaction {
   id             String              @id @default(cuid())
   amount         Decimal             @db.Decimal(12, 2)
   type           BankTransactionType
+  moneyType      BankMoneyType       @default(CLEAN)
   sourceSystem   String              @default("manual")
   description    String?
   createdById    String?

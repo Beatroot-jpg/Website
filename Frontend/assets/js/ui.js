@@ -278,7 +278,22 @@ export function rosterStatusBadge(status) {
 }
 
 export function bankTransactionBadge(type, label = type) {
-  return badge(label, type === "DEBIT" ? "danger" : "good");
+  const normalized = `${type || ""}`.toUpperCase();
+  const tone = normalized === "DEBIT" || normalized === "SUBTRACT" ? "danger" : "good";
+  const text = label === type
+    ? normalized === "DEBIT"
+      ? "Subtract"
+      : normalized === "CREDIT"
+        ? "Correction"
+        : label
+    : label;
+
+  return badge(text, tone);
+}
+
+export function bankMoneyBadge(moneyType) {
+  const normalized = `${moneyType || ""}`.toUpperCase();
+  return badge(normalized === "DIRTY" ? "Dirty Money" : "Clean Money", normalized === "DIRTY" ? "accent" : "neutral");
 }
 
 export function roleBadge(role) {

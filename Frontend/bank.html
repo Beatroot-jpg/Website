@@ -42,18 +42,27 @@
           <article class="panel">
             <div class="panel-header">
               <h2 id="transactionFormTitle">Add transaction</h2>
-              <p id="transactionFormSubtitle">Use this for manual deposits, withdrawals, or corrections.</p>
+              <p id="transactionFormSubtitle">Choose the money type and whether this is a correction or a subtract entry.</p>
             </div>
 
             <form class="stack-form" id="transactionForm">
               <input type="hidden" id="transactionId" name="transactionId">
-              <label class="field-stack">
-                <span>Type</span>
-                <select name="type">
-                  <option value="CREDIT">Credit</option>
-                  <option value="DEBIT">Debit</option>
-                </select>
-              </label>
+              <div class="field-grid">
+                <label class="field-stack">
+                  <span>Money type</span>
+                  <select name="moneyType">
+                    <option value="CLEAN">Clean Money</option>
+                    <option value="DIRTY">Dirty Money</option>
+                  </select>
+                </label>
+                <label class="field-stack">
+                  <span>Function</span>
+                  <select name="entryType">
+                    <option value="CORRECTION">Correction</option>
+                    <option value="SUBTRACT">Subtract</option>
+                  </select>
+                </label>
+              </div>
               <label class="field-stack">
                 <span>Amount</span>
                 <input type="number" min="0" step="0.01" name="amount" placeholder="0.00" required>
@@ -73,9 +82,10 @@
           <article class="panel">
             <div class="panel-header">
               <h2>Transaction history</h2>
-              <p>All manual and system-linked ledger entries in reverse chronological order.</p>
+              <p>Manual and system-linked ledger entries with clean and dirty money tracked separately.</p>
             </div>
             <div id="transactionTable"></div>
+            <div class="pager" id="transactionPagination"></div>
           </article>
         </section>
       </main>
