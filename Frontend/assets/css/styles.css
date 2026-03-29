@@ -225,16 +225,16 @@ textarea:focus {
 }
 
 .split-grid {
-  grid-template-columns: minmax(380px, 0.95fr) minmax(0, 1.35fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .action-grid {
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
 .content-grid {
-  grid-template-columns: minmax(0, 1.4fr) minmax(340px, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
@@ -243,20 +243,20 @@ textarea:focus {
 }
 
 .feed-grid {
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .metric-grid {
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .field-grid,
 .permission-list {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .feature-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .auth-panel,
@@ -405,7 +405,7 @@ label span,
 .stack-list {
   display: grid;
   gap: 0.9rem;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
 }
 
@@ -594,7 +594,7 @@ label span,
 }
 
 .workspace-tools {
-  grid-template-columns: minmax(0, 1.4fr) minmax(340px, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
@@ -675,7 +675,7 @@ label span,
 }
 
 .quick-actions-list {
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .quick-action {
@@ -687,6 +687,81 @@ label span,
 .collection-tools {
   justify-content: space-between;
   margin-bottom: 0.85rem;
+}
+
+.workspace > *,
+.workspace-header > *,
+.workspace-tools > *,
+.panel > *,
+.panel-header > *,
+.global-search-panel > *,
+.quick-actions-panel > *,
+.metric-card > *,
+.activity-card > *,
+.empty-state > *,
+.sidebar > *,
+.search-result > *,
+.quick-action > * {
+  min-width: 0;
+}
+
+.workspace-header,
+.header-controls,
+.inline-actions,
+.collection-tools,
+.bulk-strip,
+.filter-chip-row,
+.toolbar-actions,
+.inline-table-actions,
+.activity-card,
+.search-result,
+.quick-action {
+  align-items: flex-start;
+}
+
+.activity-card,
+.search-result,
+.quick-action {
+  flex-wrap: wrap;
+}
+
+.panel,
+.workspace-header,
+.workspace-tools,
+.global-search-panel,
+.quick-actions-panel,
+.metric-card,
+.activity-card,
+.empty-state,
+.search-result,
+.quick-action,
+.table-shell {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.panel-header p,
+.activity-card p,
+.search-result-copy p,
+.quick-action small,
+.sidebar-footer,
+.toolbar-meta,
+.empty-state p,
+.muted,
+.subtle-row {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.primary-button,
+.secondary-button,
+.ghost-button,
+.mini-action,
+.filter-chip,
+.user-pill,
+.badge {
+  max-width: 100%;
+  white-space: normal;
 }
 
 .bulk-strip {
