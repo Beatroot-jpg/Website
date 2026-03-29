@@ -1,5 +1,9 @@
 import { prisma } from "../db.js";
 
+function isManualBalanceCorrection(transaction) {
+  return transaction.sourceSystem === "manual" && transaction.type === "CREDIT";
+}
+
 export function getTransactionEffect(transaction) {
   const amount = Number(transaction.amount || 0);
   return transaction.type === "DEBIT" ? amount * -1 : amount;
@@ -11,20 +15,27 @@ export function getEntryTypeFromTransaction(transaction) {
 
 export async function getBankBalances() {
   const transactions = await prisma.bankTransaction.findMany({
+    orderBy: [
+      { createdAt: "asc" },
+      { id: "asc" }
+    ],
     select: {
       amount: true,
       type: true,
-      moneyType: true
+      moneyType: true,
+      sourceSystem: true
     }
   });
 
   const totals = transactions.reduce((sum, transaction) => {
-    const effect = getTransactionEffect(transaction);
-
     if (transaction.moneyType === "DIRTY") {
-      sum.dirty += effect;
+      sum.dirty = isManualBalanceCorrection(transaction)
+        ? Number(transaction.amount || 0)
+        : sum.dirty + getTransactionEffect(transaction);
     } else {
-      sum.clean += effect;
+      sum.clean = isManualBalanceCorrection(transaction)
+        ? Number(transaction.amount || 0)
+        : sum.clean + getTransactionEffect(transaction);
     }
 
     return sum;

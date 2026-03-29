@@ -38,6 +38,7 @@ const transactionFormTitle = document.querySelector("#transactionFormTitle");
 const transactionFormSubtitle = document.querySelector("#transactionFormSubtitle");
 const transactionSubmitButton = document.querySelector("#transactionSubmitButton");
 const resetTransactionButton = document.querySelector("#resetTransactionForm");
+const transactionAmountHint = document.querySelector("#transactionAmountHint");
 const toolbarHost = document.createElement("div");
 const initialParams = new URLSearchParams(window.location.search);
 const searchQuery = (initialParams.get("search") || "").trim().toLowerCase();
@@ -85,10 +86,13 @@ function resetTransactionForm({ clearDraftState = false, clearUrl = true } = {})
   transactionForm.reset();
   transactionIdField.value = "";
   transactionFormTitle.textContent = "Add transaction";
-  transactionFormSubtitle.textContent = "Record the transaction first, then review the running ledger directly underneath it.";
+  transactionFormSubtitle.textContent = "Use correction to set a balance exactly, or subtract to take money away.";
   transactionSubmitButton.textContent = "Record transaction";
   transactionForm.elements.moneyType.value = "CLEAN";
   transactionForm.elements.entryType.value = "CORRECTION";
+  if (transactionAmountHint) {
+    transactionAmountHint.textContent = "Correction sets the selected money balance to this exact amount. Subtract removes this amount from the current balance.";
+  }
   mountFormError(transactionError, "");
 
   if (clearDraftState) {
@@ -110,6 +114,18 @@ function fillTransactionForm(transaction) {
   transactionForm.elements.entryType.value = transaction.entryType || "CORRECTION";
   transactionForm.elements.amount.value = transaction.amount;
   transactionForm.elements.description.value = transaction.description || "";
+  updateAmountHint();
+}
+
+function updateAmountHint() {
+  if (!transactionAmountHint) {
+    return;
+  }
+
+  const entryType = `${transactionForm.elements.entryType.value || ""}`.toUpperCase();
+  transactionAmountHint.textContent = entryType === "SUBTRACT"
+    ? "Subtract removes this amount from the selected money balance."
+    : "Correction sets the selected money balance to this exact amount, even if that amount is 0.";
 }
 
 function maybeOpenRequestedEdit() {
@@ -617,6 +633,8 @@ resetTransactionButton?.addEventListener("click", () => {
   resetTransactionForm({ clearDraftState: true });
 });
 
+transactionForm?.elements.entryType?.addEventListener("change", updateAmountHint);
+
 subscribeToMutations(["bank", "distribution"], () => {
   showToast("Live update received for the bank ledger.", "info");
   loadBank();
@@ -624,4 +642,5 @@ subscribeToMutations(["bank", "distribution"], () => {
 
 resetTransactionForm({ clearUrl: false });
 restoreDraftForm(transactionForm, "bank-transaction");
+updateAmountHint();
 loadBank();
