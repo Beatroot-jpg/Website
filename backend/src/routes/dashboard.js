@@ -24,6 +24,20 @@ function formatMovementType(type) {
   }
 }
 
+function buildBankTransactionHref(transaction, canViewDistribution) {
+  if (transaction.sourceSystem === "distribution_deposit") {
+    return canViewDistribution
+      ? "./distribution.html?view=ledger-deposited#distributionLedgerTable"
+      : "./bank.html?view=dirty#transactionTable";
+  }
+
+  if (transaction.distributionId) {
+    return `./bank.html?search=${encodeURIComponent(transaction.description || transaction.moneyType)}#transactionTable`;
+  }
+
+  return `./bank.html?editTransaction=${transaction.id}#transactionForm`;
+}
+
 router.get(
   "/summary",
   asyncHandler(async (req, res) => {
@@ -169,11 +183,7 @@ router.get(
           badgeLabel: transaction.entryType,
           tone: transaction.entryType === "SUBTRACT" ? "danger" : transaction.moneyType === "DIRTY" ? "accent" : "good",
           createdAt: transaction.createdAt,
-          href: transaction.distributionId && canViewDistribution
-            ? `./distribution.html?editDistribution=${transaction.distributionId}#distributionForm`
-            : transaction.distributionId
-              ? `./bank.html?search=${encodeURIComponent(transaction.description || transaction.moneyType)}#transactionTable`
-              : `./bank.html?editTransaction=${transaction.id}#transactionForm`
+          href: buildBankTransactionHref(transaction, canViewDistribution)
         }))
       );
     }

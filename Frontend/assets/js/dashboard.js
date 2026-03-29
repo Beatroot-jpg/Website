@@ -113,8 +113,22 @@ function renderTransactionFeed(items) {
     return;
   }
 
+  function buildTransactionHref(item) {
+    if (item.sourceSystem === "distribution_deposit") {
+      return hasPermission("DISTRIBUTION")
+        ? "./distribution.html?view=ledger-deposited#distributionLedgerTable"
+        : "./bank.html?view=dirty#transactionTable";
+    }
+
+    if (item.distribution?.id) {
+      return `./bank.html?search=${encodeURIComponent(item.description || item.moneyType)}#transactionTable`;
+    }
+
+    return `./bank.html?editTransaction=${item.id}#transactionForm`;
+  }
+
   transactionFeed.innerHTML = items.map((item) => `
-    <a class="activity-link" href="${item.distribution?.id && hasPermission("DISTRIBUTION") ? `./distribution.html?editDistribution=${item.distribution.id}#collectionForm` : `./bank.html${item.distribution?.id ? `?search=${encodeURIComponent(item.description || item.moneyType)}#transactionTable` : `?editTransaction=${item.id}#transactionForm`}`}">
+    <a class="activity-link" href="${buildTransactionHref(item)}">
       <article class="activity-card">
         <div>
           <strong>${item.moneyType} Money</strong>

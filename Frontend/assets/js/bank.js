@@ -163,6 +163,24 @@ function renderSummary(balances, recentTransactions) {
   `;
 }
 
+function buildTransactionSourceHref(transaction) {
+  if (transaction.sourceSystem === "distribution_deposit") {
+    return hasPermission("DISTRIBUTION")
+      ? "./distribution.html?view=ledger-deposited#distributionLedgerTable"
+      : "./bank.html?view=dirty#transactionTable";
+  }
+
+  if (transaction.distributionId) {
+    return `./bank.html?search=${encodeURIComponent(transaction.description || transaction.moneyType)}#transactionTable`;
+  }
+
+  if (transaction.sourceSystem === "manual") {
+    return `./bank.html?editTransaction=${transaction.id}#transactionForm`;
+  }
+
+  return "";
+}
+
 function getSelectedTransactions(transactions = transactionsCache) {
   const availableIds = new Set(transactions.map((transaction) => transaction.id));
   selectedTransactionIds = new Set([...selectedTransactionIds].filter((id) => availableIds.has(id)));
@@ -376,13 +394,11 @@ function renderTransactions(transactions, pagination) {
               <td>${transaction.description || "No description"}</td>
               <td>
                 <div class="inline-table-actions">
-                  ${transaction.distributionId
-                    ? hasPermission("DISTRIBUTION")
-                      ? `<a class="mini-action" href="./distribution.html?editDistribution=${transaction.distributionId}#distributionForm">Open source</a>`
-                      : `<span class="badge neutral">Linked entry</span>`
-                    : transaction.sourceSystem === "manual"
-                      ? `<button class="mini-action" type="button" data-edit-transaction="${transaction.id}">Edit</button>`
-                      : ""}
+                  ${transaction.sourceSystem === "manual" && !transaction.distributionId
+                    ? `<button class="mini-action" type="button" data-edit-transaction="${transaction.id}">Edit</button>`
+                    : buildTransactionSourceHref(transaction)
+                      ? `<a class="mini-action" href="${buildTransactionSourceHref(transaction)}">${transaction.sourceSystem === "distribution_deposit" ? "Open ledger" : "View entry"}</a>`
+                      : `<span class="badge neutral">System entry</span>`}
                 </div>
               </td>
               <td>${formatDate(transaction.createdAt)}</td>

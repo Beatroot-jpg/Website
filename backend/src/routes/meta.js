@@ -6,6 +6,20 @@ import { authenticateToken, listPermissionMetadata } from "../middleware/auth.js
 
 const router = Router();
 
+function buildBankResultHref(transaction, canViewDistribution) {
+  if (transaction.sourceSystem === "distribution_deposit") {
+    return canViewDistribution
+      ? "./distribution.html?view=ledger-deposited#distributionLedgerTable"
+      : "./bank.html?view=dirty#transactionTable";
+  }
+
+  if (transaction.distributionId) {
+    return `./bank.html?search=${encodeURIComponent(transaction.description || transaction.moneyType)}#transactionTable`;
+  }
+
+  return `./bank.html?editTransaction=${transaction.id}#transactionForm`;
+}
+
 router.get(
   "/bootstrap-status",
   asyncHandler(async (_req, res) => {
@@ -159,11 +173,7 @@ router.get(
           group: "Bank",
           title: item.description || `${item.moneyType} ${item.type === "DEBIT" ? "subtract" : "correction"}`,
           subtitle: `${item.moneyType} money - ${item.sourceSystem} - ${item.amount}`,
-          href: item.distributionId && canViewDistribution
-            ? `./distribution.html?editDistribution=${item.distributionId}#distributionForm`
-            : item.distributionId
-              ? `./bank.html?search=${encodeURIComponent(item.description || item.moneyType)}#transactionTable`
-              : `./bank.html?editTransaction=${item.id}#transactionForm`,
+          href: buildBankResultHref(item, canViewDistribution),
           tone: item.type === "DEBIT" ? "danger" : "good",
           sortAt: item.createdAt
         })))

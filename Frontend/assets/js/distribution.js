@@ -152,13 +152,29 @@ function updateDistributionTotalHint() {
 }
 
 function populateDistributionOptions() {
-  distributionRunnerSelect.innerHTML = distributorsCache.length
-    ? distributorsCache.map((distributor) => `<option value="${distributor.id}">${distributor.name} - ${distributor.number}${distributor.active ? "" : " - inactive"}</option>`).join("")
+  const currentDistribution = requestedDistributionEditId
+    ? distributionsCache.find((distribution) => distribution.id === requestedDistributionEditId)
+    : null;
+  const currentDistributorId = distributionForm.elements.distributorId.value || currentDistribution?.distributorId || "";
+  const currentItemId = distributionForm.elements.itemId.value || currentDistribution?.itemId || "";
+  const availableDistributors = distributorsCache.filter((distributor) => distributor.active || distributor.id === currentDistributorId);
+  const availableItems = itemsCache.filter((item) => item.quantity > 0 || item.id === currentItemId);
+
+  distributionRunnerSelect.innerHTML = availableDistributors.length
+    ? availableDistributors.map((distributor) => `<option value="${distributor.id}">${distributor.name} - ${distributor.number}${distributor.active ? "" : " - inactive"}</option>`).join("")
     : "<option value=''>No runners available</option>";
 
-  distributionItemSelect.innerHTML = itemsCache.length
-    ? itemsCache.map((item) => `<option value="${item.id}">${item.name} - ${item.quantity} ${item.unit}${item.category ? ` - ${item.category}` : ""}</option>`).join("")
+  distributionItemSelect.innerHTML = availableItems.length
+    ? availableItems.map((item) => `<option value="${item.id}">${item.name} - ${item.quantity} ${item.unit}${item.category ? ` - ${item.category}` : ""}</option>`).join("")
     : "<option value=''>No stock available</option>";
+
+  if (currentDistributorId && availableDistributors.some((distributor) => distributor.id === currentDistributorId)) {
+    distributionRunnerSelect.value = currentDistributorId;
+  }
+
+  if (currentItemId && availableItems.some((item) => item.id === currentItemId)) {
+    distributionItemSelect.value = currentItemId;
+  }
 }
 
 function populateCollectionOptions() {
@@ -206,7 +222,7 @@ function syncCollectionAmount() {
   }
 }
 
-function resetRunnerForm({ clearDraftState = false } = {}) {
+function resetRunnerForm({ clearDraftState = false, clearUrl = true } = {}) {
   runnerForm.reset();
   runnerIdField.value = "";
   runnerFormTitle.textContent = "Create runner";
@@ -218,9 +234,14 @@ function resetRunnerForm({ clearDraftState = false } = {}) {
   if (clearDraftState) {
     runnerDraft.clearDraft();
   }
+
+  if (clearUrl) {
+    requestedDistributorEditId = "";
+    updateUrlParams({ editDistributor: "" }, ["editDistributor"]);
+  }
 }
 
-function resetDistributionForm({ clearDraftState = false } = {}) {
+function resetDistributionForm({ clearDraftState = false, clearUrl = true } = {}) {
   distributionForm.reset();
   distributionIdField.value = "";
   distributionFormTitle.textContent = "Create distribution";
@@ -234,9 +255,14 @@ function resetDistributionForm({ clearDraftState = false } = {}) {
   if (clearDraftState) {
     distributionDraft.clearDraft();
   }
+
+  if (clearUrl) {
+    requestedDistributionEditId = "";
+    updateUrlParams({ editDistribution: "" }, ["editDistribution"]);
+  }
 }
 
-function resetCollectionForm({ clearDraftState = false } = {}) {
+function resetCollectionForm({ clearDraftState = false, clearUrl = true } = {}) {
   collectionForm.reset();
   collectionEntryIdField.value = "";
   collectionFormTitle.textContent = "Collect payment";
@@ -253,6 +279,12 @@ function resetCollectionForm({ clearDraftState = false } = {}) {
   if (clearDraftState) {
     collectionDraft.clearDraft();
   }
+
+  if (clearUrl) {
+    requestedCollectionEditId = "";
+    requestedDistributionEditId = "";
+    updateUrlParams({ editCollection: "", editDistribution: "" }, ["editCollection", "editDistribution"]);
+  }
 }
 
 function fillRunnerForm(distributor) {
@@ -266,6 +298,7 @@ function fillRunnerForm(distributor) {
 }
 
 function fillDistributionForm(distribution) {
+  populateDistributionOptions();
   distributionIdField.value = distribution.id;
   distributionFormTitle.textContent = `Edit ${distribution.item.name}`;
   distributionSubmitButton.textContent = "Save changes";
@@ -318,6 +351,10 @@ function openRequestedTargets() {
 
     if (distributor) {
       fillRunnerForm(distributor);
+    } else {
+      requestedDistributorEditId = "";
+      updateUrlParams({ editDistributor: "" }, ["editDistributor"]);
+      showToast("That runner could not be found.", "error");
     }
   }
 
@@ -329,12 +366,19 @@ function openRequestedTargets() {
       collectionForm.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
+
+    requestedCollectionEditId = "";
+    updateUrlParams({ editCollection: "" }, ["editCollection"]);
+    showToast("That ledger entry could not be found.", "error");
   }
 
   if (requestedDistributionEditId) {
     const distribution = distributionsCache.find((entry) => entry.id === requestedDistributionEditId);
 
     if (!distribution) {
+      requestedDistributionEditId = "";
+      updateUrlParams({ editDistribution: "" }, ["editDistribution"]);
+      showToast("That distribution could not be found.", "error");
       return;
     }
 
@@ -959,7 +1003,7 @@ subscribeToMutations(["distribution", "inventory", "bank"], () => {
   loadPage();
 });
 
-resetRunnerForm();
-resetDistributionForm();
-resetCollectionForm();
+resetRunnerForm({ clearUrl: false });
+resetDistributionForm({ clearUrl: false });
+resetCollectionForm({ clearUrl: false });
 loadPage();
