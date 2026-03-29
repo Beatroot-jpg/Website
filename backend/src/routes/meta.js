@@ -6,11 +6,9 @@ import { authenticateToken, listPermissionMetadata } from "../middleware/auth.js
 
 const router = Router();
 
-function buildBankResultHref(transaction, canViewDistribution) {
+function buildBankResultHref(transaction) {
   if (transaction.sourceSystem === "distribution_deposit") {
-    return canViewDistribution
-      ? "./distribution.html?view=ledger-deposited#distributionLedgerTable"
-      : "./bank.html?view=dirty#transactionTable";
+    return "./bank.html?view=dirty#transactionTable";
   }
 
   if (transaction.distributionId) {
@@ -173,7 +171,7 @@ router.get(
           group: "Bank",
           title: item.description || `${item.moneyType} ${item.type === "DEBIT" ? "subtract" : "correction"}`,
           subtitle: `${item.moneyType} money - ${item.sourceSystem} - ${item.amount}`,
-          href: buildBankResultHref(item, canViewDistribution),
+          href: buildBankResultHref(item),
           tone: item.type === "DEBIT" ? "danger" : "good",
           sortAt: item.createdAt
         })))

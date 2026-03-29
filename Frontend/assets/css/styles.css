@@ -188,7 +188,7 @@ textarea:focus {
 
 .auth-body,
 .app-body {
-  padding: 1rem;
+  padding: 1.15rem;
 }
 
 .auth-shell,
@@ -203,12 +203,13 @@ textarea:focus {
 .permission-list,
 .feature-grid {
   display: grid;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 .auth-shell,
 .app-shell {
-  max-width: 1520px;
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
 }
 
@@ -323,7 +324,7 @@ textarea:focus {
 .workspace-header,
 .panel,
 .sidebar {
-  padding: 1.2rem;
+  padding: 1.4rem;
 }
 
 .panel {
@@ -411,7 +412,7 @@ label span,
 
 .workspace {
   align-content: start;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 .field-stack {
@@ -916,12 +917,12 @@ label span,
 .activity-meta {
   display: grid;
   gap: 0.4rem;
-  justify-items: end;
-  text-align: right;
+  justify-items: start;
+  text-align: left;
 }
 
 .table-shell {
-  overflow: auto;
+  overflow: hidden;
   border: 2px solid var(--line);
   background: rgba(14, 16, 20, 0.98);
   box-shadow: var(--shadow-soft);
@@ -929,8 +930,9 @@ label span,
 
 .data-table {
   width: 100%;
-  min-width: 1080px;
+  min-width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .data-table th,
@@ -938,8 +940,10 @@ label span,
   padding: 0.82rem 0.88rem;
   text-align: left;
   border-bottom: 1px solid var(--line);
-  vertical-align: middle;
-  white-space: nowrap;
+  vertical-align: top;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .data-table th {
@@ -982,10 +986,14 @@ label span,
 }
 
 .data-table td .subtle-row {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 0.42rem;
-  white-space: nowrap;
+  display: block;
+  margin-top: 0.28rem;
+  margin-left: 0;
+  white-space: normal;
+}
+
+.inline-table-actions {
+  width: 100%;
 }
 
 .section-divider {

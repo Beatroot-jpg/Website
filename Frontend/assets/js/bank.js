@@ -1,6 +1,5 @@
 import { api } from "./api.js";
 import { announceMutation, subscribeToMutations } from "./live.js";
-import { hasPermission } from "./session.js";
 import {
   bankMoneyBadge,
   bankTransactionBadge,
@@ -165,9 +164,7 @@ function renderSummary(balances, recentTransactions) {
 
 function buildTransactionSourceHref(transaction) {
   if (transaction.sourceSystem === "distribution_deposit") {
-    return hasPermission("DISTRIBUTION")
-      ? "./distribution.html?view=ledger-deposited#distributionLedgerTable"
-      : "./bank.html?view=dirty#transactionTable";
+    return "./bank.html?view=dirty#transactionTable";
   }
 
   if (transaction.distributionId) {

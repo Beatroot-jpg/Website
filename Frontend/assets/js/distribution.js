@@ -123,18 +123,6 @@ function distributionView() {
   return "active";
 }
 
-function ledgerView() {
-  if (rawView === "ledger-pending") {
-    return "pending";
-  }
-
-  if (rawView === "ledger-deposited") {
-    return "deposited";
-  }
-
-  return "all";
-}
-
 function setDistributionLock(locked) {
   ["distributorId", "itemId", "quantity", "unitValue"].forEach((name) => {
     if (distributionForm.elements[name]) {
@@ -421,14 +409,7 @@ function visibleDistributions() {
 }
 
 function visibleLedgerEntries() {
-  let entries = [...ledgerCache];
-  const view = ledgerView();
-
-  if (view === "pending") {
-    entries = entries.filter((entry) => entry.status === "PENDING");
-  } else if (view === "deposited") {
-    entries = entries.filter((entry) => entry.status === "DEPOSITED");
-  }
+  let entries = ledgerCache.filter((entry) => entry.status === "PENDING");
 
   if (searchQuery) {
     entries = entries.filter((entry) => [
@@ -669,24 +650,16 @@ function renderDistributors() {
 }
 
 function renderLedgerToolbar() {
-  const view = ledgerView();
+  const entries = visibleLedgerEntries();
   const selectedEntries = selectedLedgerEntries();
   const selectedTotal = selectedEntries.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
-  const links = [
-    { label: "All", view: "" },
-    { label: "Pending", view: "ledger-pending" },
-    { label: "Deposited", view: "ledger-deposited" }
-  ];
+  const pendingTotal = entries.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
 
   ledgerToolbar.innerHTML = `
     <div class="collection-tools">
-      <div class="filter-chip-row">
-        ${links.map((link) => `
-          <a class="filter-chip ${((!view && !link.view) || (view === "pending" && link.view === "ledger-pending") || (view === "deposited" && link.view === "ledger-deposited")) ? "active" : ""}" href="${buildPageHref("./distribution.html", { view: link.view, search: searchQuery, hash: "distributionLedgerTable" })}">${link.label}</a>
-        `).join("")}
-      </div>
       <div class="toolbar-actions">
-        <span class="toolbar-meta">${visibleLedgerEntries().length} shown</span>
+        <span class="toolbar-meta">${entries.length} active entries</span>
+        <span class="toolbar-meta">${formatCurrency(pendingTotal)} waiting to deposit</span>
       </div>
       ${selectedEntries.length ? `
         <div class="bulk-strip">
@@ -725,11 +698,11 @@ function renderLedgerToolbar() {
 
 function renderLedgerEntries() {
   const entries = visibleLedgerEntries();
-  const allSelectable = entries.filter((entry) => entry.status === "PENDING" && Number(entry.amount) > 0);
+  const allSelectable = entries.filter((entry) => Number(entry.amount) > 0);
   const allSelected = allSelectable.length && allSelectable.every((entry) => selectedLedgerIds.has(entry.id));
 
   if (!entries.length) {
-    ledgerTable.innerHTML = renderEmptyState("No ledger entries yet", "Collections will appear here as money comes back from active runs.");
+    ledgerTable.innerHTML = renderEmptyState("No active ledger entries", "Pending collections will show here until they are deposited into Dirty Money.");
     return;
   }
 
@@ -745,8 +718,6 @@ function renderLedgerEntries() {
             <th>Item</th>
             <th>Action</th>
             <th>Amount</th>
-            <th>Status</th>
-            <th>Deposit</th>
             <th>Logged by</th>
             <th>Action</th>
             <th>Recorded</th>
@@ -765,12 +736,10 @@ function renderLedgerEntries() {
                 <td>${entry.distribution.item.name}</td>
                 <td>${badge(humanizeCollectionAction(entry.action), entry.action === "FAULTY_CLEAR" ? "danger" : entry.action === "FULL_CLEAR" ? "good" : "warn")}</td>
                 <td>${formatCurrency(entry.amount)}</td>
-                <td>${badge(entry.status === "DEPOSITED" ? "Deposited" : "Pending", entry.status === "DEPOSITED" ? "good" : "accent")}</td>
-                <td>${entry.bankTransaction ? `${formatCurrency(entry.bankTransaction.amount)} dirty` : "Not deposited"}</td>
                 <td>${entry.createdBy?.name || "System"}</td>
                 <td>
                   <div class="inline-table-actions">
-                    ${entry.status === "PENDING" ? `<button class="mini-action" type="button" data-edit-entry="${entry.id}">Edit</button>` : ""}
+                    <button class="mini-action" type="button" data-edit-entry="${entry.id}">Edit</button>
                     <button class="mini-action" type="button" data-open-distribution="${entry.distributionId}">Open run</button>
                   </div>
                 </td>
