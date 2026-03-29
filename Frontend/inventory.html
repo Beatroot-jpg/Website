@@ -36,7 +36,7 @@
           </div>
         </header>
 
-        <section class="split-grid">
+        <section class="action-grid">
           <article class="panel">
             <div class="panel-header">
               <h2 id="inventoryFormTitle">Create item</h2>
@@ -74,8 +74,10 @@
               <p class="muted" id="inventoryQuantityHint">Starting quantity is only used when creating a new item.</p>
               <p class="form-error hidden" id="inventoryError"></p>
             </form>
+          </article>
 
-            <div class="panel-header section-divider">
+          <article class="panel">
+            <div class="panel-header">
               <h2 id="adjustFormTitle">Adjust stock</h2>
               <p id="adjustFormSubtitle">Apply an add, subtract, or correction movement to an existing item.</p>
             </div>
@@ -111,14 +113,19 @@
               <p class="form-error hidden" id="adjustError"></p>
             </form>
           </article>
+        </section>
 
+        <section class="content-grid">
           <article class="panel">
             <div class="panel-header">
               <h2>Current inventory</h2>
               <p>Live quantities across all stored items.</p>
             </div>
             <div id="inventoryTable"></div>
-            <div class="panel-header section-divider">
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
               <h2>Recent stock activity</h2>
               <p>Latest adds, subtracts, and corrections across your items.</p>
             </div>

@@ -38,7 +38,7 @@
 
         <section class="metric-grid" id="distributionSummary"></section>
 
-        <section class="split-grid">
+        <section class="action-grid">
           <article class="panel">
             <div class="panel-header">
               <h2 id="runnerFormTitle">Create runner</h2>
@@ -65,8 +65,10 @@
               </div>
               <p class="form-error hidden" id="runnerError"></p>
             </form>
+          </article>
 
-            <div class="panel-header section-divider">
+          <article class="panel">
+            <div class="panel-header">
               <h2 id="distributionFormTitle">Create distribution</h2>
               <p id="distributionFormSubtitle">Hand product out to a runner and lock in what they owe back.</p>
             </div>
@@ -102,8 +104,10 @@
               </div>
               <p class="form-error hidden" id="distributionError"></p>
             </form>
+          </article>
 
-            <div class="panel-header section-divider" id="collectionForm">
+          <article class="panel" id="collectionForm">
+            <div class="panel-header">
               <h2 id="collectionFormTitle">Collect payment</h2>
               <p id="collectionFormSubtitle">Log what comes back, clear the run, or close it as faulty.</p>
             </div>
@@ -140,7 +144,9 @@
               <p class="form-error hidden" id="collectionError"></p>
             </form>
           </article>
+        </section>
 
+        <section class="content-grid">
           <article class="panel">
             <div class="panel-header">
               <h2>Active distributions</h2>
@@ -148,9 +154,7 @@
             </div>
             <div id="distributionTable"></div>
           </article>
-        </section>
 
-        <section class="feed-grid">
           <article class="panel">
             <div class="panel-header">
               <h2>Runners</h2>
@@ -158,7 +162,9 @@
             </div>
             <div id="distributorTable"></div>
           </article>
+        </section>
 
+        <section class="workspace-row">
           <article class="panel">
             <div class="panel-header">
               <h2>Collection ledger</h2>

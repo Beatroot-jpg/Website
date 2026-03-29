@@ -194,6 +194,9 @@ textarea:focus {
 .auth-shell,
 .app-shell,
 .split-grid,
+.action-grid,
+.content-grid,
+.workspace-row,
 .feed-grid,
 .metric-grid,
 .field-grid,
@@ -222,15 +225,29 @@ textarea:focus {
 }
 
 .split-grid {
-  grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
+  grid-template-columns: minmax(380px, 0.95fr) minmax(0, 1.35fr);
+}
+
+.action-grid {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  align-items: start;
+}
+
+.content-grid {
+  grid-template-columns: minmax(0, 1.4fr) minmax(340px, 1fr);
+  align-items: start;
+}
+
+.workspace-row {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .feed-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
 }
 
 .metric-grid {
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
 .field-grid,
@@ -309,6 +326,12 @@ textarea:focus {
   padding: 1.2rem;
 }
 
+.panel {
+  display: grid;
+  align-content: start;
+  gap: 0.95rem;
+}
+
 .auth-panel h1,
 .workspace-header h1,
 .panel-header h2,
@@ -370,7 +393,6 @@ label span,
 }
 
 .stack-form,
-.stack-list,
 .field-stack,
 .nav-list,
 .workspace,
@@ -380,8 +402,16 @@ label span,
   gap: 0.9rem;
 }
 
+.stack-list {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  align-items: stretch;
+}
+
 .workspace {
   align-content: start;
+  gap: 1rem;
 }
 
 .field-stack {
@@ -564,7 +594,7 @@ label span,
 }
 
 .workspace-tools {
-  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.95fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(340px, 1fr);
   align-items: start;
 }
 
@@ -737,7 +767,7 @@ label span,
 }
 
 .panel-header {
-  margin-bottom: 0.9rem;
+  margin-bottom: 0;
   padding-bottom: 0.75rem;
   border-bottom: 2px solid var(--line);
 }
@@ -785,6 +815,7 @@ label span,
 .activity-card {
   justify-content: space-between;
   align-items: flex-start;
+  min-height: 112px;
   background:
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.06), transparent 0 10rem),
     rgba(14, 16, 20, 0.98);
@@ -883,7 +914,9 @@ label span,
 }
 
 .section-divider {
-  margin-top: 1.4rem;
+  margin-top: 0.2rem;
+  padding-top: 1rem;
+  border-top: 2px solid var(--line);
 }
 
 .stock-readout {
@@ -1131,6 +1164,9 @@ label span,
   .auth-shell,
   .app-shell,
   .split-grid,
+  .action-grid,
+  .content-grid,
+  .workspace-row,
   .feed-grid,
   .workspace-tools {
     grid-template-columns: 1fr;
