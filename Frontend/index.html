@@ -10,32 +10,48 @@
   </head>
   <body class="auth-body">
     <div class="auth-shell">
-      <section class="auth-panel">
+      <section class="auth-panel auth-hero-panel">
         <div class="hero-brand">
-          <img class="hero-logo" src="./assets/images/new_logo.png" alt="YUGO MAFIA logo">
+          <div class="hero-logo-shell">
+            <img class="hero-logo" src="./assets/images/new_logo.png" alt="YUGO MAFIA logo">
+          </div>
+
+          <div class="hero-brand-copy">
+            <p class="eyebrow">Private Member Access</p>
+            <p class="hero-kicker">Live inventory. Live collections. Live movement.</p>
+          </div>
         </div>
 
-        <div>
-          <p class="eyebrow">YUGO MAFIA</p>
-          <h1>Run stock, money, and permissions from one control centre.</h1>
-          <p class="muted">
-            This control system is built for a static Netlify frontend with a Railway-hosted API and PostgreSQL database.
-            Each major tab lives as its own HTML page while sharing the same YUGO MAFIA theme, login flow, and UI system.
+        <div class="hero-stage">
+          <p class="hero-overline">Step Into</p>
+          <h1 class="hero-title">
+            <span>YUGO</span>
+            <span>MAFIA</span>
+          </h1>
+          <p class="hero-subtitle">
+            The control room for the crew, the product, and the numbers that keep everything moving.
           </p>
         </div>
 
-        <div class="feature-grid">
-          <article class="feature-card">
-            <strong>Inventory</strong>
-            <span class="muted">Track quantity, add or subtract stock, and keep movement logs tidy.</span>
+        <div class="hero-callout">
+          <span class="hero-callout-line"></span>
+          <p>
+            Built to feel sharp, dark, and unmistakably yours the second the page opens.
+          </p>
+        </div>
+
+        <div class="feature-grid auth-feature-grid">
+          <article class="feature-card hero-feature-card">
+            <strong>Inventory Flow</strong>
+            <span class="muted">Track what is on hand, what is moving out, and what needs attention next.</span>
           </article>
-          <article class="feature-card">
-            <strong>Bank</strong>
-            <span class="muted">Track clean and dirty money with a running balance and system-linked history.</span>
+          <article class="feature-card hero-feature-card">
+            <strong>Money Watch</strong>
+            <span class="muted">See clean and dirty money clearly, from collection through to deposit.</span>
           </article>
-          <article class="feature-card">
-            <strong>Access control</strong>
-            <span class="muted">Create users and decide exactly which pages they can open.</span>
+          <article class="feature-card hero-feature-card">
+            <strong>Member Access</strong>
+            <span class="muted">Keep each person in the right lane with clear page permissions and role access.</span>
           </article>
         </div>
       </section>
@@ -44,7 +60,7 @@
         <p class="eyebrow">Sign In</p>
         <h2>Welcome back</h2>
         <p class="muted" id="setupHint">
-          Use your admin or user credentials to access the systems you have permission to use.
+          Enter your username and password to step into the live YUGO MAFIA workspace.
         </p>
 
         <form class="stack-form" id="loginForm">
