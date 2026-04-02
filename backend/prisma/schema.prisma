@@ -15,6 +15,8 @@ enum Role {
 enum PermissionKey {
   DASHBOARD
   ROSTER
+  ANALYTICS
+  DAILY_TASKS
   INVENTORY
   BANK
   DISTRIBUTION
@@ -69,6 +71,12 @@ enum RosterStatus {
   INACTIVE
 }
 
+enum DailyTaskImportance {
+  LOW
+  MEDIUM
+  HIGH
+}
+
 model User {
   id                     String            @id @default(cuid())
   email                  String            @unique
@@ -82,6 +90,8 @@ model User {
   createdRunnerDistributions RunnerDistribution[] @relation("RunnerDistributionCreatedBy")
   createdCollectionEntries DistributionCollection[] @relation("DistributionCollectionCreatedBy")
   createdTransactions    BankTransaction[] @relation("BankTransactionCreatedBy")
+  createdDailyTasks      DailyTask[]       @relation("DailyTaskCreatedBy")
+  dailyTaskCompletions   DailyTaskCompletion[]
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 }
@@ -221,4 +231,34 @@ model RosterMember {
   updatedAt   DateTime     @updatedAt
 
   @@index([displayOrder])
+}
+
+model DailyTask {
+  id             String                @id @default(cuid())
+  title          String
+  description    String?
+  importance     DailyTaskImportance   @default(MEDIUM)
+  active         Boolean               @default(true)
+  createdById    String?
+  createdBy      User?                 @relation("DailyTaskCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  completions    DailyTaskCompletion[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([active])
+}
+
+model DailyTaskCompletion {
+  id            String      @id @default(cuid())
+  taskId         String
+  userId         String
+  taskDay        String
+  pointsAwarded  Int
+  completedAt    DateTime   @default(now())
+  task           DailyTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId, taskDay])
+  @@index([taskDay])
+  @@index([userId, taskDay])
 }

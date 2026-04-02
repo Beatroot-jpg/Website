@@ -38,7 +38,8 @@ router.get(
 
     const allowed = new Set(req.user.permissions);
     const canViewInventory = allowed.has("INVENTORY") || req.user.role === "ADMIN";
-    const canViewRoster = allowed.has("ROSTER") || req.user.role === "ADMIN";
+    const canViewAnalytics = allowed.has("ANALYTICS") || req.user.role === "ADMIN";
+    const canViewDailyTasks = allowed.has("DAILY_TASKS") || req.user.role === "ADMIN";
     const canViewBank = allowed.has("BANK") || req.user.role === "ADMIN";
     const canViewDistribution = allowed.has("DISTRIBUTION") || req.user.role === "ADMIN";
     const canViewUsers = allowed.has("USERS") || req.user.role === "ADMIN";
@@ -80,35 +81,19 @@ router.get(
           sortAt: item.updatedAt
         })))
         : [],
-      canViewRoster
-        ? prisma.rosterMember.findMany({
-          where: {
-            OR: [
-              { name: containsFilter },
-              { discordName: containsFilter },
-              { rank: containsFilter }
-            ]
-          },
-          orderBy: [{ displayOrder: "asc" }, { updatedAt: "desc" }],
-          take: 4,
-          select: {
-            id: true,
-            name: true,
-            discordName: true,
-            rank: true,
-            status: true,
-            updatedAt: true
+      canViewAnalytics && /(analytics|stats|trend|weekly|sales|output|performance)/i.test(query)
+        ? Promise.resolve([
+          {
+            id: "analytics-page",
+            group: "Analytics",
+            title: "Analytics page",
+            subtitle: "Weekly comparisons, top movers, and output trends.",
+            href: "./analytics.html",
+            tone: "accent",
+            sortAt: new Date().toISOString()
           }
-        }).then((items) => items.map((item) => ({
-          id: `roster-${item.id}`,
-          group: "Roster",
-          title: item.name,
-          subtitle: `${item.rank} - ${item.discordName} - ${item.status}`,
-          href: `./roster.html?editMember=${item.id}#rosterForm`,
-          tone: item.status === "ACTIVE" ? "good" : item.status === "LOA" ? "warn" : "neutral",
-          sortAt: item.updatedAt
-        })))
-        : [],
+        ])
+        : Promise.resolve([]),
       canViewDistribution
         ? prisma.runnerDistribution.findMany({
           where: {
@@ -142,6 +127,36 @@ router.get(
           subtitle: `${item.quantity} units for ${item.distributor.name} - ${item.status}`,
           href: `./distribution.html?editDistribution=${item.id}#collectionForm`,
           tone: item.status === "CLEARED" ? "good" : item.status === "FAULTY" ? "danger" : item.status === "PARTIAL" ? "warn" : "accent",
+          sortAt: item.updatedAt
+        })))
+        : [],
+      canViewDailyTasks
+        ? prisma.dailyTask.findMany({
+          where: {
+            active: true,
+            OR: [
+              { title: containsFilter },
+              { description: containsFilter }
+            ]
+          },
+          orderBy: [{ importance: "desc" }, { updatedAt: "desc" }],
+          take: 4,
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            importance: true,
+            updatedAt: true
+          }
+        }).then((items) => items.map((item) => ({
+          id: `daily-task-${item.id}`,
+          group: "Daily tasks",
+          title: item.title,
+          subtitle: `${item.importance.toLowerCase()} priority${item.description ? ` - ${item.description}` : ""}`,
+          href: req.user.role === "ADMIN"
+            ? `./daily-tasks.html?editTask=${item.id}#adminTaskForm`
+            : "./daily-tasks.html#taskChecklist",
+          tone: item.importance === "HIGH" ? "warn" : item.importance === "MEDIUM" ? "accent" : "neutral",
           sortAt: item.updatedAt
         })))
         : [],

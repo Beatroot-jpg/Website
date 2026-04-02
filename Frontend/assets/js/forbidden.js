@@ -3,7 +3,7 @@ const reasonElement = document.querySelector("#forbiddenReason");
 const homeLink = document.querySelector("#homeLink");
 
 if (permission && reasonElement) {
-  reasonElement.textContent = `You do not currently have access to the ${permission.toLowerCase()} page.`;
+  reasonElement.textContent = `You do not currently have access to the ${permission.toLowerCase().replaceAll("_", " ")} page.`;
 }
 
 homeLink?.addEventListener("click", (event) => {

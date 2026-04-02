@@ -12,6 +12,8 @@ import bankRoutes from "./routes/bank.js";
 import distributionRoutes from "./routes/distribution.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import rosterRoutes from "./routes/roster.js";
+import analyticsRoutes from "./routes/analytics.js";
+import dailyTaskRoutes from "./routes/daily-tasks.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -48,6 +50,8 @@ app.use("/api/bank", bankRoutes);
 app.use("/api/distribution", distributionRoutes);
 app.use("/api/roster", rosterRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api/daily-tasks", dailyTaskRoutes);
 
 app.use((error, _req, res, _next) => {
   console.error(error);

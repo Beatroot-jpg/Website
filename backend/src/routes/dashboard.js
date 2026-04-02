@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { asyncHandler } from "../http.js";
 import { authenticateToken, requirePermission } from "../middleware/auth.js";
 import { getBankBalances, getEntryTypeFromTransaction } from "../services/bank.js";
+import { getOperationalDayKey, getSydneyDateKey, getWeekStartKey, shiftDateKey } from "../services/time.js";
 
 const router = Router();
 
@@ -42,6 +43,8 @@ router.get(
     const metrics = [];
     const allowed = new Set(req.user.permissions);
     const canViewInventory = allowed.has("INVENTORY") || req.user.role === "ADMIN";
+    const canViewAnalytics = allowed.has("ANALYTICS") || req.user.role === "ADMIN";
+    const canViewDailyTasks = allowed.has("DAILY_TASKS") || req.user.role === "ADMIN";
     const canViewBank = allowed.has("BANK") || req.user.role === "ADMIN";
     const canViewDistribution = allowed.has("DISTRIBUTION") || req.user.role === "ADMIN";
     const recentActivity = [];
@@ -260,6 +263,78 @@ router.get(
           createdAt: distribution.updatedAt,
           href: `./distribution.html?editDistribution=${distribution.id}#collectionForm`
         }))
+      );
+    }
+
+    if (canViewAnalytics) {
+      const weekStartKey = getWeekStartKey(getSydneyDateKey());
+      const weekSearchStart = new Date(`${shiftDateKey(weekStartKey, -1)}T00:00:00Z`);
+      const weeklyDeposits = await prisma.bankTransaction.findMany({
+        where: {
+          sourceSystem: "distribution_deposit",
+          createdAt: {
+            gte: weekSearchStart
+          }
+        },
+        select: {
+          amount: true,
+          createdAt: true
+        }
+      });
+      const weeklyDepositTotal = weeklyDeposits.reduce((sum, transaction) => (
+        getWeekStartKey(getSydneyDateKey(transaction.createdAt)) === weekStartKey
+          ? sum + Number(transaction.amount || 0)
+          : sum
+      ), 0);
+
+      metrics.push({
+        label: "Weekly deposited",
+        value: Number(weeklyDepositTotal || 0),
+        tone: "accent",
+        currency: true,
+        note: "Open analytics",
+        href: "./analytics.html"
+      });
+    }
+
+    if (canViewDailyTasks) {
+      const taskDay = getOperationalDayKey();
+      const [activeTaskCount, completedCount, pointsToday] = await Promise.all([
+        prisma.dailyTask.count({
+          where: { active: true }
+        }),
+        prisma.dailyTaskCompletion.count({
+          where: {
+            userId: req.user.id,
+            taskDay
+          }
+        }),
+        prisma.dailyTaskCompletion.aggregate({
+          where: {
+            userId: req.user.id,
+            taskDay
+          },
+          _sum: {
+            pointsAwarded: true
+          }
+        })
+      ]);
+
+      metrics.push(
+        {
+          label: "Tasks today",
+          value: `${completedCount}/${activeTaskCount}`,
+          tone: completedCount === activeTaskCount && activeTaskCount > 0 ? "good" : "neutral",
+          note: "Open daily tasks",
+          href: "./daily-tasks.html#taskChecklist"
+        },
+        {
+          label: "Task points today",
+          value: Number(pointsToday._sum.pointsAwarded || 0),
+          tone: "good",
+          note: "See leaderboard",
+          href: "./daily-tasks.html#leaderboardPanel"
+        }
       );
     }
 

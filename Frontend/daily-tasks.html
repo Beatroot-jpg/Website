@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Tasks</title>
+    <link rel="stylesheet" href="./assets/css/styles.css">
+    <script src="./assets/js/runtime-config.js"></script>
+    <script src="./assets/js/config.js"></script>
+  </head>
+  <body class="app-body">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <img class="brand-logo" src="./assets/images/new_logo.png" alt="YUGO MAFIA logo">
+          <div>
+            <strong>YUGO MAFIA</strong>
+            <span class="muted">Daily workspace</span>
+          </div>
+        </div>
+        <p class="sidebar-section-title">Sections</p>
+        <nav class="nav-list" id="sidebarNav"></nav>
+        <div class="sidebar-footer">A daily checklist that resets each evening, with a leaderboard to keep people pushing.</div>
+      </aside>
+
+      <main class="workspace">
+        <header class="workspace-header">
+          <div>
+            <p class="eyebrow">Daily Tasks</p>
+            <h1 id="pageTitle"></h1>
+            <p class="muted" id="pageSubtitle"></p>
+          </div>
+          <div class="header-controls">
+            <div class="user-pill" id="userPill"></div>
+            <button class="ghost-button" id="logoutButton" type="button">Log out</button>
+          </div>
+        </header>
+
+        <section class="workflow-stack">
+          <article class="panel">
+            <div class="panel-header">
+              <h2>My progress today</h2>
+              <p id="taskResetLabel">Tasks reset every day at 5:00 PM Australia/Sydney.</p>
+            </div>
+            <div class="metric-grid" id="taskSummary"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h2>My position</h2>
+              <p>Your current leaderboard standing sits here so you know exactly how you are tracking.</p>
+            </div>
+            <div class="task-summary-list" id="currentStanding"></div>
+          </article>
+
+          <article class="panel" id="taskChecklist">
+            <div class="panel-header">
+              <h2>Today's checklist</h2>
+              <p>Each task is one clean row. Tick it off, get the highlight, and let the points build.</p>
+            </div>
+            <div class="task-checklist" id="taskList"></div>
+          </article>
+
+          <article class="panel" id="leaderboardPanel">
+            <div class="panel-header">
+              <h2>All-time leaderboard</h2>
+              <p>This shows the long-term effort table so everyone can see who is consistently showing up.</p>
+            </div>
+            <div class="leaderboard-list" id="taskLeaderboard"></div>
+          </article>
+
+          <article class="panel hidden" id="adminTaskPanel">
+            <div class="panel-header">
+              <h2 id="adminTaskFormTitle">Create daily task</h2>
+              <p id="adminTaskFormSubtitle">Admins can create or edit the task library from one clean section.</p>
+            </div>
+
+            <form class="stack-form" id="adminTaskForm">
+              <input type="hidden" id="adminTaskId" name="adminTaskId">
+              <label class="field-stack">
+                <span>Task title</span>
+                <input type="text" name="title" placeholder="Collect returns, check stock, update records" required>
+              </label>
+              <label class="field-stack">
+                <span>Importance</span>
+                <select name="importance">
+                  <option value="HIGH">High</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="LOW">Low</option>
+                </select>
+              </label>
+              <label class="field-stack">
+                <span>Description</span>
+                <textarea name="description" placeholder="Explain what the task means so users know exactly what to do."></textarea>
+              </label>
+              <label class="permission-option">
+                <input type="checkbox" name="active" checked>
+                <span>Task is active</span>
+              </label>
+              <div class="inline-actions">
+                <button class="primary-button" id="adminTaskSubmit" type="submit">Save task</button>
+                <button class="ghost-button" id="resetAdminTaskForm" type="button">Reset form</button>
+              </div>
+              <p class="form-error hidden" id="adminTaskError"></p>
+            </form>
+
+            <div class="panel-header section-divider">
+              <h2>Task library</h2>
+              <p>The live task list stays directly underneath the form so admins can edit and tidy it without jumping around.</p>
+            </div>
+            <div id="adminTaskLibrary"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast-stack" id="toastStack"></div>
+    <script type="module" src="./assets/js/daily-tasks.js"></script>
+  </body>
+</html>

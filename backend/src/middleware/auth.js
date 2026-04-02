@@ -70,6 +70,10 @@ export function requireAdmin(req, res, next) {
 export function listPermissionMetadata() {
   return APP_PERMISSIONS.map((key) => ({
     key,
-    label: key.charAt(0) + key.slice(1).toLowerCase()
+    label: key
+      .toLowerCase()
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ")
   }));
 }

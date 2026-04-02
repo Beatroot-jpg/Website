@@ -1063,6 +1063,193 @@ label span,
   gap: 0.22rem;
 }
 
+.insight-list,
+.leaderboard-list,
+.task-checklist,
+.task-summary-list {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.insight-row,
+.leaderboard-row,
+.task-card,
+.standing-card {
+  position: relative;
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem 1.05rem;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--line);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.05), transparent 0 10rem),
+    rgba(14, 16, 20, 0.98);
+  box-shadow: var(--shadow-soft);
+}
+
+.insight-row strong,
+.leaderboard-row strong,
+.task-card strong,
+.standing-card strong {
+  color: var(--ink);
+}
+
+.insight-headline,
+.standing-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.insight-value,
+.standing-value strong {
+  color: var(--signal-strong);
+  font-family: "Sora", "Segoe UI", sans-serif;
+  font-size: 1.4rem;
+  letter-spacing: -0.04em;
+  text-shadow: 0 0 16px rgba(106, 139, 255, 0.14);
+}
+
+.insight-meta,
+.task-card-header,
+.leaderboard-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.insight-bar-track {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.insight-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(85, 121, 255, 0.42), rgba(228, 238, 255, 0.92));
+  box-shadow: 0 0 18px rgba(106, 139, 255, 0.18);
+}
+
+.insight-comparison {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.insight-comparison.up {
+  color: var(--good);
+}
+
+.insight-comparison.down {
+  color: var(--danger);
+}
+
+.insight-comparison.flat {
+  color: var(--muted-strong);
+}
+
+.task-card {
+  gap: 0.9rem;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.task-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.task-card.completed {
+  border-color: rgba(129, 216, 175, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(129, 216, 175, 0.08), transparent 0 10rem),
+    rgba(16, 22, 20, 0.98);
+}
+
+.task-card.completed strong,
+.task-card.completed p {
+  opacity: 0.8;
+}
+
+.task-card.completed .task-title {
+  text-decoration: line-through;
+}
+
+.task-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+}
+
+.task-toggle input {
+  width: 22px;
+  height: 22px;
+  margin-top: 0.2rem;
+  accent-color: #9bb7ff;
+  flex: 0 0 auto;
+}
+
+.task-copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.task-points {
+  color: var(--signal-strong);
+  font-weight: 800;
+}
+
+.standing-card {
+  border-color: var(--signal-border);
+}
+
+.leaderboard-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+}
+
+.leaderboard-row.is-current-user {
+  border-color: rgba(155, 183, 255, 0.28);
+  box-shadow:
+    var(--shadow-soft),
+    0 0 24px rgba(106, 139, 255, 0.12);
+}
+
+.leaderboard-rank {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  color: var(--signal-strong);
+  font-family: "Sora", "Segoe UI", sans-serif;
+  font-weight: 800;
+  background: rgba(20, 24, 33, 0.96);
+}
+
+.leaderboard-points {
+  color: var(--signal-strong);
+  font-family: "Sora", "Segoe UI", sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
 .ledger-row {
   display: grid;
   gap: 0.15rem;
@@ -1328,6 +1515,19 @@ label span,
   .toolbar-actions {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .insight-headline,
+  .insight-meta,
+  .task-card-header,
+  .leaderboard-meta,
+  .standing-value,
+  .task-toggle {
+    align-items: flex-start;
+  }
+
+  .leaderboard-row {
+    grid-template-columns: 1fr;
   }
 
   .hero-logo {

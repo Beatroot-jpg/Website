@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics</title>
+    <link rel="stylesheet" href="./assets/css/styles.css">
+    <script src="./assets/js/runtime-config.js"></script>
+    <script src="./assets/js/config.js"></script>
+  </head>
+  <body class="app-body">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <img class="brand-logo" src="./assets/images/new_logo.png" alt="YUGO MAFIA logo">
+          <div>
+            <strong>YUGO MAFIA</strong>
+            <span class="muted">Daily workspace</span>
+          </div>
+        </div>
+        <p class="sidebar-section-title">Sections</p>
+        <nav class="nav-list" id="sidebarNav"></nav>
+        <div class="sidebar-footer">A read-only view of weekly output, money flow, and what the group is moving right now.</div>
+      </aside>
+
+      <main class="workspace">
+        <header class="workspace-header">
+          <div>
+            <p class="eyebrow">Analytics</p>
+            <h1 id="pageTitle"></h1>
+            <p class="muted" id="pageSubtitle"></p>
+          </div>
+          <div class="header-controls">
+            <div class="user-pill" id="userPill"></div>
+            <button class="ghost-button" id="logoutButton" type="button">Log out</button>
+          </div>
+        </header>
+
+        <section class="workflow-stack">
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Weekly snapshot</h2>
+              <p>This is the simple "how are we moving this week?" section for regular users.</p>
+            </div>
+            <div class="metric-grid" id="analyticsSnapshot"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Week by week comparison</h2>
+              <p>Each week is shown in a clean list so people can scan output and money side by side without hunting around.</p>
+            </div>
+            <div class="insight-list" id="analyticsWeekRows"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Top movers this week</h2>
+              <p>The busiest items this week sit here with quick visual bars so people understand what is moving most.</p>
+            </div>
+            <div class="insight-list" id="analyticsTopItems"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Recent output</h2>
+              <p>Latest distributions stay in one readable list so the team can see what is actively going out right now.</p>
+            </div>
+            <div class="stack-list" id="analyticsRecentRuns"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Overall stats</h2>
+              <p>The larger all-time numbers are grouped together here so they feel like a summary, not noise.</p>
+            </div>
+            <div class="metric-grid" id="analyticsOverall"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast-stack" id="toastStack"></div>
+    <script type="module" src="./assets/js/analytics.js"></script>
+  </body>
+</html>

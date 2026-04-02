@@ -6,10 +6,16 @@ export const NAV_ITEMS = [
     description: "Overview"
   },
   {
-    key: "ROSTER",
-    label: "Roster",
-    href: "./roster.html",
-    description: "Team lineup"
+    key: "ANALYTICS",
+    label: "Analytics",
+    href: "./analytics.html",
+    description: "Trends and output"
+  },
+  {
+    key: "DAILY_TASKS",
+    label: "Daily tasks",
+    href: "./daily-tasks.html",
+    description: "Checklist and ranks"
   },
   {
     key: "INVENTORY",
@@ -39,10 +45,16 @@ export const NAV_ITEMS = [
 
 export const QUICK_ACTIONS = [
   {
-    permission: "ROSTER",
-    label: "Add member",
-    href: "./roster.html#rosterForm",
-    description: "Update lineup"
+    permission: "ANALYTICS",
+    label: "View analytics",
+    href: "./analytics.html",
+    description: "See weekly trends"
+  },
+  {
+    permission: "DAILY_TASKS",
+    label: "Open tasks",
+    href: "./daily-tasks.html#taskChecklist",
+    description: "Complete today"
   },
   {
     permission: "INVENTORY",
@@ -78,7 +90,8 @@ export const QUICK_ACTIONS = [
 
 export const PERMISSION_LABELS = {
   DASHBOARD: "Dashboard",
-  ROSTER: "Roster",
+  ANALYTICS: "Analytics",
+  DAILY_TASKS: "Daily tasks",
   INVENTORY: "Inventory",
   BANK: "Bank",
   DISTRIBUTION: "Distribution",
@@ -89,21 +102,21 @@ export const PERMISSION_PRESETS = [
   {
     key: "INVENTORY_STAFF",
     label: "Inventory Staff",
-    permissions: ["DASHBOARD", "ROSTER", "INVENTORY"]
+    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "INVENTORY"]
   },
   {
     key: "FINANCE",
     label: "Finance",
-    permissions: ["DASHBOARD", "ROSTER", "BANK"]
+    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "BANK"]
   },
   {
     key: "DISTRIBUTOR",
     label: "Distributor",
-    permissions: ["DASHBOARD", "ROSTER", "INVENTORY", "DISTRIBUTION"]
+    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "INVENTORY", "DISTRIBUTION"]
   },
   {
     key: "OPERATIONS",
     label: "Operations",
-    permissions: ["DASHBOARD", "ROSTER", "INVENTORY", "BANK", "DISTRIBUTION"]
+    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "INVENTORY", "BANK", "DISTRIBUTION"]
   }
 ];
