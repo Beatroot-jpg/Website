@@ -14,6 +14,72 @@ const router = Router();
 
 router.use(authenticateToken, requirePermission("INVENTORY"));
 
+function normalizeMovementType(value, fallback = "CORRECTION") {
+  const normalized = `${value ?? fallback}`.trim().toUpperCase();
+
+  if (!["STOCK_IN", "STOCK_OUT", "CORRECTION"].includes(normalized)) {
+    throw createError(400, "A valid adjustment type is required.");
+  }
+
+  return normalized;
+}
+
+function requireAmount(value, type) {
+  const parsed = requireInt(value, "Amount");
+
+  if (type === "CORRECTION") {
+    if (parsed < 0) {
+      throw createError(400, "Correction amount cannot be negative.");
+    }
+
+    return parsed;
+  }
+
+  const amount = Math.abs(parsed);
+
+  if (amount === 0) {
+    throw createError(400, "Amount must be greater than 0.");
+  }
+
+  return amount;
+}
+
+async function resolveQuantityDelta({ rawAmount, type, currentQuantity, itemId, movementId = null, createdAt = null }) {
+  const amount = requireAmount(rawAmount, type);
+
+  if (type === "STOCK_IN") {
+    return amount;
+  }
+
+  if (type === "STOCK_OUT") {
+    if (currentQuantity - amount < 0) {
+      throw createError(400, "Adjustment would move stock below zero.");
+    }
+
+    return amount * -1;
+  }
+
+  if (!movementId || !createdAt) {
+    return amount - currentQuantity;
+  }
+
+  const laterMovementAggregate = await prisma.inventoryMovement.aggregate({
+    where: {
+      itemId,
+      createdAt: {
+        gt: createdAt
+      }
+    },
+    _sum: {
+      quantityDelta: true
+    }
+  });
+
+  const laterNet = Number(laterMovementAggregate._sum.quantityDelta || 0);
+  const quantityBeforeMovement = currentQuantity - laterNet;
+  return amount - quantityBeforeMovement;
+}
+
 router.get(
   "/",
   asyncHandler(async (_req, res) => {
@@ -124,10 +190,19 @@ router.delete(
       select: {
         id: true,
         name: true,
-        _count: {
+        distributions: {
           select: {
-            distributions: true,
-            runnerDistributions: true
+            id: true
+          }
+        },
+        runnerDistributions: {
+          select: {
+            id: true,
+            collections: {
+              select: {
+                bankTransactionId: true
+              }
+            }
           }
         }
       }
@@ -137,12 +212,57 @@ router.delete(
       throw createError(404, "Inventory item not found.");
     }
 
-    if (existingItem._count.distributions || existingItem._count.runnerDistributions) {
-      throw createError(400, "This item already has distribution history and cannot be deleted.");
-    }
+    const legacyDistributionIds = existingItem.distributions.map((distribution) => distribution.id);
+    const runnerDistributionIds = existingItem.runnerDistributions.map((distribution) => distribution.id);
+    const depositedTransactionIds = [...new Set(
+      existingItem.runnerDistributions
+        .flatMap((distribution) => distribution.collections || [])
+        .map((collection) => collection.bankTransactionId)
+        .filter(Boolean)
+    )];
 
-    await prisma.inventoryItem.delete({
-      where: { id: existingItem.id }
+    await prisma.$transaction(async (transaction) => {
+      if (depositedTransactionIds.length) {
+        await transaction.bankTransaction.deleteMany({
+          where: {
+            id: {
+              in: depositedTransactionIds
+            }
+          }
+        });
+      }
+
+      if (legacyDistributionIds.length) {
+        await transaction.bankTransaction.deleteMany({
+          where: {
+            distributionId: {
+              in: legacyDistributionIds
+            }
+          }
+        });
+
+        await transaction.distribution.deleteMany({
+          where: {
+            id: {
+              in: legacyDistributionIds
+            }
+          }
+        });
+      }
+
+      if (runnerDistributionIds.length) {
+        await transaction.runnerDistribution.deleteMany({
+          where: {
+            id: {
+              in: runnerDistributionIds
+            }
+          }
+        });
+      }
+
+      await transaction.inventoryItem.delete({
+        where: { id: existingItem.id }
+      });
     });
 
     res.json({
@@ -229,25 +349,12 @@ router.patch(
     }
 
     const nextItemId = `${req.body.itemId ?? movement.itemId}`.trim();
-    const nextQuantityDelta = req.body.quantityDelta !== undefined
-      ? requireInt(req.body.quantityDelta, "Adjustment quantity")
-      : movement.quantityDelta;
     const nextType = req.body.type !== undefined
-      ? ["STOCK_IN", "STOCK_OUT", "CORRECTION"].includes(req.body.type)
-        ? req.body.type
-        : null
+      ? normalizeMovementType(req.body.type)
       : movement.type;
 
     if (!nextItemId) {
       throw createError(400, "Item is required.");
-    }
-
-    if (!nextType) {
-      throw createError(400, "A valid adjustment type is required.");
-    }
-
-    if (nextQuantityDelta === 0) {
-      throw createError(400, "Adjustment quantity cannot be zero.");
     }
 
     const itemIds = [...new Set([movement.itemId, nextItemId])];
@@ -269,6 +376,21 @@ router.patch(
     if (!previousItem || !nextItem) {
       throw createError(404, "Inventory item not found.");
     }
+
+    const currentQuantityWithoutMovement = movement.itemId === nextItemId
+      ? previousItem.quantity - movement.quantityDelta
+      : nextItem.quantity;
+    const fallbackAmount = movement.type === "CORRECTION"
+      ? previousItem.quantity
+      : Math.abs(movement.quantityDelta);
+    const nextQuantityDelta = await resolveQuantityDelta({
+      rawAmount: req.body.quantityDelta !== undefined ? req.body.quantityDelta : fallbackAmount,
+      type: nextType,
+      currentQuantity: currentQuantityWithoutMovement,
+      itemId: nextItemId,
+      movementId: movement.id,
+      createdAt: movement.createdAt
+    });
 
     if (movement.itemId === nextItemId) {
       const nextQuantity = previousItem.quantity - movement.quantityDelta + nextQuantityDelta;
@@ -338,15 +460,7 @@ router.patch(
 router.post(
   "/:id/adjust",
   asyncHandler(async (req, res) => {
-    const quantityDelta = requireInt(req.body.quantityDelta, "Adjustment quantity");
-
-    if (quantityDelta === 0) {
-      throw createError(400, "Adjustment quantity cannot be zero.");
-    }
-
-    const type = ["STOCK_IN", "STOCK_OUT", "CORRECTION"].includes(req.body.type)
-      ? req.body.type
-      : "CORRECTION";
+    const type = normalizeMovementType(req.body.type);
 
     const item = await prisma.inventoryItem.findUnique({
       where: { id: req.params.id }
@@ -356,6 +470,12 @@ router.post(
       throw createError(404, "Inventory item not found.");
     }
 
+    const quantityDelta = await resolveQuantityDelta({
+      rawAmount: req.body.quantityDelta,
+      type,
+      currentQuantity: item.quantity,
+      itemId: item.id
+    });
     const newQuantity = item.quantity + quantityDelta;
 
     if (newQuantity < 0) {

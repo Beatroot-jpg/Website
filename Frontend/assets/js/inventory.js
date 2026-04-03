@@ -42,6 +42,7 @@ const adjustFormTitle = document.querySelector("#adjustFormTitle");
 const adjustFormSubtitle = document.querySelector("#adjustFormSubtitle");
 const adjustSubmitButton = document.querySelector("#adjustSubmitButton");
 const resetAdjustButton = document.querySelector("#resetAdjustForm");
+const adjustQuantityHint = document.querySelector("#adjustQuantityHint");
 const toolbarHost = document.createElement("div");
 const initialParams = new URLSearchParams(window.location.search);
 const searchQuery = (initialParams.get("search") || "").trim().toLowerCase();
@@ -101,6 +102,58 @@ function formatMovementType(type) {
   }
 }
 
+function movementDisplayQuantity(movement, fallbackQuantity = 0) {
+  if (`${movement?.type || ""}`.toUpperCase() === "CORRECTION") {
+    return Number(movement?.displayQuantity ?? fallbackQuantity ?? 0);
+  }
+
+  return Math.abs(Number(movement?.quantityDelta || 0));
+}
+
+function decorateItems(items = []) {
+  return items.map((item) => {
+    let rollingQuantity = Number(item.quantity || 0);
+    const movements = (item.movements || []).map((movement) => {
+      const signedDelta = Number(movement.quantityDelta || 0);
+      const displayQuantity = movement.type === "CORRECTION"
+        ? rollingQuantity
+        : Math.abs(signedDelta);
+
+      rollingQuantity -= signedDelta;
+
+      return {
+        ...movement,
+        displayQuantity
+      };
+    });
+
+    return {
+      ...item,
+      movements
+    };
+  });
+}
+
+function updateAdjustmentHint() {
+  if (!adjustQuantityHint || !adjustForm?.elements?.type) {
+    return;
+  }
+
+  const type = `${adjustForm.elements.type.value || ""}`.toUpperCase();
+
+  if (type === "STOCK_OUT") {
+    adjustQuantityHint.textContent = "Subtract removes this amount from stock on hand.";
+    return;
+  }
+
+  if (type === "CORRECTION") {
+    adjustQuantityHint.textContent = "Correction sets stock on hand to the exact amount, even if that amount is 0.";
+    return;
+  }
+
+  adjustQuantityHint.textContent = "Add increases stock on hand by this amount.";
+}
+
 function resetItemForm({ clearDraftState = false, clearUrl = true } = {}) {
   createForm.reset();
   inventoryItemIdField.value = "";
@@ -155,6 +208,8 @@ function resetAdjustmentForm({ clearDraftState = false, clearUrl = true } = {}) 
     itemSelect.value = itemsCache[0].id;
   }
 
+  updateAdjustmentHint();
+
   if (clearDraftState) {
     adjustDraft.clearDraft();
   }
@@ -168,12 +223,13 @@ function resetAdjustmentForm({ clearDraftState = false, clearUrl = true } = {}) 
 function fillMovementForm(movement) {
   movementIdField.value = movement.id;
   adjustFormTitle.textContent = "Edit stock log";
-  adjustFormSubtitle.textContent = "Update this stock movement and the current quantity will reconcile automatically.";
+  adjustFormSubtitle.textContent = "Update this stock movement. Correction sets stock to an exact amount.";
   adjustSubmitButton.textContent = "Save adjustment";
   adjustForm.elements.itemId.value = movement.itemId;
-  adjustForm.elements.quantityDelta.value = movement.quantityDelta;
+  adjustForm.elements.quantityDelta.value = movementDisplayQuantity(movement);
   adjustForm.elements.type.value = movement.type;
   adjustForm.elements.reason.value = movement.reason || "";
+  updateAdjustmentHint();
 }
 
 function editableMovementTypes() {
@@ -289,7 +345,7 @@ function renderRecentMovementFeed(items) {
         <article class="activity-card ${requestedMovementEditId === movement.id ? "editing-card" : ""}">
           <div>
             <strong>${movement.itemName}</strong>
-            <p>${formatMovementType(movement.type)} <span class="emphasis-inline">${Math.abs(movement.quantityDelta)} ${movement.itemUnit}</span></p>
+            <p>${formatMovementType(movement.type)} <span class="emphasis-inline">${movementDisplayQuantity(movement)} ${movement.itemUnit}</span></p>
           </div>
           <div class="activity-meta">
             ${badge(editable ? "Edit log" : "Source-linked", editable ? "accent" : "neutral")}
@@ -420,7 +476,7 @@ async function deleteInventoryItem(itemId) {
     return;
   }
 
-  const confirmed = window.confirm(`Delete ${item.name} from inventory completely? This cannot be undone.`);
+  const confirmed = window.confirm(`Delete ${item.name} completely? This will also remove linked distribution and bank history for that item.`);
 
   if (!confirmed) {
     return;
@@ -504,7 +560,7 @@ function renderTable(items) {
                 <td>${item.category || "Uncategorised"}</td>
                 <td>
                   ${latestMovement
-                    ? `<div class="stock-summary"><strong>${formatMovementType(latestMovement.type)}</strong><span class="muted">${Math.abs(latestMovement.quantityDelta)} ${item.unit}</span></div>`
+                    ? `<div class="stock-summary"><strong>${formatMovementType(latestMovement.type)}</strong><span class="muted">${movementDisplayQuantity(latestMovement)} ${item.unit}</span></div>`
                     : "No activity yet"}
                 </td>
                 <td>
@@ -560,9 +616,10 @@ async function loadInventory() {
 
   try {
     const { items } = await api("/inventory");
-    itemsCache = items;
+    itemsCache = decorateItems(items);
     populateItemSelect(itemsCache);
     restoreDraftForm(adjustForm, "inventory-adjust");
+    updateAdjustmentHint();
     rerenderCollection();
     maybeOpenRequestedEdit();
   } catch (error) {
@@ -656,6 +713,8 @@ resetInventoryButton?.addEventListener("click", () => {
 resetAdjustButton?.addEventListener("click", () => {
   resetAdjustmentForm({ clearDraftState: true });
 });
+
+adjustForm?.elements?.type?.addEventListener("change", updateAdjustmentHint);
 
 subscribeToMutations(["inventory", "distribution"], () => {
   showToast("Live update received for inventory.", "info");
