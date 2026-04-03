@@ -25,7 +25,7 @@ import {
 initProtectedPage({
   pageKey: "BANK",
   title: "Bank ledger",
-  subtitle: "Track clean and dirty money with simple correction and subtract entries."
+  subtitle: "Track clean and dirty money with simple add, correction, and subtract entries."
 });
 
 const summaryGrid = document.querySelector("#bankSummary");
@@ -86,13 +86,11 @@ function resetTransactionForm({ clearDraftState = false, clearUrl = true } = {})
   transactionForm.reset();
   transactionIdField.value = "";
   transactionFormTitle.textContent = "Add transaction";
-  transactionFormSubtitle.textContent = "Use correction to set a balance exactly, or subtract to take money away.";
+  transactionFormSubtitle.textContent = "Use add to stack money on top, correction to set an exact balance, or subtract to take money away.";
   transactionSubmitButton.textContent = "Record transaction";
   transactionForm.elements.moneyType.value = "CLEAN";
-  transactionForm.elements.entryType.value = "CORRECTION";
-  if (transactionAmountHint) {
-    transactionAmountHint.textContent = "Correction sets the selected money balance to this exact amount. Subtract removes this amount from the current balance.";
-  }
+  transactionForm.elements.entryType.value = "ADD";
+  updateAmountHint();
   mountFormError(transactionError, "");
 
   if (clearDraftState) {
@@ -125,7 +123,9 @@ function updateAmountHint() {
   const entryType = `${transactionForm.elements.entryType.value || ""}`.toUpperCase();
   transactionAmountHint.textContent = entryType === "SUBTRACT"
     ? "Subtract removes this amount from the selected money balance."
-    : "Correction sets the selected money balance to this exact amount, even if that amount is 0.";
+    : entryType === "ADD"
+      ? "Add increases the selected money balance by this amount."
+      : "Correction sets the selected money balance to this exact amount, even if that amount is 0.";
 }
 
 function maybeOpenRequestedEdit() {
@@ -142,7 +142,7 @@ function maybeOpenRequestedEdit() {
     return;
   }
 
-  if (transaction.distributionId || transaction.sourceSystem !== "manual") {
+  if (transaction.distributionId || !["manual", "manual_addition", "manual_correction"].includes(transaction.sourceSystem)) {
     requestedTransactionEditId = "";
     updateUrlParams({ editTransaction: "" }, ["editTransaction"]);
     showToast("That ledger entry is edited from its source system.", "info");
@@ -177,7 +177,7 @@ function buildTransactionSourceHref(transaction) {
     return `./bank.html?search=${encodeURIComponent(transaction.description || transaction.moneyType)}#transactionTable`;
   }
 
-  if (transaction.sourceSystem === "manual") {
+  if (["manual", "manual_addition", "manual_correction"].includes(transaction.sourceSystem)) {
     return `./bank.html?editTransaction=${transaction.id}#transactionForm`;
   }
 
@@ -190,7 +190,7 @@ function describeSource(transaction) {
     return linkedCount ? `Distribution deposit - ${linkedCount} ledger ${linkedCount === 1 ? "entry" : "entries"}` : "Distribution deposit";
   }
 
-  if (transaction.sourceSystem === "manual") {
+  if (["manual", "manual_addition", "manual_correction"].includes(transaction.sourceSystem)) {
     return "Manual entry";
   }
 
@@ -399,7 +399,7 @@ function renderTransactions(transactions, pagination) {
                 <input class="table-check" type="checkbox" data-select-transaction="${transaction.id}" ${selectedTransactionIds.has(transaction.id) ? "checked" : ""}>
               </td>
               <td>${bankMoneyBadge(transaction.moneyType)}</td>
-              <td>${bankTransactionBadge(transaction.entryType, transaction.entryType === "SUBTRACT" ? "Subtract" : "Correction")}</td>
+              <td>${bankTransactionBadge(transaction.entryType, transaction.entryType === "SUBTRACT" ? "Subtract" : transaction.entryType === "ADD" ? "Add" : "Correction")}</td>
               <td>
                 <div class="ledger-row">
                   <strong class="ledger-amount">${formatCurrency(transaction.amount)}</strong>
@@ -410,7 +410,7 @@ function renderTransactions(transactions, pagination) {
               <td>${transaction.description || "No description"}</td>
               <td>
                 <div class="inline-table-actions">
-                  ${transaction.sourceSystem === "manual" && !transaction.distributionId
+                  ${["manual", "manual_addition", "manual_correction"].includes(transaction.sourceSystem) && !transaction.distributionId
                     ? `
                       <button class="mini-action" type="button" data-edit-transaction="${transaction.id}">Edit</button>
                       <button class="mini-action danger-action" type="button" data-revert-transaction="${transaction.id}">Revert</button>

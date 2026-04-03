@@ -48,7 +48,7 @@
           <article class="panel">
             <div class="panel-header">
               <h2 id="transactionFormTitle">Add transaction</h2>
-              <p id="transactionFormSubtitle">Use correction to set a balance exactly, or subtract to take money away.</p>
+              <p id="transactionFormSubtitle">Use add to stack money on top, correction to set an exact balance, or subtract to take money away.</p>
             </div>
 
             <form class="stack-form" id="transactionForm">
@@ -64,6 +64,7 @@
                 <label class="field-stack">
                   <span>Function</span>
                   <select name="entryType">
+                    <option value="ADD">Add</option>
                     <option value="CORRECTION">Correction</option>
                     <option value="SUBTRACT">Subtract</option>
                   </select>
@@ -73,7 +74,7 @@
                 <span>Amount</span>
                 <input type="number" min="0" step="0.01" name="amount" placeholder="0.00" required>
               </label>
-              <p class="muted" id="transactionAmountHint">Correction sets the selected money balance to this exact amount. Subtract removes this amount from the current balance.</p>
+              <p class="muted" id="transactionAmountHint">Add increases the selected money balance by this amount.</p>
               <label class="field-stack">
                 <span>Description</span>
                 <textarea name="description" placeholder="Manual transfer, correction, expense note"></textarea>

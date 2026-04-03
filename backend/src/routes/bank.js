@@ -28,7 +28,7 @@ function normalizeMoneyType(value, fallback = "CLEAN") {
 function normalizeEntryType(value, fallback = "CORRECTION") {
   const normalized = `${value ?? fallback}`.trim().toUpperCase();
 
-  if (!["CORRECTION", "SUBTRACT"].includes(normalized)) {
+  if (!["ADD", "CORRECTION", "SUBTRACT"].includes(normalized)) {
     throw createError(400, "A valid ledger function is required.");
   }
 
@@ -39,8 +39,24 @@ function typeFromEntryType(entryType) {
   return entryType === "SUBTRACT" ? "DEBIT" : "CREDIT";
 }
 
+function sourceSystemFromEntryType(entryType, fallback = "manual") {
+  if (entryType === "ADD") {
+    return "manual_addition";
+  }
+
+  if (entryType === "CORRECTION") {
+    return "manual_correction";
+  }
+
+  return fallback;
+}
+
 function entryTypeFromTransaction(transaction) {
-  return transaction.type === "DEBIT" ? "SUBTRACT" : "CORRECTION";
+  if (transaction.type === "DEBIT") {
+    return "SUBTRACT";
+  }
+
+  return transaction.sourceSystem === "manual_addition" ? "ADD" : "CORRECTION";
 }
 
 function buildTransactionWhere(query = {}) {
@@ -70,7 +86,17 @@ function buildTransactionWhere(query = {}) {
   }
 
   if (entryType) {
-    where.type = typeFromEntryType(entryType);
+    if (entryType === "SUBTRACT") {
+      where.type = "DEBIT";
+    } else if (entryType === "ADD") {
+      where.type = "CREDIT";
+      where.sourceSystem = "manual_addition";
+    } else if (entryType === "CORRECTION") {
+      where.type = "CREDIT";
+      where.sourceSystem = {
+        in: ["manual", "manual_correction"]
+      };
+    }
   }
 
   return where;
@@ -176,7 +202,7 @@ router.post(
         type: typeFromEntryType(entryType),
         moneyType: normalizeMoneyType(req.body.moneyType),
         description: normalizeOptionalString(req.body.description),
-        sourceSystem: "manual",
+        sourceSystem: sourceSystemFromEntryType(entryType),
         createdById: req.user.id
       },
       include: transactionInclude()
@@ -200,7 +226,7 @@ router.patch(
       throw createError(404, "Bank transaction not found.");
     }
 
-    if (transaction.distributionId || transaction.sourceSystem !== "manual") {
+    if (transaction.distributionId || !["manual", "manual_addition", "manual_correction"].includes(transaction.sourceSystem)) {
       throw createError(400, "This transaction must be edited from its source system.");
     }
 
@@ -218,6 +244,7 @@ router.patch(
         moneyType: req.body.moneyType !== undefined
           ? normalizeMoneyType(req.body.moneyType)
           : transaction.moneyType,
+        sourceSystem: sourceSystemFromEntryType(entryType, transaction.sourceSystem),
         description: req.body.description !== undefined
           ? normalizeOptionalString(req.body.description)
           : transaction.description
@@ -250,7 +277,7 @@ router.post(
       throw createError(404, "Bank transaction not found.");
     }
 
-    if (transaction.sourceSystem === "manual" && !transaction.distributionId) {
+    if (["manual", "manual_addition", "manual_correction"].includes(transaction.sourceSystem) && !transaction.distributionId) {
       await prisma.bankTransaction.delete({
         where: { id: transaction.id }
       });

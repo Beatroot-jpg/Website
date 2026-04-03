@@ -1,7 +1,7 @@
 import { prisma } from "../db.js";
 
 function isManualBalanceCorrection(transaction) {
-  return transaction.sourceSystem === "manual" && transaction.type === "CREDIT";
+  return ["manual", "manual_correction"].includes(transaction.sourceSystem) && transaction.type === "CREDIT";
 }
 
 export function getTransactionEffect(transaction) {
@@ -10,7 +10,11 @@ export function getTransactionEffect(transaction) {
 }
 
 export function getEntryTypeFromTransaction(transaction) {
-  return transaction.type === "DEBIT" ? "SUBTRACT" : "CORRECTION";
+  if (transaction.type === "DEBIT") {
+    return "SUBTRACT";
+  }
+
+  return transaction.sourceSystem === "manual_addition" ? "ADD" : "CORRECTION";
 }
 
 export async function getBankBalances() {
