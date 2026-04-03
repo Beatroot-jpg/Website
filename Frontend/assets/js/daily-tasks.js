@@ -134,14 +134,14 @@ function renderSummary(summary) {
       <small>${summary.completionRate}% complete</small>
     </article>
     <article class="metric-card accent">
-      <p>Points today</p>
-      <strong>${summary.todayPoints}</strong>
-      <small>Built from completed tasks</small>
+      <p>Done overall</p>
+      <strong>${summary.overallCompletedCount || 0}</strong>
+      <small>All-time task completions</small>
     </article>
     <article class="metric-card neutral">
-      <p>Current streak</p>
-      <strong>${summary.streakDays}</strong>
-      <small>Consecutive task days</small>
+      <p>All-time points</p>
+      <strong>${summary.totalPoints || 0}</strong>
+      <small>Total points earned</small>
     </article>
     <article class="metric-card warn">
       <p>Leaderboard rank</p>

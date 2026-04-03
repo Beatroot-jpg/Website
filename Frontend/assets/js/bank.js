@@ -158,22 +158,12 @@ function renderSummary(balances, recentTransactions) {
     <article class="metric-card good">
       <p>Clean money</p>
       <strong>${formatCurrency(balances.clean)}</strong>
-      <small>Running clean balance</small>
+      <small>Live clean balance</small>
     </article>
     <article class="metric-card accent">
       <p>Dirty money</p>
       <strong>${formatCurrency(balances.dirty)}</strong>
-      <small>Running dirty balance</small>
-    </article>
-    <article class="metric-card neutral">
-      <p>Total on hand</p>
-      <strong>${formatCurrency(balances.overall)}</strong>
-      <small>Combined live balance</small>
-    </article>
-    <article class="metric-card neutral">
-      <p>Recent transaction count</p>
-      <strong>${recentTransactions.length}</strong>
-      <small>Latest 5 entries</small>
+      <small>Live dirty balance</small>
     </article>
   `;
 }
@@ -555,7 +545,7 @@ function renderPagination(pagination) {
 }
 
 async function loadBank() {
-  summaryGrid.innerHTML = renderMetricSkeleton(4);
+  summaryGrid.innerHTML = renderMetricSkeleton(2);
   tableContainer.innerHTML = renderTableSkeleton(9, 6);
   if (paginationContainer) {
     paginationContainer.innerHTML = "";

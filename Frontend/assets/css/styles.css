@@ -1234,6 +1234,39 @@ label span,
   gap: 0.22rem;
 }
 
+.inventory-summary-strip {
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: 0.85rem;
+}
+
+.inventory-summary-card {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--line);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.05), transparent 0 8rem),
+    rgba(14, 16, 20, 0.98);
+}
+
+.inventory-summary-label,
+.comparison-label {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.inventory-summary-card strong {
+  color: var(--ink);
+  font-family: "Sora", "Segoe UI", sans-serif;
+  font-size: 1.55rem;
+  letter-spacing: -0.04em;
+}
+
 .insight-list,
 .leaderboard-list,
 .task-checklist,
@@ -1307,6 +1340,25 @@ label span,
   border-radius: inherit;
   background: linear-gradient(90deg, rgba(85, 121, 255, 0.42), rgba(228, 238, 255, 0.92));
   box-shadow: 0 0 18px rgba(106, 139, 255, 0.18);
+}
+
+.comparison-stack {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.comparison-track-row {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.muted-track {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.previous-bar {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.24), rgba(197, 205, 220, 0.72));
+  box-shadow: none;
 }
 
 .insight-comparison {

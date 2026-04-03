@@ -3,11 +3,13 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { asyncHandler } from "../http.js";
 import { authenticateToken, requirePermission } from "../middleware/auth.js";
-import { buildRecentWeekBuckets, getSydneyDateKey, getWeekStartKey, shiftDateKey } from "../services/time.js";
+import { buildRecentWeekBuckets, getSydneyDateKey, getWeekStartKey } from "../services/time.js";
 
 const router = Router();
 
 router.use(authenticateToken, requirePermission("ANALYTICS"));
+
+const OPEN_STATUSES = new Set(["ACTIVE", "PARTIAL"]);
 
 function toNumber(value) {
   return Number(value || 0);
@@ -17,38 +19,30 @@ function toMoney(value) {
   return Number(toNumber(value).toFixed(2));
 }
 
-function changeSummary(current, previous) {
-  const delta = toMoney(current - previous);
-
-  if (previous === 0) {
-    return {
-      delta,
-      percent: current === 0 ? 0 : 100
-    };
-  }
-
+function metric(label, current, previous, format = "number") {
   return {
-    delta,
-    percent: Number((((current - previous) / previous) * 100).toFixed(1))
+    label,
+    current: format === "currency" ? toMoney(current) : Number(current || 0),
+    previous: format === "currency" ? toMoney(previous) : Number(previous || 0),
+    delta: format === "currency"
+      ? toMoney(current - previous)
+      : Number((current || 0) - (previous || 0)),
+    format
   };
 }
 
 router.get(
   "/summary",
   asyncHandler(async (_req, res) => {
-    const weeks = buildRecentWeekBuckets(8);
-    const earliestWeekStartKey = weeks[0]?.startKey || getWeekStartKey(getSydneyDateKey());
-    const earliestDate = new Date(`${shiftDateKey(earliestWeekStartKey, -1)}T00:00:00Z`);
-    const currentWeekKey = weeks[weeks.length - 1]?.key;
-    const previousWeekKey = weeks[weeks.length - 2]?.key;
+    const [previousWeek, currentWeek] = buildRecentWeekBuckets(2);
+    const earliestDate = new Date(`${previousWeek.startKey}T00:00:00Z`);
 
     const [
-      recentDistributions,
-      recentCollections,
-      recentDeposits,
+      distributions,
+      collections,
+      bankTransactions,
       openDistributions,
-      distributionAggregate,
-      depositAggregate
+      pendingLedger
     ] = await Promise.all([
       prisma.runnerDistribution.findMany({
         where: {
@@ -56,19 +50,15 @@ router.get(
             gte: earliestDate
           }
         },
-        orderBy: { createdAt: "desc" },
-        include: {
+        select: {
+          id: true,
+          itemId: true,
+          quantity: true,
+          createdAt: true,
           item: {
             select: {
               id: true,
               name: true
-            }
-          },
-          distributor: {
-            select: {
-              id: true,
-              name: true,
-              number: true
             }
           }
         }
@@ -79,33 +69,28 @@ router.get(
             gte: earliestDate
           }
         },
-        orderBy: { createdAt: "desc" },
         select: {
-          id: true,
           amount: true,
           action: true,
-          createdAt: true,
-          distributionId: true
+          createdAt: true
         }
       }),
       prisma.bankTransaction.findMany({
         where: {
-          sourceSystem: "distribution_deposit",
           createdAt: {
             gte: earliestDate
           }
         },
-        orderBy: { createdAt: "desc" },
         select: {
-          id: true,
           amount: true,
+          moneyType: true,
           createdAt: true
         }
       }),
       prisma.runnerDistribution.findMany({
         where: {
           status: {
-            in: ["ACTIVE", "PARTIAL"]
+            in: [...OPEN_STATUSES]
           }
         },
         select: {
@@ -113,16 +98,12 @@ router.get(
           amountReturned: true
         }
       }),
-      prisma.runnerDistribution.aggregate({
-        _count: { id: true },
-        _sum: {
-          quantity: true,
-          totalOwed: true
-        }
-      }),
-      prisma.bankTransaction.aggregate({
+      prisma.distributionCollection.aggregate({
         where: {
-          sourceSystem: "distribution_deposit"
+          status: "PENDING"
+        },
+        _count: {
+          id: true
         },
         _sum: {
           amount: true
@@ -130,149 +111,126 @@ router.get(
       })
     ]);
 
-    const weekMap = new Map(
-      weeks.map((week) => [
-        week.key,
-        {
-          ...week,
-          distributionCount: 0,
-          unitsDistributed: 0,
-          valueAssigned: 0,
-          amountCollected: 0,
-          amountDeposited: 0
-        }
-      ])
-    );
+    const unitsByWeek = {
+      current: 0,
+      previous: 0
+    };
+    const collectionsByWeek = {
+      current: 0,
+      previous: 0
+    };
+    const moneyByType = {
+      CLEAN: { current: 0, previous: 0 },
+      DIRTY: { current: 0, previous: 0 }
+    };
+    const productMap = new Map();
 
-    const topItemMap = new Map();
+    const resolveWeekSlot = (date) => {
+      const weekKey = getWeekStartKey(getSydneyDateKey(date));
 
-    recentDistributions.forEach((distribution) => {
-      const weekKey = getWeekStartKey(getSydneyDateKey(distribution.createdAt));
-      const week = weekMap.get(weekKey);
+      if (weekKey === currentWeek.key) {
+        return "current";
+      }
 
-      if (!week) {
+      if (weekKey === previousWeek.key) {
+        return "previous";
+      }
+
+      return null;
+    };
+
+    distributions.forEach((distribution) => {
+      const weekSlot = resolveWeekSlot(distribution.createdAt);
+
+      if (!weekSlot) {
         return;
       }
 
       const quantity = Number(distribution.quantity || 0);
-      const totalOwed = toNumber(distribution.totalOwed);
+      unitsByWeek[weekSlot] += quantity;
 
-      week.distributionCount += 1;
-      week.unitsDistributed += quantity;
-      week.valueAssigned = toMoney(week.valueAssigned + totalOwed);
+      const existing = productMap.get(distribution.itemId) || {
+        label: distribution.item.name,
+        current: 0,
+        previous: 0
+      };
 
-      if (weekKey === currentWeekKey) {
-        const existing = topItemMap.get(distribution.itemId) || {
-          itemId: distribution.itemId,
-          name: distribution.item.name,
-          quantity: 0,
-          valueAssigned: 0
-        };
-
-        existing.quantity += quantity;
-        existing.valueAssigned = toMoney(existing.valueAssigned + totalOwed);
-        topItemMap.set(distribution.itemId, existing);
-      }
+      existing[weekSlot] += quantity;
+      productMap.set(distribution.itemId, existing);
     });
 
-    recentCollections.forEach((collection) => {
+    collections.forEach((collection) => {
       if (collection.action === "FAULTY_CLEAR") {
         return;
       }
 
-      const weekKey = getWeekStartKey(getSydneyDateKey(collection.createdAt));
-      const week = weekMap.get(weekKey);
+      const weekSlot = resolveWeekSlot(collection.createdAt);
 
-      if (!week) {
+      if (!weekSlot) {
         return;
       }
 
-      week.amountCollected = toMoney(week.amountCollected + toNumber(collection.amount));
+      collectionsByWeek[weekSlot] += toNumber(collection.amount);
     });
 
-    recentDeposits.forEach((transaction) => {
-      const weekKey = getWeekStartKey(getSydneyDateKey(transaction.createdAt));
-      const week = weekMap.get(weekKey);
+    bankTransactions.forEach((transaction) => {
+      const weekSlot = resolveWeekSlot(transaction.createdAt);
 
-      if (!week) {
+      if (!weekSlot || !moneyByType[transaction.moneyType]) {
         return;
       }
 
-      week.amountDeposited = toMoney(week.amountDeposited + toNumber(transaction.amount));
+      moneyByType[transaction.moneyType][weekSlot] += toNumber(transaction.amount);
     });
-
-    const orderedWeeks = weeks.map((week) => weekMap.get(week.key));
-    const currentWeek = weekMap.get(currentWeekKey) || {
-      unitsDistributed: 0,
-      valueAssigned: 0,
-      amountCollected: 0,
-      amountDeposited: 0
-    };
-    const previousWeek = weekMap.get(previousWeekKey) || {
-      unitsDistributed: 0,
-      valueAssigned: 0,
-      amountCollected: 0,
-      amountDeposited: 0
-    };
 
     const outstandingTotal = openDistributions.reduce((sum, distribution) => (
       sum + Math.max(0, toNumber(distribution.totalOwed) - toNumber(distribution.amountReturned))
     ), 0);
 
-    const recentRuns = recentDistributions
-      .slice(0, 6)
-      .map((distribution) => ({
-        id: distribution.id,
-        item: distribution.item,
-        distributor: distribution.distributor,
-        quantity: distribution.quantity,
-        totalOwed: toMoney(distribution.totalOwed),
-        amountReturned: toMoney(distribution.amountReturned),
-        status: distribution.status,
-        updatedAt: distribution.updatedAt,
-        createdAt: distribution.createdAt
-      }));
-
-    const topItems = [...topItemMap.values()]
+    const productGraph = [...productMap.values()]
+      .map((entry) => ({
+        ...entry,
+        delta: entry.current - entry.previous
+      }))
       .sort((left, right) => (
-        right.quantity - left.quantity || right.valueAssigned - left.valueAssigned || left.name.localeCompare(right.name)
+        (right.current + right.previous) - (left.current + left.previous)
+        || right.current - left.current
+        || left.label.localeCompare(right.label)
       ))
       .slice(0, 6);
 
     res.json({
-      snapshot: {
-        units: {
-          current: currentWeek.unitsDistributed,
-          previous: previousWeek.unitsDistributed,
-          ...changeSummary(currentWeek.unitsDistributed, previousWeek.unitsDistributed)
+      snapshot: [
+        metric("Products moved", unitsByWeek.current, unitsByWeek.previous),
+        metric("Clean money moved", moneyByType.CLEAN.current, moneyByType.CLEAN.previous, "currency"),
+        metric("Dirty money moved", moneyByType.DIRTY.current, moneyByType.DIRTY.previous, "currency"),
+        metric("Collections logged", collectionsByWeek.current, collectionsByWeek.previous, "currency")
+      ],
+      moneyGraph: [
+        {
+          label: "Clean money",
+          current: toMoney(moneyByType.CLEAN.current),
+          previous: toMoney(moneyByType.CLEAN.previous),
+          delta: toMoney(moneyByType.CLEAN.current - moneyByType.CLEAN.previous)
         },
-        assigned: {
-          current: currentWeek.valueAssigned,
-          previous: previousWeek.valueAssigned,
-          ...changeSummary(currentWeek.valueAssigned, previousWeek.valueAssigned)
-        },
-        collected: {
-          current: currentWeek.amountCollected,
-          previous: previousWeek.amountCollected,
-          ...changeSummary(currentWeek.amountCollected, previousWeek.amountCollected)
-        },
-        deposited: {
-          current: currentWeek.amountDeposited,
-          previous: previousWeek.amountDeposited,
-          ...changeSummary(currentWeek.amountDeposited, previousWeek.amountDeposited)
+        {
+          label: "Dirty money",
+          current: toMoney(moneyByType.DIRTY.current),
+          previous: toMoney(moneyByType.DIRTY.previous),
+          delta: toMoney(moneyByType.DIRTY.current - moneyByType.DIRTY.previous)
         }
-      },
-      overall: {
-        totalRuns: distributionAggregate._count.id || 0,
-        totalUnits: distributionAggregate._sum.quantity || 0,
-        totalAssigned: toMoney(distributionAggregate._sum.totalOwed),
-        totalDeposited: toMoney(depositAggregate._sum.amount),
+      ],
+      productGraph,
+      distributionOverview: {
         activeRuns: openDistributions.length,
-        outstandingTotal: toMoney(outstandingTotal)
+        outstandingTotal: toMoney(outstandingTotal),
+        pendingLedgerCount: pendingLedger._count.id || 0,
+        pendingLedgerTotal: toMoney(pendingLedger._sum.amount)
       },
-      weeks: orderedWeeks,
-      topItems,
-      recentRuns
+      periodLabels: {
+        current: currentWeek.label,
+        previous: previousWeek.label
+      }
     });
   })
 );

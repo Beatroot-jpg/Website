@@ -219,6 +219,7 @@ router.get(
       summary: {
         taskCount,
         completedCount: todayCompletionCount,
+        overallCompletedCount: standings.currentUserStanding.completedCount,
         completionRate: taskCount ? Math.round((todayCompletionCount / taskCount) * 100) : 0,
         todayPoints,
         totalPoints: standings.currentUserStanding.totalPoints,

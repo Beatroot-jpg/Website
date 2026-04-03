@@ -37,22 +37,17 @@ router.post(
     const quantity = req.body.quantity !== undefined && req.body.quantity !== ""
       ? requireInt(req.body.quantity, "Quantity")
       : 0;
-    const reorderLevel = req.body.reorderLevel !== undefined && req.body.reorderLevel !== ""
-      ? requireInt(req.body.reorderLevel, "Reorder level")
-      : 0;
 
-    if (quantity < 0 || reorderLevel < 0) {
-      throw createError(400, "Quantity and reorder level cannot be negative.");
+    if (quantity < 0) {
+      throw createError(400, "Quantity cannot be negative.");
     }
 
     const item = await prisma.inventoryItem.create({
       data: {
         name: requireString(req.body.name, "Name"),
-        sku: normalizeOptionalString(req.body.sku),
         category: normalizeOptionalString(req.body.category),
         unit: requireString(req.body.unit || "unit", "Unit"),
         quantity,
-        reorderLevel,
         notes: normalizeOptionalString(req.body.notes),
         movements: quantity > 0 ? {
           create: {
@@ -95,28 +90,16 @@ router.patch(
       name: req.body.name !== undefined
         ? requireString(req.body.name, "Name")
         : existingItem.name,
-      sku: req.body.sku !== undefined
-        ? normalizeOptionalString(req.body.sku)
-        : existingItem.sku,
       category: req.body.category !== undefined
         ? normalizeOptionalString(req.body.category)
         : existingItem.category,
       unit: req.body.unit !== undefined
         ? requireString(req.body.unit || "unit", "Unit")
         : existingItem.unit,
-      reorderLevel: req.body.reorderLevel !== undefined && req.body.reorderLevel !== ""
-        ? requireInt(req.body.reorderLevel, "Reorder level")
-        : req.body.reorderLevel !== undefined
-          ? 0
-          : existingItem.reorderLevel,
       notes: req.body.notes !== undefined
         ? normalizeOptionalString(req.body.notes)
         : existingItem.notes
     };
-
-    if (updateData.reorderLevel < 0) {
-      throw createError(400, "Reorder level cannot be negative.");
-    }
 
     const item = await prisma.inventoryItem.update({
       where: { id: existingItem.id },
@@ -130,6 +113,42 @@ router.patch(
     });
 
     res.json({ item });
+  })
+);
+
+router.delete(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    const existingItem = await prisma.inventoryItem.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: {
+            distributions: true,
+            runnerDistributions: true
+          }
+        }
+      }
+    });
+
+    if (!existingItem) {
+      throw createError(404, "Inventory item not found.");
+    }
+
+    if (existingItem._count.distributions || existingItem._count.runnerDistributions) {
+      throw createError(400, "This item already has distribution history and cannot be deleted.");
+    }
+
+    await prisma.inventoryItem.delete({
+      where: { id: existingItem.id }
+    });
+
+    res.json({
+      deletedId: existingItem.id,
+      message: `${existingItem.name} deleted.`
+    });
   })
 );
 

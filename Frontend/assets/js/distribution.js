@@ -435,6 +435,10 @@ function selectedLedgerEntries() {
 }
 
 function renderSummary(summary) {
+  if (!summaryGrid) {
+    return;
+  }
+
   summaryGrid.innerHTML = `
     <article class="metric-card neutral">
       <p>Active runs</p>
@@ -840,7 +844,9 @@ function renderLedgerEntries() {
 }
 
 async function loadPage() {
-  summaryGrid.innerHTML = renderMetricSkeleton(5);
+  if (summaryGrid) {
+    summaryGrid.innerHTML = renderMetricSkeleton(5);
+  }
   distributionTable.innerHTML = renderTableSkeleton(10, 5);
   distributorTable.innerHTML = renderTableSkeleton(6, 5);
   ledgerTable.innerHTML = renderTableSkeleton(10, 5);
@@ -872,7 +878,9 @@ async function loadPage() {
     renderLedgerEntries();
     openRequestedTargets();
   } catch (error) {
-    summaryGrid.innerHTML = renderEmptyState("Unable to load distribution page", error.message);
+    if (summaryGrid) {
+      summaryGrid.innerHTML = renderEmptyState("Unable to load distribution page", error.message);
+    }
     distributionTable.innerHTML = "";
     distributorTable.innerHTML = "";
     ledgerTable.innerHTML = "";

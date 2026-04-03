@@ -12,11 +12,8 @@ import {
 import {
   bindDraftForm,
   buildPageHref,
-  clearSavedView,
   downloadCsv,
-  loadSavedView,
-  restoreDraftForm,
-  saveSavedView
+  restoreDraftForm
 } from "./workflow.js";
 
 initProtectedPage({
@@ -29,6 +26,7 @@ const createForm = document.querySelector("#inventoryForm");
 const adjustForm = document.querySelector("#adjustForm");
 const createError = document.querySelector("#inventoryError");
 const adjustError = document.querySelector("#adjustError");
+const summaryContainer = document.querySelector("#inventorySummary");
 const tableContainer = document.querySelector("#inventoryTable");
 const recentMovementFeed = document.querySelector("#recentMovementFeed");
 const itemSelect = document.querySelector("#adjustItemId");
@@ -58,7 +56,6 @@ tableContainer.before(toolbarHost);
 
 let itemsCache = [];
 let hasShownFilterMessage = false;
-let selectedItemIds = new Set();
 
 if (createDraft.restored || adjustDraft.restored) {
   showToast("Restored saved inventory drafts.", "info");
@@ -107,8 +104,8 @@ function formatMovementType(type) {
 function resetItemForm({ clearDraftState = false, clearUrl = true } = {}) {
   createForm.reset();
   inventoryItemIdField.value = "";
-  inventoryFormTitle.textContent = "Create item";
-  inventoryFormSubtitle.textContent = "Add a new inventory item and optional opening stock.";
+  inventoryFormTitle.textContent = "Add new item";
+  inventoryFormSubtitle.textContent = "Use this form to add a new stock item or update one that already exists.";
   inventorySubmitButton.textContent = "Create item";
   inventoryQuantityHint.textContent = "Starting quantity is only used when creating a new item.";
 
@@ -132,7 +129,7 @@ function resetItemForm({ clearDraftState = false, clearUrl = true } = {}) {
 function fillItemForm(item) {
   inventoryItemIdField.value = item.id;
   inventoryFormTitle.textContent = `Edit ${item.name}`;
-  inventoryFormSubtitle.textContent = "Update item details here. Use the stock form below to change quantity.";
+  inventoryFormSubtitle.textContent = "Update the item details here. Use the stock form below to change quantity.";
   inventorySubmitButton.textContent = "Save item";
   inventoryQuantityHint.textContent = `Current stock is ${item.quantity} ${item.unit}.`;
   createForm.elements.name.value = item.name;
@@ -150,7 +147,7 @@ function resetAdjustmentForm({ clearDraftState = false, clearUrl = true } = {}) 
   adjustForm.reset();
   movementIdField.value = "";
   adjustFormTitle.textContent = "Adjust stock";
-  adjustFormSubtitle.textContent = "Apply an add, subtract, or correction movement to an existing item.";
+  adjustFormSubtitle.textContent = "Pick an item, enter the amount, and record what happened in plain terms.";
   adjustSubmitButton.textContent = "Apply adjustment";
   mountFormError(adjustError, "");
 
@@ -251,13 +248,8 @@ function currentViewLabel() {
   return searchQuery ? `Search / ${searchQuery}` : "All inventory";
 }
 
-function getSelectedItems(items = itemsCache) {
-  const availableIds = new Set(items.map((item) => item.id));
-  selectedItemIds = new Set([...selectedItemIds].filter((id) => availableIds.has(id)));
-  return items.filter((item) => selectedItemIds.has(item.id));
-}
-
 function rerenderCollection() {
+  renderSummary(itemsCache);
   renderToolbar(itemsCache);
   renderTable(itemsCache);
   renderRecentMovementFeed(itemsCache);
@@ -309,58 +301,64 @@ function renderRecentMovementFeed(items) {
   }).join("");
 }
 
+function renderSummary(items) {
+  if (!summaryContainer) {
+    return;
+  }
+
+  const visibleItems = getVisibleItems(items);
+  const totalUnits = visibleItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  const categories = new Set(visibleItems.map((item) => (item.category || "").trim()).filter(Boolean)).size;
+  const updatedToday = visibleItems.filter((item) => {
+    const updated = new Date(item.updatedAt);
+    const now = new Date();
+
+    return updated.getFullYear() === now.getFullYear()
+      && updated.getMonth() === now.getMonth()
+      && updated.getDate() === now.getDate();
+  }).length;
+
+  summaryContainer.innerHTML = `
+    <div class="inventory-summary-strip">
+      <article class="inventory-summary-card">
+        <span class="inventory-summary-label">Items shown</span>
+        <strong>${visibleItems.length}</strong>
+      </article>
+      <article class="inventory-summary-card">
+        <span class="inventory-summary-label">Units in stock</span>
+        <strong>${totalUnits}</strong>
+      </article>
+      <article class="inventory-summary-card">
+        <span class="inventory-summary-label">Categories</span>
+        <strong>${categories || 0}</strong>
+      </article>
+      <article class="inventory-summary-card">
+        <span class="inventory-summary-label">Updated today</span>
+        <strong>${updatedToday}</strong>
+      </article>
+    </div>
+  `;
+}
+
 function renderToolbar(items) {
   const visibleItems = getVisibleItems(items);
-  const selectedItems = getSelectedItems(items);
-  const savedView = loadSavedView("inventory");
   const filterLinks = [
     { label: "All", href: buildPageHref("./inventory.html", { hash: "inventoryTable" }), active: !activeView },
     { label: "Recent", href: buildPageHref("./inventory.html", { view: "recent", hash: "inventoryTable" }), active: activeView === "recent" }
   ];
+  const searchMeta = searchQuery ? `Search: "${searchQuery}"` : currentViewLabel();
 
   toolbarHost.innerHTML = `
-    <div class="filter-chip-row">
+    <div class="filter-chip-row inventory-filter-row">
       ${filterLinks.map((link) => `
         <a class="filter-chip ${link.active ? "active" : ""}" href="${link.href}">${link.label}</a>
       `).join("")}
-      ${savedView ? `<a class="filter-chip saved" href="${savedView.href}">Saved: ${savedView.label}</a>` : ""}
     </div>
-    <div class="toolbar-actions">
-      <span class="toolbar-meta">${visibleItems.length} shown</span>
-      <button class="ghost-button toolbar-button" type="button" data-action="save-view">Save view</button>
-      ${savedView ? `<button class="ghost-button toolbar-button" type="button" data-action="clear-view">Clear saved</button>` : ""}
+    <div class="toolbar-actions inventory-toolbar-actions">
+      <span class="toolbar-meta">${searchMeta}</span>
       <button class="ghost-button toolbar-button" type="button" data-action="export">Export CSV</button>
     </div>
-    ${selectedItems.length ? `
-      <div class="bulk-strip">
-        <span class="toolbar-meta">${selectedItems.length} selected</span>
-        <button class="ghost-button toolbar-button" type="button" data-bulk-adjust="-1">Bulk -1</button>
-        <button class="ghost-button toolbar-button" type="button" data-bulk-adjust="1">Bulk +1</button>
-        <button class="ghost-button toolbar-button" type="button" data-bulk-adjust="5">Bulk +5</button>
-        <button class="ghost-button toolbar-button" type="button" data-bulk-export>Export selected</button>
-        <button class="ghost-button toolbar-button" type="button" data-bulk-clear>Clear</button>
-      </div>
-    ` : ""}
   `;
-
-  toolbarHost.querySelector('[data-action="save-view"]')?.addEventListener("click", () => {
-    saveSavedView("inventory", {
-      label: currentViewLabel(),
-      href: buildPageHref("./inventory.html", {
-        view: activeView,
-        search: searchQuery,
-        hash: "inventoryTable"
-      })
-    });
-    showToast("Saved inventory view.", "success");
-    renderToolbar(items);
-  });
-
-  toolbarHost.querySelector('[data-action="clear-view"]')?.addEventListener("click", () => {
-    clearSavedView("inventory");
-    showToast("Cleared saved inventory view.", "info");
-    renderToolbar(items);
-  });
 
   toolbarHost.querySelector('[data-action="export"]')?.addEventListener("click", () => {
     downloadCsv(
@@ -376,78 +374,82 @@ function renderToolbar(items) {
     );
     showToast("Inventory CSV exported.", "success");
   });
-
-  toolbarHost.querySelectorAll("[data-bulk-adjust]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      try {
-        await runBulkAdjustment(
-          selectedItems.map((item) => item.id),
-          Number(button.dataset.bulkAdjust)
-        );
-        selectedItemIds = new Set();
-        await loadInventory();
-        announceMutation(["inventory"]);
-        showToast("Bulk inventory adjustment completed.", "success");
-      } catch (error) {
-        showToast(error.message, "error");
-      }
-    });
-  });
-
-  toolbarHost.querySelector("[data-bulk-export]")?.addEventListener("click", () => {
-    downloadCsv(
-      "inventory-selected.csv",
-      [
-        { label: "Name", value: (item) => item.name },
-        { label: "Category", value: (item) => item.category || "" },
-        { label: "Unit", value: (item) => item.unit },
-        { label: "Quantity", value: (item) => item.quantity },
-        { label: "Notes", value: (item) => item.notes || "" }
-      ],
-      selectedItems
-    );
-    showToast("Selected inventory exported.", "success");
-  });
-
-  toolbarHost.querySelector("[data-bulk-clear]")?.addEventListener("click", () => {
-    selectedItemIds = new Set();
-    rerenderCollection();
-  });
 }
 
-async function runInlineAdjustment(itemId, quantityDelta) {
-  await api(`/inventory/${itemId}/adjust`, {
-    method: "POST",
-    body: {
-      quantityDelta,
-      type: quantityDelta > 0 ? "STOCK_IN" : "STOCK_OUT",
-      reason: "Inline quick adjust"
-    }
-  });
+function openItemEditor(itemId) {
+  requestedItemEditId = itemId;
+  updateUrlParams({ editItem: requestedItemEditId }, ["editMovement"]);
+  requestedMovementEditId = "";
+  const item = itemsCache.find((entry) => entry.id === requestedItemEditId);
+
+  if (item) {
+    fillItemForm(item);
+    createForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
-async function runBulkAdjustment(itemIds, quantityDelta) {
-  await api("/inventory/bulk-adjust", {
-    method: "POST",
-    body: {
-      itemIds,
-      quantityDelta,
-      type: quantityDelta > 0 ? "STOCK_IN" : "STOCK_OUT",
-      reason: "Bulk quick adjust"
-    }
+function openAdjustmentForm(itemId) {
+  requestedItemEditId = "";
+  requestedMovementEditId = "";
+  updateUrlParams({}, ["editItem", "editMovement"]);
+  resetAdjustmentForm({ clearUrl: false });
+  itemSelect.value = itemId;
+  adjustForm.elements.quantityDelta.focus();
+  adjustForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function openMovementEditor(movementId) {
+  requestedMovementEditId = movementId;
+  updateUrlParams({ editMovement: requestedMovementEditId }, ["editItem"]);
+  requestedItemEditId = "";
+  const movement = itemsCache
+    .flatMap((item) => item.movements || [])
+    .find((entry) => entry.id === requestedMovementEditId);
+
+  if (movement) {
+    fillMovementForm(movement);
+    adjustForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+async function deleteInventoryItem(itemId) {
+  const item = itemsCache.find((entry) => entry.id === itemId);
+
+  if (!item) {
+    showToast("That inventory item could not be found.", "error");
+    return;
+  }
+
+  const confirmed = window.confirm(`Delete ${item.name} from inventory completely? This cannot be undone.`);
+
+  if (!confirmed) {
+    return;
+  }
+
+  await api(`/inventory/${itemId}`, {
+    method: "DELETE"
   });
+
+  if (inventoryItemIdField.value === itemId) {
+    resetItemForm({ clearDraftState: true });
+  }
+
+  if (adjustForm.elements.itemId.value === itemId) {
+    resetAdjustmentForm({ clearDraftState: true });
+  }
+
+  showToast("Inventory item deleted.", "success");
 }
 
 function renderTable(items) {
   const visibleItems = getVisibleItems(items);
-  const allVisibleSelected = visibleItems.length && visibleItems.every((item) => selectedItemIds.has(item.id));
 
   if (!visibleItems.length) {
     tableContainer.innerHTML = renderEmptyState(
       items.length ? "No matching inventory items" : "No inventory items yet",
       items.length
         ? "Try a broader search or remove the current filter."
-        : "Create your first item with the form on the left."
+        : "Add your first item with the form below."
     );
     return;
   }
@@ -472,15 +474,11 @@ function renderTable(items) {
       <table class="data-table">
         <thead>
           <tr>
-            <th class="table-select-cell">
-              <input class="table-check" type="checkbox" data-select-all ${allVisibleSelected ? "checked" : ""}>
-            </th>
             <th>Item</th>
             <th>Stock on hand</th>
             <th>Category</th>
             <th>Latest activity</th>
-            <th>Quick adjust</th>
-            <th>Action</th>
+            <th>Actions</th>
             <th>Updated</th>
           </tr>
         </thead>
@@ -492,13 +490,10 @@ function renderTable(items) {
             const isEditingMovement = (item.movements || []).some((movement) => movement.id === requestedMovementEditId);
 
             return `
-              <tr class="${selectedItemIds.has(item.id) ? "selected-row" : ""} ${isEditingItem || isEditingMovement ? "editing-row" : ""}">
-                <td class="table-select-cell">
-                  <input class="table-check" type="checkbox" data-select-item="${item.id}" ${selectedItemIds.has(item.id) ? "checked" : ""}>
-                </td>
+              <tr class="${isEditingItem || isEditingMovement ? "editing-row" : ""}">
                 <td>
                   <strong>${item.name}</strong>
-                  <span class="subtle-row">${item.unit}</span>
+                  <span class="subtle-row">${item.notes || item.unit}</span>
                 </td>
                 <td>
                   <div class="stock-readout">
@@ -514,15 +509,10 @@ function renderTable(items) {
                 </td>
                 <td>
                   <div class="inline-table-actions">
-                    <button class="mini-action" type="button" data-inline-adjust="${item.id}" data-delta="-1">-1</button>
-                    <button class="mini-action" type="button" data-inline-adjust="${item.id}" data-delta="1">+1</button>
-                    <button class="mini-action" type="button" data-inline-adjust="${item.id}" data-delta="5">+5</button>
-                  </div>
-                </td>
-                <td>
-                  <div class="inline-table-actions">
                     <button class="mini-action" type="button" data-edit-item="${item.id}">Edit item</button>
+                    <button class="mini-action" type="button" data-adjust-item="${item.id}">Adjust stock</button>
                     ${canEditMovement ? `<button class="mini-action" type="button" data-edit-movement="${latestMovement.id}">Edit log</button>` : ""}
+                    <button class="mini-action danger-action" type="button" data-delete-item="${item.id}">Delete</button>
                   </div>
                 </td>
                 <td>${formatDate(item.updatedAt)}</td>
@@ -534,82 +524,43 @@ function renderTable(items) {
     </div>
   `;
 
-  tableContainer.querySelectorAll("[data-inline-adjust]").forEach((button) => {
+  tableContainer.querySelectorAll("[data-edit-item]").forEach((button) => {
+    button.addEventListener("click", () => openItemEditor(button.dataset.editItem));
+  });
+
+  tableContainer.querySelectorAll("[data-adjust-item]").forEach((button) => {
+    button.addEventListener("click", () => openAdjustmentForm(button.dataset.adjustItem));
+  });
+
+  tableContainer.querySelectorAll("[data-edit-movement]").forEach((button) => {
+    button.addEventListener("click", () => openMovementEditor(button.dataset.editMovement));
+  });
+
+  tableContainer.querySelectorAll("[data-delete-item]").forEach((button) => {
     button.addEventListener("click", async () => {
       try {
-        await runInlineAdjustment(button.dataset.inlineAdjust, Number(button.dataset.delta));
+        await deleteInventoryItem(button.dataset.deleteItem);
         await loadInventory();
         announceMutation(["inventory"]);
-        showToast("Inventory updated inline.", "success");
       } catch (error) {
         showToast(error.message, "error");
       }
     });
   });
-
-  tableContainer.querySelectorAll("[data-edit-item]").forEach((button) => {
-    button.addEventListener("click", () => {
-      requestedItemEditId = button.dataset.editItem;
-      updateUrlParams({ editItem: requestedItemEditId }, ["editMovement"]);
-      requestedMovementEditId = "";
-      const item = itemsCache.find((entry) => entry.id === requestedItemEditId);
-
-      if (item) {
-        fillItemForm(item);
-        createForm.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    });
-  });
-
-  tableContainer.querySelectorAll("[data-edit-movement]").forEach((button) => {
-    button.addEventListener("click", () => {
-      requestedMovementEditId = button.dataset.editMovement;
-      updateUrlParams({ editMovement: requestedMovementEditId }, ["editItem"]);
-      requestedItemEditId = "";
-      const movement = itemsCache
-        .flatMap((item) => item.movements || [])
-        .find((entry) => entry.id === requestedMovementEditId);
-
-      if (movement) {
-        fillMovementForm(movement);
-        adjustForm.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    });
-  });
-
-  tableContainer.querySelector("[data-select-all]")?.addEventListener("change", (event) => {
-    if (event.target.checked) {
-      visibleItems.forEach((item) => selectedItemIds.add(item.id));
-    } else {
-      visibleItems.forEach((item) => selectedItemIds.delete(item.id));
-    }
-
-    rerenderCollection();
-  });
-
-  tableContainer.querySelectorAll("[data-select-item]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      if (event.target.checked) {
-        selectedItemIds.add(input.dataset.selectItem);
-      } else {
-        selectedItemIds.delete(input.dataset.selectItem);
-      }
-
-      rerenderCollection();
-    });
-  });
 }
 
 async function loadInventory() {
+  if (summaryContainer) {
+    summaryContainer.innerHTML = "<div class='inventory-summary-card skeleton-card'></div><div class='inventory-summary-card skeleton-card'></div>";
+  }
   if (recentMovementFeed) {
     recentMovementFeed.innerHTML = "<div class='activity-card skeleton-card'></div><div class='activity-card skeleton-card'></div>";
   }
-  tableContainer.innerHTML = renderTableSkeleton(8, 5);
+  tableContainer.innerHTML = renderTableSkeleton(6, 5);
 
   try {
     const { items } = await api("/inventory");
     itemsCache = items;
-    getSelectedItems(itemsCache);
     populateItemSelect(itemsCache);
     restoreDraftForm(adjustForm, "inventory-adjust");
     rerenderCollection();
