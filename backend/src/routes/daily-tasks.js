@@ -45,14 +45,56 @@ function sortTasks(tasks = []) {
   ));
 }
 
-function buildStanding(rankingRows, usersById, currentUserId) {
-  const leaderboard = rankingRows
-    .map((row) => ({
+function chooseLatestDate(left, right) {
+  if (!left) {
+    return right || null;
+  }
+
+  if (!right) {
+    return left;
+  }
+
+  return new Date(left) > new Date(right) ? left : right;
+}
+
+function buildStanding(dailyRows, weeklyRows, usersById, currentUserId) {
+  const totalsByUser = new Map();
+
+  dailyRows.forEach((row) => {
+    const existing = totalsByUser.get(row.userId) || {
       userId: row.userId,
-      name: usersById.get(row.userId)?.name || "Unknown user",
-      totalPoints: row._sum.pointsAwarded || 0,
-      completedCount: row._count._all || 0,
-      lastCompletedAt: row._max.completedAt
+      totalPoints: 0,
+      completedCount: 0,
+      lastCompletedAt: null
+    };
+
+    existing.totalPoints += row._sum.pointsAwarded || 0;
+    existing.completedCount += row._count._all || 0;
+    existing.lastCompletedAt = chooseLatestDate(existing.lastCompletedAt, row._max.completedAt);
+    totalsByUser.set(row.userId, existing);
+  });
+
+  weeklyRows.forEach((row) => {
+    const existing = totalsByUser.get(row.userId) || {
+      userId: row.userId,
+      totalPoints: 0,
+      completedCount: 0,
+      lastCompletedAt: null
+    };
+
+    existing.totalPoints += row._sum.pointsAwarded || 0;
+    existing.completedCount += row._count._all || 0;
+    existing.lastCompletedAt = chooseLatestDate(existing.lastCompletedAt, row._max.createdAt);
+    totalsByUser.set(row.userId, existing);
+  });
+
+  const leaderboard = [...totalsByUser.values()]
+    .map((entry) => ({
+      userId: entry.userId,
+      name: usersById.get(entry.userId)?.name || "Unknown user",
+      totalPoints: entry.totalPoints,
+      completedCount: entry.completedCount,
+      lastCompletedAt: entry.lastCompletedAt
     }))
     .sort((left, right) => (
       right.totalPoints - left.totalPoints
@@ -113,12 +155,102 @@ function mapAdminDailyTasks(tasks, todayCountsByTask, allTimeCountsByTask) {
   }));
 }
 
-function mapAdminWeeklyTasks(tasks, weekCountsByTask, allTimeCountsByTask) {
-  return tasks.map((task) => ({
+function mapAdminWeeklyTasks(tasks, currentWeekCompletionMap, allTimeCountsByTask) {
+  return tasks.map((task) => {
+    const completion = currentWeekCompletionMap.get(task.id);
+    const attendeeCount = completion?.awards?.length || 0;
+
+    return {
+      ...task,
+      currentWeekCompletionCount: completion ? 1 : 0,
+      currentWeekAttendeeCount: attendeeCount,
+      currentWeekPointsAwarded: completion?.awards?.[0]?.pointsAwarded ?? (IMPORTANCE_POINTS[task.importance] || 0),
+      allTimeCompletionCount: allTimeCountsByTask.get(task.id) || 0
+    };
+  });
+}
+
+function serializeWeeklyCompletion(task, completion) {
+  const awards = (completion?.awards || [])
+    .map((award) => ({
+      id: award.id,
+      userId: award.userId,
+      name: award.user?.name || "Unknown user",
+      pointsAwarded: Number(award.pointsAwarded || 0)
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  return {
     ...task,
-    currentWeekCompletionCount: weekCountsByTask.get(task.id) || 0,
-    allTimeCompletionCount: allTimeCountsByTask.get(task.id) || 0
-  }));
+    completed: Boolean(completion),
+    completedAt: completion?.completedAt || null,
+    completedBy: completion?.completedBy || null,
+    pointsAwarded: awards[0]?.pointsAwarded ?? (IMPORTANCE_POINTS[task.importance] || 0),
+    attendeeCount: awards.length,
+    attendees: awards
+  };
+}
+
+function normalizeAttendeeIds(value) {
+  if (!Array.isArray(value)) {
+    throw createError(400, "Select at least one team member.");
+  }
+
+  const attendeeIds = [...new Set(value.map((entry) => `${entry}`.trim()).filter(Boolean))];
+
+  if (!attendeeIds.length) {
+    throw createError(400, "Select at least one team member.");
+  }
+
+  return attendeeIds;
+}
+
+function normalizePointsAwarded(value, fallback) {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw createError(400, "Points must be a whole number equal to or above zero.");
+  }
+
+  return parsed;
+}
+
+async function validateTaskTeamMembers(attendeeIds = []) {
+  const members = await prisma.user.findMany({
+    where: {
+      id: {
+        in: attendeeIds
+      },
+      active: true,
+      OR: [
+        {
+          role: "ADMIN"
+        },
+        {
+          permissions: {
+            some: {
+              key: "DAILY_TASKS"
+            }
+          }
+        }
+      ]
+    },
+    select: {
+      id: true,
+      name: true,
+      role: true
+    }
+  });
+
+  if (members.length !== attendeeIds.length) {
+    throw createError(400, "One or more selected users can no longer receive task credit.");
+  }
+
+  return members.sort((left, right) => left.name.localeCompare(right.name));
 }
 
 router.get(
@@ -131,7 +263,8 @@ router.get(
     const [
       activeTasks,
       todayCompletions,
-      rankingRows,
+      dailyRankingRows,
+      weeklyRankingRows,
       userTaskDays,
       adminDailyTasks,
       todayCompletionCounts,
@@ -139,8 +272,8 @@ router.get(
       activeWeeklyTasks,
       weeklyCompletions,
       adminWeeklyTasks,
-      currentWeekCompletionCounts,
-      allTimeWeeklyCompletionCounts
+      allTimeWeeklyCompletionCounts,
+      adminTeamMembers
     ] = await Promise.all([
       prisma.dailyTask.findMany({
         where: { active: true },
@@ -168,6 +301,18 @@ router.get(
         },
         _max: {
           completedAt: true
+        }
+      }),
+      prisma.weeklyTaskAward.groupBy({
+        by: ["userId"],
+        _sum: {
+          pointsAwarded: true
+        },
+        _count: {
+          _all: true
+        },
+        _max: {
+          createdAt: true
         }
       }),
       prisma.dailyTaskCompletion.findMany({
@@ -216,6 +361,16 @@ router.get(
               id: true,
               name: true
             }
+          },
+          awards: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
           }
         }
       }),
@@ -227,31 +382,51 @@ router.get(
       isAdmin
         ? prisma.weeklyTaskCompletion.groupBy({
           by: ["taskId"],
-          where: {
-            weekKey: currentWeekKey
-          },
           _count: {
             _all: true
           }
         })
         : Promise.resolve([]),
       isAdmin
-        ? prisma.weeklyTaskCompletion.groupBy({
-          by: ["taskId"],
-          _count: {
-            _all: true
+        ? prisma.user.findMany({
+          where: {
+            active: true,
+            OR: [
+              {
+                role: "ADMIN"
+              },
+              {
+                permissions: {
+                  some: {
+                    key: "DAILY_TASKS"
+                  }
+                }
+              }
+            ]
+          },
+          orderBy: {
+            name: "asc"
+          },
+          select: {
+            id: true,
+            name: true,
+            role: true
           }
         })
         : Promise.resolve([])
     ]);
 
     const usersById = new Map();
+    const standingUserIds = [...new Set([
+      ...dailyRankingRows.map((row) => row.userId),
+      ...weeklyRankingRows.map((row) => row.userId)
+    ])];
 
-    if (rankingRows.length) {
+    if (standingUserIds.length) {
       const users = await prisma.user.findMany({
         where: {
           id: {
-            in: rankingRows.map((row) => row.userId)
+            in: standingUserIds
           }
         },
         select: {
@@ -265,12 +440,9 @@ router.get(
 
     const completionMap = new Map(todayCompletions.map((completion) => [completion.taskId, completion]));
     const weeklyCompletionMap = new Map(weeklyCompletions.map((completion) => [completion.taskId, completion]));
-    const standings = buildStanding(rankingRows, usersById, req.user.id);
+    const standings = buildStanding(dailyRankingRows, weeklyRankingRows, usersById, req.user.id);
     const todayCountsByTask = new Map(todayCompletionCounts.map((entry) => [entry.taskId, entry._count._all || 0]));
     const allTimeCountsByTask = new Map(allTimeCompletionCounts.map((entry) => [entry.taskId, entry._count._all || 0]));
-    const currentWeekCountsByTask = new Map(
-      currentWeekCompletionCounts.map((entry) => [entry.taskId, entry._count._all || 0])
-    );
     const allTimeWeeklyCountsByTask = new Map(
       allTimeWeeklyCompletionCounts.map((entry) => [entry.taskId, entry._count._all || 0])
     );
@@ -286,16 +458,9 @@ router.get(
       };
     });
 
-    const weeklyTasks = sortTasks(activeWeeklyTasks).map((task) => {
-      const completion = weeklyCompletionMap.get(task.id);
-
-      return {
-        ...task,
-        completed: Boolean(completion),
-        completedAt: completion?.completedAt || null,
-        completedBy: completion?.completedBy || null
-      };
-    });
+    const weeklyTasks = sortTasks(activeWeeklyTasks).map((task) => (
+      serializeWeeklyCompletion(task, weeklyCompletionMap.get(task.id))
+    ));
 
     const todayPoints = todayCompletions.reduce((sum, completion) => sum + Number(completion.pointsAwarded || 0), 0);
     const todayCompletionCount = todayCompletions.length;
@@ -327,7 +492,8 @@ router.get(
       admin: isAdmin
         ? {
           dailyTasks: mapAdminDailyTasks(adminDailyTasks, todayCountsByTask, allTimeCountsByTask),
-          weeklyTasks: mapAdminWeeklyTasks(adminWeeklyTasks, currentWeekCountsByTask, allTimeWeeklyCountsByTask)
+          weeklyTasks: mapAdminWeeklyTasks(adminWeeklyTasks, weeklyCompletionMap, allTimeWeeklyCountsByTask),
+          teamMembers: adminTeamMembers
         }
         : null
     });
@@ -437,13 +603,42 @@ router.put(
       throw createError(400, "Only active weekly tasks can be completed.");
     }
 
-    const completion = existingCompletion
-      ? existingCompletion
-      : await prisma.weeklyTaskCompletion.create({
-        data: {
+    const attendeeIds = normalizeAttendeeIds(req.body.attendeeIds);
+    const pointsAwarded = normalizePointsAwarded(req.body.pointsAwarded, IMPORTANCE_POINTS[task.importance] || 0);
+    await validateTaskTeamMembers(attendeeIds);
+
+    const completion = await prisma.$transaction(async (transaction) => {
+      const savedCompletion = await transaction.weeklyTaskCompletion.upsert({
+        where: completionWhere,
+        create: {
           taskId: task.id,
           weekKey: currentWeekKey,
           completedById: req.user.id
+        },
+        update: {
+          completedAt: new Date(),
+          completedById: req.user.id
+        }
+      });
+
+      await transaction.weeklyTaskAward.deleteMany({
+        where: {
+          completionId: savedCompletion.id
+        }
+      });
+
+      await transaction.weeklyTaskAward.createMany({
+        data: attendeeIds.map((userId) => ({
+          completionId: savedCompletion.id,
+          userId,
+          weekKey: currentWeekKey,
+          pointsAwarded
+        }))
+      });
+
+      return transaction.weeklyTaskCompletion.findUnique({
+        where: {
+          id: savedCompletion.id
         },
         include: {
           completedBy: {
@@ -451,11 +646,25 @@ router.put(
               id: true,
               name: true
             }
+          },
+          awards: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
           }
         }
       });
+    });
 
-    res.json({ completion, removed: false });
+    res.json({
+      completion: serializeWeeklyCompletion(task, completion),
+      removed: false
+    });
   })
 );
 

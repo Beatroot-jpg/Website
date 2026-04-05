@@ -94,6 +94,7 @@ model User {
   dailyTaskCompletions   DailyTaskCompletion[]
   createdWeeklyTasks     WeeklyTask[]      @relation("WeeklyTaskCreatedBy")
   completedWeeklyTasks   WeeklyTaskCompletion[] @relation("WeeklyTaskCompletedBy")
+  weeklyTaskAwards       WeeklyTaskAward[]
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 }
@@ -288,7 +289,23 @@ model WeeklyTaskCompletion {
   completedById  String?
   task           WeeklyTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
   completedBy    User?       @relation("WeeklyTaskCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  awards         WeeklyTaskAward[]
 
   @@unique([taskId, weekKey])
+  @@index([weekKey])
+}
+
+model WeeklyTaskAward {
+  id            String               @id @default(cuid())
+  completionId  String
+  userId        String
+  weekKey       String
+  pointsAwarded Int
+  createdAt     DateTime             @default(now())
+  completion    WeeklyTaskCompletion @relation(fields: [completionId], references: [id], onDelete: Cascade)
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([completionId, userId])
+  @@index([userId])
   @@index([weekKey])
 }

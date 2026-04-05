@@ -48,6 +48,19 @@ const adminWeeklyTaskLibrary = document.querySelector("#adminWeeklyTaskLibrary")
 const openWeeklyTaskFormButton = document.querySelector("#openWeeklyTaskFormButton");
 const weeklyTaskFormHost = document.querySelector("#weeklyTaskFormHost");
 const weeklyTaskFormContent = document.querySelector("#weeklyTaskFormContent");
+const weeklyCompletionForm = document.querySelector("#weeklyCompletionForm");
+const weeklyCompletionTaskId = document.querySelector("#weeklyCompletionTaskId");
+const weeklyCompletionTaskName = document.querySelector("#weeklyCompletionTaskName");
+const weeklyCompletionTaskDescription = document.querySelector("#weeklyCompletionTaskDescription");
+const weeklyCompletionPoints = document.querySelector("#weeklyCompletionPoints");
+const weeklyCompletionMembers = document.querySelector("#weeklyCompletionMembers");
+const weeklyCompletionError = document.querySelector("#weeklyCompletionError");
+const weeklyCompletionFormTitle = document.querySelector("#weeklyCompletionFormTitle");
+const weeklyCompletionFormSubtitle = document.querySelector("#weeklyCompletionFormSubtitle");
+const weeklyCompletionSubmit = document.querySelector("#weeklyCompletionSubmit");
+const weeklyCompletionReopen = document.querySelector("#weeklyCompletionReopen");
+const weeklyCompletionFormHost = document.querySelector("#weeklyCompletionFormHost");
+const weeklyCompletionFormContent = document.querySelector("#weeklyCompletionFormContent");
 
 const adminDraft = bindDraftForm(adminTaskForm, "daily-task-admin-form");
 const weeklyDraft = bindDraftForm(weeklyTaskForm, "weekly-task-admin-form");
@@ -57,6 +70,8 @@ let requestedTaskEditId = pageParams.get("editTask") || "";
 let requestedWeeklyTaskEditId = pageParams.get("editWeeklyTask") || "";
 let adminDailyTasksCache = [];
 let adminWeeklyTasksCache = [];
+let weeklyTaskCache = [];
+let teamMembersCache = [];
 
 if (adminDraft.restored) {
   showToast("Restored saved daily task draft.", "info");
@@ -90,6 +105,34 @@ function updateUrlParams(updates = {}, removeKeys = []) {
   const query = params.toString();
   const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
   window.history.replaceState({}, "", nextUrl);
+}
+
+function resolveWeeklyTask(taskId) {
+  return weeklyTaskCache.find((task) => task.id === taskId)
+    || adminWeeklyTasksCache.find((task) => task.id === taskId)
+    || null;
+}
+
+function renderTeamMemberOptions(selectedIds = []) {
+  if (!weeklyCompletionMembers) {
+    return;
+  }
+
+  if (!teamMembersCache.length) {
+    weeklyCompletionMembers.innerHTML = renderEmptyState(
+      "No team members available",
+      "There are no active users with task access available to receive points right now."
+    );
+    return;
+  }
+
+  const selected = new Set(selectedIds);
+  weeklyCompletionMembers.innerHTML = teamMembersCache.map((member) => `
+    <label class="permission-option">
+      <input type="checkbox" name="attendeeIds" value="${member.id}" ${selected.has(member.id) ? "checked" : ""}>
+      <span>${member.name} <span class="muted">(${member.role})</span></span>
+    </label>
+  `).join("");
 }
 
 function resetAdminForm({ clearDraftState = false, clearUrl = true } = {}) {
@@ -140,6 +183,24 @@ function resetWeeklyForm({ clearDraftState = false, clearUrl = true } = {}) {
   }
 }
 
+function resetWeeklyCompletionForm() {
+  if (!weeklyCompletionForm) {
+    return;
+  }
+
+  weeklyCompletionForm.reset();
+  weeklyCompletionTaskId.value = "";
+  weeklyCompletionFormTitle.textContent = "Complete weekly task";
+  weeklyCompletionFormSubtitle.textContent = "Select the people who took part and assign the points they should receive from this shared task.";
+  weeklyCompletionTaskName.textContent = "Weekly task";
+  weeklyCompletionTaskDescription.textContent = "Choose the members who attended, then save the completion.";
+  weeklyCompletionSubmit.textContent = "Save completion";
+  weeklyCompletionReopen.classList.add("hidden");
+  weeklyCompletionReopen.disabled = false;
+  mountFormError(weeklyCompletionError, "");
+  renderTeamMemberOptions([]);
+}
+
 function fillAdminForm(task) {
   if (!adminTaskForm) {
     return;
@@ -170,6 +231,25 @@ function fillWeeklyForm(task) {
   weeklyTaskForm.elements.importance.value = task.importance;
   weeklyTaskForm.elements.description.value = task.description || "";
   weeklyTaskForm.elements.active.checked = task.active;
+}
+
+function fillWeeklyCompletionForm(task) {
+  if (!weeklyCompletionForm) {
+    return;
+  }
+
+  weeklyCompletionTaskId.value = task.id;
+  weeklyCompletionFormTitle.textContent = task.completed ? `Edit ${task.title}` : `Complete ${task.title}`;
+  weeklyCompletionFormSubtitle.textContent = task.completed
+    ? "Adjust who attended, change the points, or reopen the task if the completion needs to be reversed."
+    : "Select the people who attended this group task and choose the points they should receive.";
+  weeklyCompletionTaskName.textContent = task.title;
+  weeklyCompletionTaskDescription.textContent = task.description || "Choose the members who attended, then save the completion.";
+  weeklyCompletionPoints.value = Number.isFinite(task.pointsAwarded) ? task.pointsAwarded : 0;
+  weeklyCompletionSubmit.textContent = task.completed ? "Save changes" : "Mark complete";
+  weeklyCompletionReopen.classList.toggle("hidden", !task.completed);
+  mountFormError(weeklyCompletionError, "");
+  renderTeamMemberOptions((task.attendees || []).map((attendee) => attendee.userId));
 }
 
 function showAdminTaskModal(opener = document.activeElement) {
@@ -207,6 +287,19 @@ function showWeeklyTaskModal(opener = document.activeElement) {
         updateUrlParams({ editWeeklyTask: "" }, ["editWeeklyTask"]);
       }
     }
+  });
+}
+
+function showWeeklyCompletionModal(opener = document.activeElement) {
+  if (!weeklyCompletionFormContent || !weeklyCompletionFormHost) {
+    return;
+  }
+
+  openFormModal({
+    content: weeklyCompletionFormContent,
+    host: weeklyCompletionFormHost,
+    focusSelector: "#weeklyCompletionPoints",
+    opener
   });
 }
 
@@ -317,6 +410,7 @@ function renderDailyTasks(tasks) {
 
 function renderWeeklyTasks(weekly = {}) {
   const tasks = weekly.tasks || [];
+  weeklyTaskCache = tasks;
   weeklyResetLabel.textContent = weekly.resetLabel || "";
 
   if (!tasks.length) {
@@ -324,54 +418,71 @@ function renderWeeklyTasks(weekly = {}) {
     return;
   }
 
-  weeklyTaskList.innerHTML = tasks.map((task) => `
-    <article class="task-card ${task.completed ? "completed" : ""}">
-      <div class="task-toggle">
-        <input
-          type="checkbox"
-          data-weekly-task-id="${task.id}"
-          ${task.completed ? "checked" : ""}
-          ${currentUser.role === "ADMIN" ? "" : "disabled"}
-        >
-        <div class="task-copy">
-          <div class="task-card-header">
-            <strong class="task-title">${task.title}</strong>
-            ${priorityBadge(task.importance)}
-          </div>
-          <p class="muted">${task.description || "No extra explanation for this weekly task."}</p>
-          <div class="badge-group">
-            ${badge(task.completed ? "Completed this week" : "Still open this week", task.completed ? "good" : "neutral")}
-            ${task.completedBy?.name ? badge(`Marked by ${task.completedBy.name}`, "accent") : ""}
-            ${task.completedAt ? `<span class="muted">Updated at ${formatDate(task.completedAt)}</span>` : ""}
+  weeklyTaskList.innerHTML = tasks.map((task) => {
+    const attendeePreview = (task.attendees || []).slice(0, 3).map((attendee) => badge(attendee.name, "neutral")).join("");
+    const remainingAttendees = (task.attendees || []).length - 3;
+
+    return `
+      <article class="task-card ${task.completed ? "completed" : ""}">
+        <div class="task-toggle">
+          <input
+            type="checkbox"
+            data-weekly-task-id="${task.id}"
+            ${task.completed ? "checked" : ""}
+            ${currentUser.role === "ADMIN" ? "" : "disabled"}
+          >
+          <div class="task-copy">
+            <div class="task-card-header">
+              <strong class="task-title">${task.title}</strong>
+              ${priorityBadge(task.importance, { points: task.pointsAwarded })}
+            </div>
+            <p class="muted">${task.description || "No extra explanation for this weekly task."}</p>
+            <div class="badge-group">
+              ${badge(task.completed ? "Completed this week" : "Still open this week", task.completed ? "good" : "neutral")}
+              ${badge(`${task.pointsAwarded || 0} points each`, "accent")}
+              ${task.attendeeCount ? badge(`${task.attendeeCount} credited`, "neutral") : ""}
+              ${task.completedBy?.name ? badge(`Saved by ${task.completedBy.name}`, "neutral") : ""}
+              ${task.completedAt ? `<span class="muted">Updated at ${formatDate(task.completedAt)}</span>` : ""}
+            </div>
+            ${(task.attendees || []).length
+              ? `<div class="badge-group">${attendeePreview}${remainingAttendees > 0 ? badge(`+${remainingAttendees} more`, "accent") : ""}</div>`
+              : ""}
+            ${currentUser.role === "ADMIN"
+              ? `<div class="inline-actions"><button class="mini-action" type="button" data-manage-weekly-task="${task.id}">${task.completed ? "Edit credit" : "Check off"}</button></div>`
+              : ""}
           </div>
         </div>
-      </div>
-    </article>
-  `).join("");
+      </article>
+    `;
+  }).join("");
 
   if (currentUser.role !== "ADMIN") {
     return;
   }
 
+  const openWeeklyCompletion = (taskId, opener) => {
+    const task = resolveWeeklyTask(taskId);
+
+    if (!task) {
+      showToast("That weekly task could not be found.", "error");
+      return;
+    }
+
+    resetWeeklyCompletionForm();
+    fillWeeklyCompletionForm(task);
+    showWeeklyCompletionModal(opener);
+  };
+
   weeklyTaskList.querySelectorAll("[data-weekly-task-id]").forEach((input) => {
-    input.addEventListener("change", async () => {
-      try {
-        input.disabled = true;
-        await api(`/daily-tasks/weekly/${input.dataset.weeklyTaskId}/completion`, {
-          method: "PUT",
-          body: {
-            completed: input.checked
-          }
-        });
-        await loadTasks(false);
-        announceMutation(["daily_tasks"]);
-        showToast(input.checked ? "Weekly task marked complete." : "Weekly task reopened.", "success");
-      } catch (error) {
-        input.checked = !input.checked;
-        showToast(error.message, "error");
-      } finally {
-        input.disabled = false;
-      }
+    input.addEventListener("click", (event) => {
+      event.preventDefault();
+      openWeeklyCompletion(input.dataset.weeklyTaskId, input);
+    });
+  });
+
+  weeklyTaskList.querySelectorAll("[data-manage-weekly-task]").forEach((button) => {
+    button.addEventListener("click", () => {
+      openWeeklyCompletion(button.dataset.manageWeeklyTask, button);
     });
   });
 }
@@ -504,6 +615,7 @@ function renderAdminPanel(admin) {
   adminPanel.classList.remove("hidden");
   adminDailyTasksCache = admin.dailyTasks || [];
   adminWeeklyTasksCache = admin.weeklyTasks || [];
+  teamMembersCache = admin.teamMembers || [];
 
   if (!adminDailyTasksCache.length) {
     adminTaskLibrary.innerHTML = renderEmptyState("No daily tasks yet", "Use the create daily task button above to add the first task.");
@@ -541,9 +653,10 @@ function renderAdminPanel(admin) {
           <span class="insight-value">${task.currentWeekCompletionCount ? "Done" : "Open"}</span>
         </div>
         <div class="badge-group">
-          ${priorityBadge(task.importance)}
+          ${priorityBadge(task.importance, { points: task.currentWeekPointsAwarded })}
           ${badge(task.active ? "Active" : "Paused", task.active ? "good" : "neutral")}
           ${badge(task.currentWeekCompletionCount ? "Completed this week" : "Open this week", task.currentWeekCompletionCount ? "good" : "accent")}
+          ${task.currentWeekCompletionCount ? badge(`${task.currentWeekAttendeeCount || 0} credited`, "neutral") : ""}
           ${badge(`${task.allTimeCompletionCount} completed weeks`, "neutral")}
         </div>
         <p class="muted">${task.description || "No description saved for this task."}</p>
@@ -576,6 +689,7 @@ async function loadTasks(showLoading = true) {
 
   try {
     const data = await api("/daily-tasks");
+    teamMembersCache = data.admin?.teamMembers || [];
     renderStanding(data.summary || {}, data.currentUserStanding || {});
     renderDailyTasks(data.tasks || []);
     renderWeeklyTasks(data.weekly || {});
@@ -676,6 +790,64 @@ weeklyTaskForm?.addEventListener("submit", async (event) => {
   }
 });
 
+weeklyCompletionForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  mountFormError(weeklyCompletionError, "");
+
+  const task = resolveWeeklyTask(weeklyCompletionTaskId.value);
+  const formData = new FormData(weeklyCompletionForm);
+  const attendeeIds = formData.getAll("attendeeIds").map((value) => `${value}`);
+  const payload = {
+    completed: true,
+    attendeeIds,
+    pointsAwarded: Number(formData.get("pointsAwarded"))
+  };
+
+  try {
+    await api(`/daily-tasks/weekly/${weeklyCompletionTaskId.value}/completion`, {
+      method: "PUT",
+      body: payload
+    });
+    resetWeeklyCompletionForm();
+    closeFormModal();
+    await loadTasks(false);
+    announceMutation(["daily_tasks"]);
+    showToast(task?.completed ? "Weekly task credit updated." : "Weekly task completed and points awarded.", "success");
+  } catch (error) {
+    mountFormError(weeklyCompletionError, error.message);
+    showToast(error.message, "error");
+  }
+});
+
+weeklyCompletionReopen?.addEventListener("click", async () => {
+  const taskId = weeklyCompletionTaskId.value;
+
+  if (!taskId) {
+    return;
+  }
+
+  mountFormError(weeklyCompletionError, "");
+  weeklyCompletionReopen.disabled = true;
+
+  try {
+    await api(`/daily-tasks/weekly/${taskId}/completion`, {
+      method: "PUT",
+      body: {
+        completed: false
+      }
+    });
+    resetWeeklyCompletionForm();
+    closeFormModal();
+    await loadTasks(false);
+    announceMutation(["daily_tasks"]);
+    showToast("Weekly task reopened and team credit removed.", "success");
+  } catch (error) {
+    weeklyCompletionReopen.disabled = false;
+    mountFormError(weeklyCompletionError, error.message);
+    showToast(error.message, "error");
+  }
+});
+
 resetAdminTaskFormButton?.addEventListener("click", () => {
   resetAdminForm({ clearDraftState: true });
 });
@@ -701,6 +873,7 @@ subscribeToMutations(["daily_tasks"], () => {
 
 resetAdminForm({ clearUrl: false });
 resetWeeklyForm({ clearUrl: false });
+resetWeeklyCompletionForm();
 restoreDraftForm(adminTaskForm, "daily-task-admin-form");
 restoreDraftForm(weeklyTaskForm, "weekly-task-admin-form");
 loadTasks();

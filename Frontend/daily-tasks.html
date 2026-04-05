@@ -56,7 +56,7 @@
           <article class="panel" id="weeklyTaskPanel">
             <div class="panel-header">
               <h2>Weekly team tasks</h2>
-              <p>Everyone can see the shared weekly list. Admins mark these off as the group finishes them.</p>
+              <p>Everyone can see the shared weekly list. Admins mark these off and award the points to the people who actually took part.</p>
             </div>
             <p class="muted" id="weeklyResetLabel"></p>
             <div class="task-checklist" id="weeklyTaskList"></div>
@@ -185,6 +185,36 @@
                     <button class="ghost-button" id="resetWeeklyTaskForm" type="button">Reset form</button>
                   </div>
                   <p class="form-error hidden" id="weeklyTaskError"></p>
+                </form>
+              </div>
+            </div>
+
+            <div class="modal-form-host" id="weeklyCompletionFormHost">
+              <div class="modal-form-content" id="weeklyCompletionFormContent">
+                <div class="panel-header">
+                  <h2 id="weeklyCompletionFormTitle">Complete weekly task</h2>
+                  <p id="weeklyCompletionFormSubtitle">Select the people who took part and assign the points they should receive from this shared task.</p>
+                </div>
+
+                <form class="stack-form" id="weeklyCompletionForm">
+                  <input type="hidden" id="weeklyCompletionTaskId" name="weeklyCompletionTaskId">
+                  <div class="feature-card">
+                    <strong id="weeklyCompletionTaskName">Weekly task</strong>
+                    <p class="muted" id="weeklyCompletionTaskDescription">Choose the members who attended, then save the completion.</p>
+                  </div>
+                  <label class="field-stack">
+                    <span>Points for each selected member</span>
+                    <input type="number" id="weeklyCompletionPoints" name="pointsAwarded" min="0" step="1" placeholder="0">
+                  </label>
+                  <div class="field-stack">
+                    <span>Team members who attended</span>
+                    <div class="permission-list" id="weeklyCompletionMembers"></div>
+                  </div>
+                  <div class="inline-actions">
+                    <button class="primary-button" id="weeklyCompletionSubmit" type="submit">Save completion</button>
+                    <button class="ghost-button hidden" id="weeklyCompletionReopen" type="button">Reopen task</button>
+                  </div>
+                  <p class="form-error hidden" id="weeklyCompletionError"></p>
                 </form>
               </div>
             </div>
