@@ -1,6 +1,7 @@
 import { api } from "./api.js";
 import { announceMutation, subscribeToMutations } from "./live.js";
 import {
+  focusFormPanel,
   formatDate,
   formatDateOnly,
   initProtectedPage,
@@ -121,7 +122,7 @@ function maybeOpenRequestedEdit() {
   }
 
   fillRosterForm(member);
-  rosterForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  focusFormPanel(rosterForm, '[name="name"]');
 }
 
 function getVisibleMembers(members) {
@@ -339,7 +340,7 @@ function renderMembers(members) {
 
       if (member) {
         fillRosterForm(member);
-        rosterForm.scrollIntoView({ behavior: "smooth", block: "start" });
+        focusFormPanel(rosterForm, '[name="name"]');
       }
     });
   });

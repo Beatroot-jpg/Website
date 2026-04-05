@@ -2,6 +2,7 @@ import { api } from "./api.js";
 import { announceMutation, subscribeToMutations } from "./live.js";
 import {
   badge,
+  focusFormPanel,
   formatDate,
   initProtectedPage,
   mountFormError,
@@ -242,7 +243,7 @@ function maybeOpenRequestedEdit() {
 
     if (item) {
       fillItemForm(item);
-      createForm.scrollIntoView({ behavior: "smooth", block: "start" });
+      focusFormPanel(createForm, '[name="name"]');
     } else {
       requestedItemEditId = "";
       updateUrlParams({ editItem: "" }, ["editItem"]);
@@ -270,7 +271,7 @@ function maybeOpenRequestedEdit() {
     }
 
     fillMovementForm(movement);
-    adjustForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    focusFormPanel(adjustForm, '[name="quantityDelta"]');
   }
 }
 
@@ -440,7 +441,7 @@ function openItemEditor(itemId) {
 
   if (item) {
     fillItemForm(item);
-    createForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    focusFormPanel(createForm, '[name="name"]');
   }
 }
 
@@ -450,8 +451,7 @@ function openAdjustmentForm(itemId) {
   updateUrlParams({}, ["editItem", "editMovement"]);
   resetAdjustmentForm({ clearUrl: false });
   itemSelect.value = itemId;
-  adjustForm.elements.quantityDelta.focus();
-  adjustForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  focusFormPanel(adjustForm, '[name="quantityDelta"]');
 }
 
 function openMovementEditor(movementId) {
@@ -464,7 +464,7 @@ function openMovementEditor(movementId) {
 
   if (movement) {
     fillMovementForm(movement);
-    adjustForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    focusFormPanel(adjustForm, '[name="quantityDelta"]');
   }
 }
 

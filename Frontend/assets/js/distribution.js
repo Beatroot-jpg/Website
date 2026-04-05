@@ -4,6 +4,7 @@ import {
   activeStateBadge,
   badge,
   distributionStatusBadge,
+  focusFormPanel,
   formatCurrency,
   formatDate,
   initProtectedPage,
@@ -339,6 +340,7 @@ function openRequestedTargets() {
 
     if (distributor) {
       fillRunnerForm(distributor);
+      focusFormPanel(runnerForm, '[name="name"]');
     } else {
       requestedDistributorEditId = "";
       updateUrlParams({ editDistributor: "" }, ["editDistributor"]);
@@ -351,7 +353,7 @@ function openRequestedTargets() {
 
     if (entry) {
       fillCollectionForm(entry);
-      collectionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+      focusFormPanel(collectionForm, '[name="amount"]');
       return;
     }
 
@@ -372,12 +374,12 @@ function openRequestedTargets() {
 
     if (window.location.hash === "#collectionForm") {
       setCollectionTarget(distribution);
-      collectionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+      focusFormPanel(collectionForm, '[name="amount"]');
       return;
     }
 
     fillDistributionForm(distribution);
-    distributionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    focusFormPanel(distributionForm, '[name="quantity"]');
   }
 }
 
@@ -552,7 +554,7 @@ function renderDistributions() {
       if (distribution) {
         setCollectionTarget(distribution);
         window.location.hash = "collectionForm";
-        collectionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+        focusFormPanel(collectionForm, '[name="amount"]');
       }
     });
   });
@@ -565,7 +567,7 @@ function renderDistributions() {
 
       if (distribution) {
         fillDistributionForm(distribution);
-        distributionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+        focusFormPanel(distributionForm, '[name="quantity"]');
       }
     });
   });
@@ -623,7 +625,7 @@ function renderDistributors() {
 
       if (distributor) {
         fillRunnerForm(distributor);
-        runnerForm.scrollIntoView({ behavior: "smooth", block: "start" });
+        focusFormPanel(runnerForm, '[name="name"]');
       }
     });
   });
@@ -790,7 +792,7 @@ function renderLedgerEntries() {
       if (entry) {
         fillCollectionForm(entry);
         window.location.hash = "collectionForm";
-        collectionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+        focusFormPanel(collectionForm, '[name="amount"]');
       }
     });
   });
@@ -837,7 +839,7 @@ function renderLedgerEntries() {
       if (distribution) {
         setCollectionTarget(distribution);
         window.location.hash = "collectionForm";
-        collectionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+        focusFormPanel(collectionForm, '[name="amount"]');
       }
     });
   });

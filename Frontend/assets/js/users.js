@@ -3,6 +3,7 @@ import { PERMISSION_PRESETS } from "./constants.js";
 import { announceMutation, subscribeToMutations } from "./live.js";
 import {
   activeStateBadge,
+  focusFormPanel,
   initProtectedPage,
   mountFormError,
   permissionBadges,
@@ -199,7 +200,7 @@ function maybeOpenRequestedEdit() {
   }
 
   fillForm(user);
-  userForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  focusFormPanel(userForm, '[name="name"]');
 }
 
 function getVisibleUsers(users) {
@@ -447,7 +448,7 @@ function renderUsers(users) {
       const user = usersCache.find((entry) => entry.id === button.dataset.editUser);
       if (user) {
         fillForm(user);
-        userForm.scrollIntoView({ behavior: "smooth", block: "start" });
+        focusFormPanel(userForm, '[name="name"]');
       }
     });
   });

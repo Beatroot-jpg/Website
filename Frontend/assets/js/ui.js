@@ -333,3 +333,47 @@ export function toggleCheckboxGroup(disabled) {
     input.disabled = disabled;
   });
 }
+
+export function focusFormPanel(formElement, focusSelector) {
+  if (!formElement) {
+    return;
+  }
+
+  const focusTarget = focusSelector
+    ? formElement.querySelector(focusSelector)
+    : formElement.querySelector("input, select, textarea, button");
+  const panel = formElement.closest(".panel") || formElement;
+
+  document.querySelectorAll(".panel.editing-focus").forEach((element) => {
+    if (element !== panel) {
+      element.classList.remove("editing-focus");
+    }
+  });
+
+  if (panel) {
+    panel.classList.remove("editing-focus");
+    void panel.offsetWidth;
+    panel.classList.add("editing-focus");
+    window.clearTimeout(panel.__editingFocusTimer);
+    panel.__editingFocusTimer = window.setTimeout(() => {
+      panel.classList.remove("editing-focus");
+    }, 2600);
+  }
+
+  panel.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
+
+  window.requestAnimationFrame(() => {
+    if (!focusTarget) {
+      return;
+    }
+
+    focusTarget.focus({ preventScroll: true });
+
+    if (typeof focusTarget.select === "function" && ["INPUT", "TEXTAREA"].includes(focusTarget.tagName)) {
+      focusTarget.select();
+    }
+  });
+}

@@ -2,6 +2,7 @@ import { api } from "./api.js";
 import { announceMutation, subscribeToMutations } from "./live.js";
 import {
   badge,
+  focusFormPanel,
   formatDate,
   initProtectedPage,
   mountFormError,
@@ -123,7 +124,7 @@ function maybeOpenRequestedTask() {
   }
 
   fillAdminForm(task);
-  adminTaskForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  focusFormPanel(adminTaskForm, '[name="title"]');
 }
 
 function renderSummary(summary) {
@@ -304,7 +305,7 @@ function renderAdminPanel(admin) {
 
       if (task) {
         fillAdminForm(task);
-        adminTaskForm.scrollIntoView({ behavior: "smooth", block: "start" });
+        focusFormPanel(adminTaskForm, '[name="title"]');
       }
     });
   });

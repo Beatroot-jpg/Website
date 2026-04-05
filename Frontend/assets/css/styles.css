@@ -347,6 +347,21 @@ textarea:focus {
   display: grid;
   align-content: start;
   gap: 0.95rem;
+  scroll-margin-top: 2rem;
+  transition:
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    transform 220ms ease;
+}
+
+.panel.editing-focus {
+  border-color: rgba(155, 183, 255, 0.38);
+  box-shadow:
+    var(--shadow-soft),
+    0 0 0 1px rgba(155, 183, 255, 0.24),
+    0 0 0 10px rgba(155, 183, 255, 0.06),
+    0 0 42px rgba(155, 183, 255, 0.16);
+  transform: translateY(-1px);
 }
 
 .auth-panel h1,

@@ -3,6 +3,7 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { asyncHandler } from "../http.js";
 import { authenticateToken, requirePermission } from "../middleware/auth.js";
+import { replayBankLedger } from "../services/bank.js";
 import { buildRecentWeekBuckets, getSydneyDateKey, getWeekStartKey } from "../services/time.js";
 
 const router = Router();
@@ -76,14 +77,16 @@ router.get(
         }
       }),
       prisma.bankTransaction.findMany({
-        where: {
-          createdAt: {
-            gte: earliestDate
-          }
-        },
+        orderBy: [
+          { createdAt: "asc" },
+          { id: "asc" }
+        ],
         select: {
+          id: true,
           amount: true,
+          type: true,
           moneyType: true,
+          sourceSystem: true,
           createdAt: true
         }
       }),
@@ -173,14 +176,16 @@ router.get(
       collectionsByWeek[weekSlot] += toNumber(collection.amount);
     });
 
-    bankTransactions.forEach((transaction) => {
+    const ledgerEffects = replayBankLedger(bankTransactions).effects;
+
+    ledgerEffects.forEach((transaction) => {
       const weekSlot = resolveWeekSlot(transaction.createdAt);
 
       if (!weekSlot || !moneyByType[transaction.moneyType]) {
         return;
       }
 
-      moneyByType[transaction.moneyType][weekSlot] += toNumber(transaction.amount);
+      moneyByType[transaction.moneyType][weekSlot] += toNumber(transaction.effectAmount);
     });
 
     const outstandingTotal = openDistributions.reduce((sum, distribution) => (
@@ -202,8 +207,8 @@ router.get(
     res.json({
       snapshot: [
         metric("Products moved", unitsByWeek.current, unitsByWeek.previous),
-        metric("Clean money moved", moneyByType.CLEAN.current, moneyByType.CLEAN.previous, "currency"),
-        metric("Dirty money moved", moneyByType.DIRTY.current, moneyByType.DIRTY.previous, "currency"),
+        metric("Clean money change", moneyByType.CLEAN.current, moneyByType.CLEAN.previous, "currency"),
+        metric("Dirty money change", moneyByType.DIRTY.current, moneyByType.DIRTY.previous, "currency"),
         metric("Collections logged", collectionsByWeek.current, collectionsByWeek.previous, "currency")
       ],
       moneyGraph: [

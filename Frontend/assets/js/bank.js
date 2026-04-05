@@ -3,6 +3,7 @@ import { announceMutation, subscribeToMutations } from "./live.js";
 import {
   bankMoneyBadge,
   bankTransactionBadge,
+  focusFormPanel,
   formatCurrency,
   formatDate,
   initProtectedPage,
@@ -150,7 +151,7 @@ function maybeOpenRequestedEdit() {
   }
 
   fillTransactionForm(transaction);
-  transactionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  focusFormPanel(transactionForm, '[name="amount"]');
 }
 
 function renderSummary(balances, recentTransactions) {
@@ -441,7 +442,7 @@ function renderTransactions(transactions, pagination) {
 
       if (transaction) {
         fillTransactionForm(transaction);
-        transactionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+        focusFormPanel(transactionForm, '[name="amount"]');
       }
     });
   });

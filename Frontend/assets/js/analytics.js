@@ -72,13 +72,13 @@ function renderComparisonGraph(container, rows = [], emptyTitle, emptyCopy, form
   }
 
   const maxValue = Math.max(
-    ...rows.flatMap((row) => [Number(row.current || 0), Number(row.previous || 0)]),
+    ...rows.flatMap((row) => [Math.abs(Number(row.current || 0)), Math.abs(Number(row.previous || 0))]),
     1
   );
 
   container.innerHTML = rows.map((row) => {
-    const currentWidth = Math.max(10, Math.round((Number(row.current || 0) / maxValue) * 100));
-    const previousWidth = Math.max(10, Math.round((Number(row.previous || 0) / maxValue) * 100));
+    const currentWidth = Math.max(10, Math.round((Math.abs(Number(row.current || 0)) / maxValue) * 100));
+    const previousWidth = Math.max(10, Math.round((Math.abs(Number(row.previous || 0)) / maxValue) * 100));
     const changeLabel = row.delta === 0
       ? "No change"
       : `${row.delta > 0 ? "+" : "-"}${formatter(Math.abs(row.delta))}`;
