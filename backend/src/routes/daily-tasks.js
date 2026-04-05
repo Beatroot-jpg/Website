@@ -3,7 +3,13 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { asyncHandler, createError } from "../http.js";
 import { authenticateToken, requireAdmin, requirePermission } from "../middleware/auth.js";
-import { getOperationalDayKey, getSydneyTimeZoneLabel, shiftDateKey } from "../services/time.js";
+import {
+  getOperationalDayKey,
+  getSydneyTimeZoneLabel,
+  getWeeklyResetLabel,
+  getWeeklyTaskKey,
+  shiftDateKey
+} from "../services/time.js";
 import { normalizeOptionalString, requireString } from "../validators.js";
 
 const router = Router();
@@ -98,10 +104,28 @@ function buildStreak(taskDays, currentTaskDay) {
   return streak;
 }
 
+function mapAdminDailyTasks(tasks, todayCountsByTask, allTimeCountsByTask) {
+  return tasks.map((task) => ({
+    ...task,
+    points: IMPORTANCE_POINTS[task.importance] || 0,
+    todayCompletionCount: todayCountsByTask.get(task.id) || 0,
+    allTimeCompletionCount: allTimeCountsByTask.get(task.id) || 0
+  }));
+}
+
+function mapAdminWeeklyTasks(tasks, weekCountsByTask, allTimeCountsByTask) {
+  return tasks.map((task) => ({
+    ...task,
+    currentWeekCompletionCount: weekCountsByTask.get(task.id) || 0,
+    allTimeCompletionCount: allTimeCountsByTask.get(task.id) || 0
+  }));
+}
+
 router.get(
   "/",
   asyncHandler(async (req, res) => {
     const currentTaskDay = getOperationalDayKey();
+    const currentWeekKey = getWeeklyTaskKey();
     const isAdmin = req.user.role === "ADMIN";
 
     const [
@@ -109,9 +133,14 @@ router.get(
       todayCompletions,
       rankingRows,
       userTaskDays,
-      adminTasks,
+      adminDailyTasks,
       todayCompletionCounts,
-      allTimeCompletionCounts
+      allTimeCompletionCounts,
+      activeWeeklyTasks,
+      weeklyCompletions,
+      adminWeeklyTasks,
+      currentWeekCompletionCounts,
+      allTimeWeeklyCompletionCounts
     ] = await Promise.all([
       prisma.dailyTask.findMany({
         where: { active: true },
@@ -172,6 +201,47 @@ router.get(
             _all: true
           }
         })
+        : Promise.resolve([]),
+      prisma.weeklyTask.findMany({
+        where: { active: true },
+        orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }]
+      }),
+      prisma.weeklyTaskCompletion.findMany({
+        where: {
+          weekKey: currentWeekKey
+        },
+        include: {
+          completedBy: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      }),
+      isAdmin
+        ? prisma.weeklyTask.findMany({
+          orderBy: [{ active: "desc" }, { updatedAt: "desc" }]
+        })
+        : Promise.resolve([]),
+      isAdmin
+        ? prisma.weeklyTaskCompletion.groupBy({
+          by: ["taskId"],
+          where: {
+            weekKey: currentWeekKey
+          },
+          _count: {
+            _all: true
+          }
+        })
+        : Promise.resolve([]),
+      isAdmin
+        ? prisma.weeklyTaskCompletion.groupBy({
+          by: ["taskId"],
+          _count: {
+            _all: true
+          }
+        })
         : Promise.resolve([])
     ]);
 
@@ -194,7 +264,17 @@ router.get(
     }
 
     const completionMap = new Map(todayCompletions.map((completion) => [completion.taskId, completion]));
+    const weeklyCompletionMap = new Map(weeklyCompletions.map((completion) => [completion.taskId, completion]));
     const standings = buildStanding(rankingRows, usersById, req.user.id);
+    const todayCountsByTask = new Map(todayCompletionCounts.map((entry) => [entry.taskId, entry._count._all || 0]));
+    const allTimeCountsByTask = new Map(allTimeCompletionCounts.map((entry) => [entry.taskId, entry._count._all || 0]));
+    const currentWeekCountsByTask = new Map(
+      currentWeekCompletionCounts.map((entry) => [entry.taskId, entry._count._all || 0])
+    );
+    const allTimeWeeklyCountsByTask = new Map(
+      allTimeWeeklyCompletionCounts.map((entry) => [entry.taskId, entry._count._all || 0])
+    );
+
     const tasks = sortTasks(activeTasks).map((task) => {
       const completion = completionMap.get(task.id);
       return {
@@ -206,15 +286,25 @@ router.get(
       };
     });
 
+    const weeklyTasks = sortTasks(activeWeeklyTasks).map((task) => {
+      const completion = weeklyCompletionMap.get(task.id);
+
+      return {
+        ...task,
+        completed: Boolean(completion),
+        completedAt: completion?.completedAt || null,
+        completedBy: completion?.completedBy || null
+      };
+    });
+
     const todayPoints = todayCompletions.reduce((sum, completion) => sum + Number(completion.pointsAwarded || 0), 0);
     const todayCompletionCount = todayCompletions.length;
     const taskCount = tasks.length;
     const streakDays = buildStreak(userTaskDays, currentTaskDay);
-    const todayCountsByTask = new Map(todayCompletionCounts.map((entry) => [entry.taskId, entry._count._all || 0]));
-    const allTimeCountsByTask = new Map(allTimeCompletionCounts.map((entry) => [entry.taskId, entry._count._all || 0]));
 
     res.json({
       taskDay: currentTaskDay,
+      weekKey: currentWeekKey,
       resetLabel: `Tasks reset every day at ${getSydneyTimeZoneLabel()}.`,
       summary: {
         taskCount,
@@ -227,16 +317,17 @@ router.get(
         streakDays
       },
       tasks,
+      weekly: {
+        weekKey: currentWeekKey,
+        resetLabel: getWeeklyResetLabel(),
+        tasks: weeklyTasks
+      },
       leaderboard: standings.leaderboard,
       currentUserStanding: standings.currentUserStanding,
       admin: isAdmin
         ? {
-          tasks: adminTasks.map((task) => ({
-            ...task,
-            points: IMPORTANCE_POINTS[task.importance] || 0,
-            todayCompletionCount: todayCountsByTask.get(task.id) || 0,
-            allTimeCompletionCount: allTimeCountsByTask.get(task.id) || 0
-          }))
+          dailyTasks: mapAdminDailyTasks(adminDailyTasks, todayCountsByTask, allTimeCountsByTask),
+          weeklyTasks: mapAdminWeeklyTasks(adminWeeklyTasks, currentWeekCountsByTask, allTimeWeeklyCountsByTask)
         }
         : null
     });
@@ -302,6 +393,72 @@ router.put(
   })
 );
 
+router.put(
+  "/weekly/:id/completion",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    if (typeof req.body.completed !== "boolean") {
+      throw createError(400, "A completed state is required.");
+    }
+
+    const task = await prisma.weeklyTask.findUnique({
+      where: { id: req.params.id }
+    });
+
+    if (!task) {
+      throw createError(404, "Weekly task not found.");
+    }
+
+    const currentWeekKey = getWeeklyTaskKey();
+    const completionWhere = {
+      taskId_weekKey: {
+        taskId: task.id,
+        weekKey: currentWeekKey
+      }
+    };
+
+    const existingCompletion = await prisma.weeklyTaskCompletion.findUnique({
+      where: completionWhere
+    });
+
+    if (!req.body.completed) {
+      if (!existingCompletion) {
+        return res.json({ completion: null, removed: false });
+      }
+
+      await prisma.weeklyTaskCompletion.delete({
+        where: completionWhere
+      });
+
+      return res.json({ completion: null, removed: true });
+    }
+
+    if (!task.active) {
+      throw createError(400, "Only active weekly tasks can be completed.");
+    }
+
+    const completion = existingCompletion
+      ? existingCompletion
+      : await prisma.weeklyTaskCompletion.create({
+        data: {
+          taskId: task.id,
+          weekKey: currentWeekKey,
+          completedById: req.user.id
+        },
+        include: {
+          completedBy: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+
+    res.json({ completion, removed: false });
+  })
+);
+
 router.post(
   "/admin/tasks",
   requireAdmin,
@@ -333,6 +490,58 @@ router.patch(
     }
 
     const task = await prisma.dailyTask.update({
+      where: { id: existingTask.id },
+      data: {
+        title: req.body.title !== undefined
+          ? requireString(req.body.title, "Task title")
+          : existingTask.title,
+        description: req.body.description !== undefined
+          ? normalizeOptionalString(req.body.description)
+          : existingTask.description,
+        importance: req.body.importance !== undefined
+          ? normalizeImportance(req.body.importance)
+          : existingTask.importance,
+        active: typeof req.body.active === "boolean"
+          ? req.body.active
+          : existingTask.active
+      }
+    });
+
+    res.json({ task });
+  })
+);
+
+router.post(
+  "/admin/weekly-tasks",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const task = await prisma.weeklyTask.create({
+      data: {
+        title: requireString(req.body.title, "Task title"),
+        description: normalizeOptionalString(req.body.description),
+        importance: normalizeImportance(req.body.importance),
+        active: typeof req.body.active === "boolean" ? req.body.active : true,
+        createdById: req.user.id
+      }
+    });
+
+    res.status(201).json({ task });
+  })
+);
+
+router.patch(
+  "/admin/weekly-tasks/:id",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const existingTask = await prisma.weeklyTask.findUnique({
+      where: { id: req.params.id }
+    });
+
+    if (!existingTask) {
+      throw createError(404, "Weekly task not found.");
+    }
+
+    const task = await prisma.weeklyTask.update({
       where: { id: existingTask.id },
       data: {
         title: req.body.title !== undefined

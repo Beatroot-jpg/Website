@@ -13,9 +13,9 @@ export const NAV_ITEMS = [
   },
   {
     key: "DAILY_TASKS",
-    label: "Daily tasks",
+    label: "Tasks",
     href: "./daily-tasks.html",
-    description: "Checklist and ranks"
+    description: "Daily and weekly"
   },
   {
     key: "INVENTORY",
@@ -54,7 +54,7 @@ export const QUICK_ACTIONS = [
     permission: "DAILY_TASKS",
     label: "Open tasks",
     href: "./daily-tasks.html#taskChecklist",
-    description: "Complete today"
+    description: "Daily and team view"
   },
   {
     permission: "INVENTORY",
@@ -91,7 +91,7 @@ export const QUICK_ACTIONS = [
 export const PERMISSION_LABELS = {
   DASHBOARD: "Dashboard",
   ANALYTICS: "Analytics",
-  DAILY_TASKS: "Daily tasks",
+  DAILY_TASKS: "Tasks",
   INVENTORY: "Inventory",
   BANK: "Bank",
   DISTRIBUTION: "Distribution",

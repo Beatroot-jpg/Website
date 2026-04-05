@@ -8,23 +8,23 @@ import {
   mountFormError,
   openFormModal,
   renderEmptyState,
-  renderMetricSkeleton,
   showToast
 } from "./ui.js";
 import { bindDraftForm, restoreDraftForm } from "./workflow.js";
 
 const currentUser = initProtectedPage({
   pageKey: "DAILY_TASKS",
-  title: "Daily tasks",
-  subtitle: "Tick off the day, build points, and watch your position move."
+  title: "Tasks",
+  subtitle: "Your daily checklist and the shared weekly team board, kept in one clean place."
 });
 
-const taskSummary = document.querySelector("#taskSummary");
 const currentStanding = document.querySelector("#currentStanding");
 const taskList = document.querySelector("#taskList");
+const weeklyTaskList = document.querySelector("#weeklyTaskList");
+const weeklyResetLabel = document.querySelector("#weeklyResetLabel");
 const leaderboard = document.querySelector("#taskLeaderboard");
-const resetLabel = document.querySelector("#taskResetLabel");
 const adminPanel = document.querySelector("#adminTaskPanel");
+
 const adminTaskForm = document.querySelector("#adminTaskForm");
 const adminTaskId = document.querySelector("#adminTaskId");
 const adminTaskError = document.querySelector("#adminTaskError");
@@ -36,24 +36,42 @@ const adminTaskLibrary = document.querySelector("#adminTaskLibrary");
 const openAdminTaskFormButton = document.querySelector("#openAdminTaskFormButton");
 const adminTaskFormHost = document.querySelector("#adminTaskFormHost");
 const adminTaskFormContent = document.querySelector("#adminTaskFormContent");
-const adminDraft = bindDraftForm(adminTaskForm, "daily-task-admin-form");
-const pageParams = new URLSearchParams(window.location.search);
-let requestedTaskEditId = pageParams.get("editTask") || "";
 
-let taskCache = [];
-let leaderboardCache = [];
-let standingCache = null;
-let adminTasksCache = [];
+const weeklyTaskForm = document.querySelector("#weeklyTaskForm");
+const weeklyTaskId = document.querySelector("#weeklyTaskId");
+const weeklyTaskError = document.querySelector("#weeklyTaskError");
+const weeklyTaskFormTitle = document.querySelector("#weeklyTaskFormTitle");
+const weeklyTaskFormSubtitle = document.querySelector("#weeklyTaskFormSubtitle");
+const weeklyTaskSubmit = document.querySelector("#weeklyTaskSubmit");
+const resetWeeklyTaskFormButton = document.querySelector("#resetWeeklyTaskForm");
+const adminWeeklyTaskLibrary = document.querySelector("#adminWeeklyTaskLibrary");
+const openWeeklyTaskFormButton = document.querySelector("#openWeeklyTaskFormButton");
+const weeklyTaskFormHost = document.querySelector("#weeklyTaskFormHost");
+const weeklyTaskFormContent = document.querySelector("#weeklyTaskFormContent");
+
+const adminDraft = bindDraftForm(adminTaskForm, "daily-task-admin-form");
+const weeklyDraft = bindDraftForm(weeklyTaskForm, "weekly-task-admin-form");
+const pageParams = new URLSearchParams(window.location.search);
+
+let requestedTaskEditId = pageParams.get("editTask") || "";
+let requestedWeeklyTaskEditId = pageParams.get("editWeeklyTask") || "";
+let adminDailyTasksCache = [];
+let adminWeeklyTasksCache = [];
 
 if (adminDraft.restored) {
-  showToast("Restored saved daily task admin draft.", "info");
+  showToast("Restored saved daily task draft.", "info");
 }
 
-function importanceBadge(importance, points) {
+if (weeklyDraft.restored) {
+  showToast("Restored saved weekly task draft.", "info");
+}
+
+function priorityBadge(importance, { points = null } = {}) {
   const normalized = `${importance || ""}`.toUpperCase();
   const tone = normalized === "HIGH" ? "warn" : normalized === "MEDIUM" ? "accent" : "neutral";
   const label = normalized === "HIGH" ? "High" : normalized === "MEDIUM" ? "Medium" : "Low";
-  return badge(`${label} - ${points} pt${points === 1 ? "" : "s"}`, tone);
+  const suffix = Number.isFinite(points) ? ` - ${points} pt${points === 1 ? "" : "s"}` : " priority";
+  return badge(`${label}${suffix}`, tone);
 }
 
 function updateUrlParams(updates = {}, removeKeys = []) {
@@ -82,7 +100,7 @@ function resetAdminForm({ clearDraftState = false, clearUrl = true } = {}) {
   adminTaskForm.reset();
   adminTaskId.value = "";
   adminTaskFormTitle.textContent = "Create daily task";
-  adminTaskFormSubtitle.textContent = "Admins can create or edit the task library from one clean section.";
+  adminTaskFormSubtitle.textContent = "Admins can create or edit the daily task library from one clean popup.";
   adminTaskSubmit.textContent = "Save task";
   adminTaskForm.elements.importance.value = "HIGH";
   adminTaskForm.elements.active.checked = true;
@@ -98,6 +116,30 @@ function resetAdminForm({ clearDraftState = false, clearUrl = true } = {}) {
   }
 }
 
+function resetWeeklyForm({ clearDraftState = false, clearUrl = true } = {}) {
+  if (!weeklyTaskForm) {
+    return;
+  }
+
+  weeklyTaskForm.reset();
+  weeklyTaskId.value = "";
+  weeklyTaskFormTitle.textContent = "Create weekly task";
+  weeklyTaskFormSubtitle.textContent = "Admins can create or edit the shared weekly team list from one focused popup.";
+  weeklyTaskSubmit.textContent = "Save task";
+  weeklyTaskForm.elements.importance.value = "HIGH";
+  weeklyTaskForm.elements.active.checked = true;
+  mountFormError(weeklyTaskError, "");
+
+  if (clearDraftState) {
+    weeklyDraft.clearDraft();
+  }
+
+  if (clearUrl) {
+    requestedWeeklyTaskEditId = "";
+    updateUrlParams({ editWeeklyTask: "" }, ["editWeeklyTask"]);
+  }
+}
+
 function fillAdminForm(task) {
   if (!adminTaskForm) {
     return;
@@ -105,13 +147,29 @@ function fillAdminForm(task) {
 
   adminTaskId.value = task.id;
   adminTaskFormTitle.textContent = `Edit ${task.title}`;
-  adminTaskFormSubtitle.textContent = "Update the task details here, then review the full task library underneath.";
+  adminTaskFormSubtitle.textContent = "Update the daily task details here, then return to the task library underneath.";
   adminTaskSubmit.textContent = "Save changes";
   mountFormError(adminTaskError, "");
   adminTaskForm.elements.title.value = task.title;
   adminTaskForm.elements.importance.value = task.importance;
   adminTaskForm.elements.description.value = task.description || "";
   adminTaskForm.elements.active.checked = task.active;
+}
+
+function fillWeeklyForm(task) {
+  if (!weeklyTaskForm) {
+    return;
+  }
+
+  weeklyTaskId.value = task.id;
+  weeklyTaskFormTitle.textContent = `Edit ${task.title}`;
+  weeklyTaskFormSubtitle.textContent = "Update the shared weekly task details here, then return to the library underneath.";
+  weeklyTaskSubmit.textContent = "Save changes";
+  mountFormError(weeklyTaskError, "");
+  weeklyTaskForm.elements.title.value = task.title;
+  weeklyTaskForm.elements.importance.value = task.importance;
+  weeklyTaskForm.elements.description.value = task.description || "";
+  weeklyTaskForm.elements.active.checked = task.active;
 }
 
 function showAdminTaskModal(opener = document.activeElement) {
@@ -133,12 +191,31 @@ function showAdminTaskModal(opener = document.activeElement) {
   });
 }
 
-function maybeOpenRequestedTask() {
-  if (!requestedTaskEditId || !adminTasksCache.length) {
+function showWeeklyTaskModal(opener = document.activeElement) {
+  if (!weeklyTaskFormContent || !weeklyTaskFormHost) {
     return;
   }
 
-  const task = adminTasksCache.find((entry) => entry.id === requestedTaskEditId);
+  openFormModal({
+    content: weeklyTaskFormContent,
+    host: weeklyTaskFormHost,
+    focusSelector: '[name="title"]',
+    opener,
+    onClose: () => {
+      if (requestedWeeklyTaskEditId) {
+        requestedWeeklyTaskEditId = "";
+        updateUrlParams({ editWeeklyTask: "" }, ["editWeeklyTask"]);
+      }
+    }
+  });
+}
+
+function maybeOpenRequestedTask() {
+  if (!requestedTaskEditId || !adminDailyTasksCache.length) {
+    return;
+  }
+
+  const task = adminDailyTasksCache.find((entry) => entry.id === requestedTaskEditId);
 
   if (!task) {
     requestedTaskEditId = "";
@@ -151,29 +228,22 @@ function maybeOpenRequestedTask() {
   showAdminTaskModal();
 }
 
-function renderSummary(summary) {
-  taskSummary.innerHTML = `
-    <article class="metric-card good">
-      <p>Done today</p>
-      <strong>${summary.completedCount}/${summary.taskCount}</strong>
-      <small>${summary.completionRate}% complete</small>
-    </article>
-    <article class="metric-card accent">
-      <p>Done overall</p>
-      <strong>${summary.overallCompletedCount || 0}</strong>
-      <small>All-time task completions</small>
-    </article>
-    <article class="metric-card neutral">
-      <p>All-time points</p>
-      <strong>${summary.totalPoints || 0}</strong>
-      <small>Total points earned</small>
-    </article>
-    <article class="metric-card warn">
-      <p>Leaderboard rank</p>
-      <strong>${summary.currentRank || "-"}</strong>
-      <small>${summary.currentRank ? "All-time position" : "Complete a task to place"}</small>
-    </article>
-  `;
+function maybeOpenRequestedWeeklyTask() {
+  if (!requestedWeeklyTaskEditId || !adminWeeklyTasksCache.length) {
+    return;
+  }
+
+  const task = adminWeeklyTasksCache.find((entry) => entry.id === requestedWeeklyTaskEditId);
+
+  if (!task) {
+    requestedWeeklyTaskEditId = "";
+    updateUrlParams({ editWeeklyTask: "" }, ["editWeeklyTask"]);
+    showToast("That weekly task could not be found.", "error");
+    return;
+  }
+
+  fillWeeklyForm(task);
+  showWeeklyTaskModal();
 }
 
 function renderStanding(summary, standing) {
@@ -185,19 +255,19 @@ function renderStanding(summary, standing) {
       </div>
       <div class="badge-group">
         ${badge(`${standing.totalPoints || 0} all-time points`, "accent")}
-        ${badge(`${standing.completedCount || 0} total completions`, "neutral")}
-        ${badge(`${summary.todayPoints} today`, "good")}
+        ${badge(`${standing.completedCount || 0} completions`, "neutral")}
+        ${badge(`${summary.streakDays || 0} day streak`, (summary.streakDays || 0) > 0 ? "good" : "neutral")}
       </div>
       <p class="muted">
         ${standing.rank
-          ? `You are currently sitting at position ${standing.rank} on the all-time table.`
-          : "You have not placed on the all-time table yet. Complete today's list to get on the board."}
+          ? `You are currently sitting at position ${standing.rank} on the all-time task board.`
+          : "You have not placed on the all-time task board yet. Keep ticking the checklist to get on the board."}
       </p>
     </article>
   `;
 }
 
-function renderTasks(tasks) {
+function renderDailyTasks(tasks) {
   if (!tasks.length) {
     taskList.innerHTML = renderEmptyState("No tasks assigned today", "When admins add active daily tasks, they will show here automatically.");
     return;
@@ -210,12 +280,11 @@ function renderTasks(tasks) {
         <div class="task-copy">
           <div class="task-card-header">
             <strong class="task-title">${task.title}</strong>
-            ${importanceBadge(task.importance, task.points)}
+            ${priorityBadge(task.importance, { points: task.points })}
           </div>
           <p class="muted">${task.description || "No extra explanation for this task."}</p>
           <div class="badge-group">
             ${badge(task.completed ? "Completed today" : "Still open", task.completed ? "good" : "neutral")}
-            <span class="task-points">${task.points} point${task.points === 1 ? "" : "s"}</span>
             ${task.completedAt ? `<span class="muted">Checked at ${formatDate(task.completedAt)}</span>` : ""}
           </div>
         </div>
@@ -233,9 +302,70 @@ function renderTasks(tasks) {
             completed: input.checked
           }
         });
-        await loadDailyTasks(false);
+        await loadTasks(false);
         announceMutation(["daily_tasks"]);
         showToast(input.checked ? "Task completed." : "Task unchecked.", "success");
+      } catch (error) {
+        input.checked = !input.checked;
+        showToast(error.message, "error");
+      } finally {
+        input.disabled = false;
+      }
+    });
+  });
+}
+
+function renderWeeklyTasks(weekly = {}) {
+  const tasks = weekly.tasks || [];
+  weeklyResetLabel.textContent = weekly.resetLabel || "";
+
+  if (!tasks.length) {
+    weeklyTaskList.innerHTML = renderEmptyState("No weekly team tasks yet", "When admins add weekly tasks, the shared checklist will show up here for everyone.");
+    return;
+  }
+
+  weeklyTaskList.innerHTML = tasks.map((task) => `
+    <article class="task-card ${task.completed ? "completed" : ""}">
+      <div class="task-toggle">
+        <input
+          type="checkbox"
+          data-weekly-task-id="${task.id}"
+          ${task.completed ? "checked" : ""}
+          ${currentUser.role === "ADMIN" ? "" : "disabled"}
+        >
+        <div class="task-copy">
+          <div class="task-card-header">
+            <strong class="task-title">${task.title}</strong>
+            ${priorityBadge(task.importance)}
+          </div>
+          <p class="muted">${task.description || "No extra explanation for this weekly task."}</p>
+          <div class="badge-group">
+            ${badge(task.completed ? "Completed this week" : "Still open this week", task.completed ? "good" : "neutral")}
+            ${task.completedBy?.name ? badge(`Marked by ${task.completedBy.name}`, "accent") : ""}
+            ${task.completedAt ? `<span class="muted">Updated at ${formatDate(task.completedAt)}</span>` : ""}
+          </div>
+        </div>
+      </div>
+    </article>
+  `).join("");
+
+  if (currentUser.role !== "ADMIN") {
+    return;
+  }
+
+  weeklyTaskList.querySelectorAll("[data-weekly-task-id]").forEach((input) => {
+    input.addEventListener("change", async () => {
+      try {
+        input.disabled = true;
+        await api(`/daily-tasks/weekly/${input.dataset.weeklyTaskId}/completion`, {
+          method: "PUT",
+          body: {
+            completed: input.checked
+          }
+        });
+        await loadTasks(false);
+        announceMutation(["daily_tasks"]);
+        showToast(input.checked ? "Weekly task marked complete." : "Weekly task reopened.", "success");
       } catch (error) {
         input.checked = !input.checked;
         showToast(error.message, "error");
@@ -283,49 +413,12 @@ function renderLeaderboard(entries, standing) {
   }
 }
 
-function renderAdminPanel(admin) {
-  if (!adminPanel) {
-    return;
-  }
-
-  if (!admin) {
-    adminPanel.classList.add("hidden");
-    return;
-  }
-
-  adminPanel.classList.remove("hidden");
-  adminTasksCache = admin.tasks || [];
-
-  if (!adminTasksCache.length) {
-    adminTaskLibrary.innerHTML = renderEmptyState("No admin tasks yet", "Use the create daily task button above to add the first task.");
-    return;
-  }
-
-  adminTaskLibrary.innerHTML = adminTasksCache.map((task) => `
-    <article class="insight-row">
-      <div class="insight-headline">
-        <strong>${task.title}</strong>
-        <span class="insight-value">${task.points} pt${task.points === 1 ? "" : "s"}</span>
-      </div>
-      <div class="badge-group">
-        ${importanceBadge(task.importance, task.points)}
-        ${badge(task.active ? "Active" : "Paused", task.active ? "good" : "neutral")}
-        ${badge(`${task.todayCompletionCount} done today`, "accent")}
-        ${badge(`${task.allTimeCompletionCount} all time`, "neutral")}
-      </div>
-      <p class="muted">${task.description || "No description saved for this task."}</p>
-      <div class="inline-actions">
-        <button class="mini-action" type="button" data-edit-task="${task.id}">Edit</button>
-        <button class="mini-action" type="button" data-toggle-task="${task.id}">${task.active ? "Pause" : "Activate"}</button>
-      </div>
-    </article>
-  `).join("");
-
+function attachAdminDailyLibraryActions() {
   adminTaskLibrary.querySelectorAll("[data-edit-task]").forEach((button) => {
     button.addEventListener("click", () => {
       requestedTaskEditId = button.dataset.editTask;
       updateUrlParams({ editTask: requestedTaskEditId });
-      const task = adminTasksCache.find((entry) => entry.id === requestedTaskEditId);
+      const task = adminDailyTasksCache.find((entry) => entry.id === requestedTaskEditId);
 
       if (task) {
         fillAdminForm(task);
@@ -336,7 +429,7 @@ function renderAdminPanel(admin) {
 
   adminTaskLibrary.querySelectorAll("[data-toggle-task]").forEach((button) => {
     button.addEventListener("click", async () => {
-      const task = adminTasksCache.find((entry) => entry.id === button.dataset.toggleTask);
+      const task = adminDailyTasksCache.find((entry) => entry.id === button.dataset.toggleTask);
 
       if (!task) {
         return;
@@ -349,7 +442,7 @@ function renderAdminPanel(admin) {
             active: !task.active
           }
         });
-        await loadDailyTasks(false);
+        await loadTasks(false);
         announceMutation(["daily_tasks"]);
         showToast("Daily task updated.", "success");
       } catch (error) {
@@ -359,37 +452,152 @@ function renderAdminPanel(admin) {
   });
 }
 
-async function loadDailyTasks(showLoading = true) {
+function attachAdminWeeklyLibraryActions() {
+  adminWeeklyTaskLibrary.querySelectorAll("[data-edit-weekly-task]").forEach((button) => {
+    button.addEventListener("click", () => {
+      requestedWeeklyTaskEditId = button.dataset.editWeeklyTask;
+      updateUrlParams({ editWeeklyTask: requestedWeeklyTaskEditId });
+      const task = adminWeeklyTasksCache.find((entry) => entry.id === requestedWeeklyTaskEditId);
+
+      if (task) {
+        fillWeeklyForm(task);
+        showWeeklyTaskModal(button);
+      }
+    });
+  });
+
+  adminWeeklyTaskLibrary.querySelectorAll("[data-toggle-weekly-task]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const task = adminWeeklyTasksCache.find((entry) => entry.id === button.dataset.toggleWeeklyTask);
+
+      if (!task) {
+        return;
+      }
+
+      try {
+        await api(`/daily-tasks/admin/weekly-tasks/${task.id}`, {
+          method: "PATCH",
+          body: {
+            active: !task.active
+          }
+        });
+        await loadTasks(false);
+        announceMutation(["daily_tasks"]);
+        showToast("Weekly task updated.", "success");
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    });
+  });
+}
+
+function renderAdminPanel(admin) {
+  if (!adminPanel) {
+    return;
+  }
+
+  if (!admin) {
+    adminPanel.classList.add("hidden");
+    return;
+  }
+
+  adminPanel.classList.remove("hidden");
+  adminDailyTasksCache = admin.dailyTasks || [];
+  adminWeeklyTasksCache = admin.weeklyTasks || [];
+
+  if (!adminDailyTasksCache.length) {
+    adminTaskLibrary.innerHTML = renderEmptyState("No daily tasks yet", "Use the create daily task button above to add the first task.");
+  } else {
+    adminTaskLibrary.innerHTML = adminDailyTasksCache.map((task) => `
+      <article class="insight-row">
+        <div class="insight-headline">
+          <strong>${task.title}</strong>
+          <span class="insight-value">${task.points} pt${task.points === 1 ? "" : "s"}</span>
+        </div>
+        <div class="badge-group">
+          ${priorityBadge(task.importance, { points: task.points })}
+          ${badge(task.active ? "Active" : "Paused", task.active ? "good" : "neutral")}
+          ${badge(`${task.todayCompletionCount} done today`, "accent")}
+          ${badge(`${task.allTimeCompletionCount} all time`, "neutral")}
+        </div>
+        <p class="muted">${task.description || "No description saved for this task."}</p>
+        <div class="inline-actions">
+          <button class="mini-action" type="button" data-edit-task="${task.id}">Edit</button>
+          <button class="mini-action" type="button" data-toggle-task="${task.id}">${task.active ? "Pause" : "Activate"}</button>
+        </div>
+      </article>
+    `).join("");
+
+    attachAdminDailyLibraryActions();
+  }
+
+  if (!adminWeeklyTasksCache.length) {
+    adminWeeklyTaskLibrary.innerHTML = renderEmptyState("No weekly tasks yet", "Use the create weekly task button above to add the first shared team task.");
+  } else {
+    adminWeeklyTaskLibrary.innerHTML = adminWeeklyTasksCache.map((task) => `
+      <article class="insight-row">
+        <div class="insight-headline">
+          <strong>${task.title}</strong>
+          <span class="insight-value">${task.currentWeekCompletionCount ? "Done" : "Open"}</span>
+        </div>
+        <div class="badge-group">
+          ${priorityBadge(task.importance)}
+          ${badge(task.active ? "Active" : "Paused", task.active ? "good" : "neutral")}
+          ${badge(task.currentWeekCompletionCount ? "Completed this week" : "Open this week", task.currentWeekCompletionCount ? "good" : "accent")}
+          ${badge(`${task.allTimeCompletionCount} completed weeks`, "neutral")}
+        </div>
+        <p class="muted">${task.description || "No description saved for this task."}</p>
+        <div class="inline-actions">
+          <button class="mini-action" type="button" data-edit-weekly-task="${task.id}">Edit</button>
+          <button class="mini-action" type="button" data-toggle-weekly-task="${task.id}">${task.active ? "Pause" : "Activate"}</button>
+        </div>
+      </article>
+    `).join("");
+
+    attachAdminWeeklyLibraryActions();
+  }
+}
+
+async function loadTasks(showLoading = true) {
   if (showLoading) {
-    taskSummary.innerHTML = renderMetricSkeleton(4);
     currentStanding.innerHTML = "<div class='standing-card skeleton-card'></div>";
     taskList.innerHTML = "<div class='task-card skeleton-card'></div><div class='task-card skeleton-card'></div>";
+    weeklyTaskList.innerHTML = "<div class='task-card skeleton-card'></div><div class='task-card skeleton-card'></div>";
     leaderboard.innerHTML = "<div class='leaderboard-row skeleton-card'></div><div class='leaderboard-row skeleton-card'></div>";
+
     if (adminTaskLibrary) {
       adminTaskLibrary.innerHTML = "<div class='insight-row skeleton-card'></div>";
+    }
+
+    if (adminWeeklyTaskLibrary) {
+      adminWeeklyTaskLibrary.innerHTML = "<div class='insight-row skeleton-card'></div>";
     }
   }
 
   try {
     const data = await api("/daily-tasks");
-    taskCache = data.tasks || [];
-    leaderboardCache = data.leaderboard || [];
-    standingCache = data.currentUserStanding || null;
-    resetLabel.textContent = data.resetLabel || "Tasks reset every day at 5:00 PM Australia/Sydney.";
-    renderSummary(data.summary || {});
     renderStanding(data.summary || {}, data.currentUserStanding || {});
-    renderTasks(taskCache);
-    renderLeaderboard(leaderboardCache, data.currentUserStanding || {});
+    renderDailyTasks(data.tasks || []);
+    renderWeeklyTasks(data.weekly || {});
+    renderLeaderboard(data.leaderboard || [], data.currentUserStanding || {});
     renderAdminPanel(data.admin);
     maybeOpenRequestedTask();
+    maybeOpenRequestedWeeklyTask();
   } catch (error) {
-    taskSummary.innerHTML = renderEmptyState("Unable to load daily tasks", error.message);
-    currentStanding.innerHTML = "";
+    currentStanding.innerHTML = renderEmptyState("Unable to load tasks", error.message);
     taskList.innerHTML = "";
+    weeklyTaskList.innerHTML = "";
+    weeklyResetLabel.textContent = "";
     leaderboard.innerHTML = "";
+
     if (adminTaskLibrary) {
       adminTaskLibrary.innerHTML = "";
     }
+
+    if (adminWeeklyTaskLibrary) {
+      adminWeeklyTaskLibrary.innerHTML = "";
+    }
+
     showToast(error.message, "error");
   }
 }
@@ -423,10 +631,47 @@ adminTaskForm?.addEventListener("submit", async (event) => {
 
     resetAdminForm({ clearDraftState: true });
     closeFormModal();
-    await loadDailyTasks(false);
+    await loadTasks(false);
     announceMutation(["daily_tasks"]);
   } catch (error) {
     mountFormError(adminTaskError, error.message);
+    showToast(error.message, "error");
+  }
+});
+
+weeklyTaskForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  mountFormError(weeklyTaskError, "");
+
+  const formData = new FormData(weeklyTaskForm);
+  const payload = {
+    title: formData.get("title"),
+    importance: formData.get("importance"),
+    description: formData.get("description"),
+    active: formData.get("active") === "on"
+  };
+
+  try {
+    if (weeklyTaskId.value) {
+      await api(`/daily-tasks/admin/weekly-tasks/${weeklyTaskId.value}`, {
+        method: "PATCH",
+        body: payload
+      });
+      showToast("Weekly task updated.", "success");
+    } else {
+      await api("/daily-tasks/admin/weekly-tasks", {
+        method: "POST",
+        body: payload
+      });
+      showToast("Weekly task created.", "success");
+    }
+
+    resetWeeklyForm({ clearDraftState: true });
+    closeFormModal();
+    await loadTasks(false);
+    announceMutation(["daily_tasks"]);
+  } catch (error) {
+    mountFormError(weeklyTaskError, error.message);
     showToast(error.message, "error");
   }
 });
@@ -435,16 +680,27 @@ resetAdminTaskFormButton?.addEventListener("click", () => {
   resetAdminForm({ clearDraftState: true });
 });
 
+resetWeeklyTaskFormButton?.addEventListener("click", () => {
+  resetWeeklyForm({ clearDraftState: true });
+});
+
 openAdminTaskFormButton?.addEventListener("click", () => {
   resetAdminForm();
   showAdminTaskModal(openAdminTaskFormButton);
 });
 
+openWeeklyTaskFormButton?.addEventListener("click", () => {
+  resetWeeklyForm();
+  showWeeklyTaskModal(openWeeklyTaskFormButton);
+});
+
 subscribeToMutations(["daily_tasks"], () => {
-  showToast("Daily tasks refreshed with live changes.", "info");
-  loadDailyTasks(false);
+  showToast("Tasks refreshed with live changes.", "info");
+  loadTasks(false);
 });
 
 resetAdminForm({ clearUrl: false });
+resetWeeklyForm({ clearUrl: false });
 restoreDraftForm(adminTaskForm, "daily-task-admin-form");
-loadDailyTasks();
+restoreDraftForm(weeklyTaskForm, "weekly-task-admin-form");
+loadTasks();

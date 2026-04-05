@@ -62,6 +62,10 @@ export function getWeekStartKey(dateKey) {
   return date.toISOString().slice(0, 10);
 }
 
+export function getWeeklyTaskKey(date = new Date()) {
+  return getWeekStartKey(getSydneyDateKey(date));
+}
+
 export function buildRecentWeekBuckets(count = 8, date = new Date()) {
   const currentWeekStart = getWeekStartKey(getSydneyDateKey(date));
   return Array.from({ length: count }, (_entry, index) => {
@@ -86,4 +90,8 @@ export function compareDateKeys(left, right) {
 
 export function getSydneyTimeZoneLabel() {
   return "5:00 PM Australia/Sydney";
+}
+
+export function getWeeklyResetLabel() {
+  return "Weekly team tasks reset every Monday at 12:00 AM Australia/Sydney.";
 }

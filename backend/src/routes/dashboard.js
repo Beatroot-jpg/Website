@@ -325,14 +325,14 @@ router.get(
           label: "Tasks today",
           value: `${completedCount}/${activeTaskCount}`,
           tone: completedCount === activeTaskCount && activeTaskCount > 0 ? "good" : "neutral",
-          note: "Open daily tasks",
+          note: "Open tasks",
           href: "./daily-tasks.html#taskChecklist"
         },
         {
           label: "Task points today",
           value: Number(pointsToday._sum.pointsAwarded || 0),
           tone: "good",
-          note: "See leaderboard",
+          note: "See task board",
           href: "./daily-tasks.html#leaderboardPanel"
         }
       );

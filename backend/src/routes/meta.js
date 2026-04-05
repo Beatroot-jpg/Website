@@ -131,34 +131,67 @@ router.get(
         })))
         : [],
       canViewDailyTasks
-        ? prisma.dailyTask.findMany({
-          where: {
-            active: true,
-            OR: [
-              { title: containsFilter },
-              { description: containsFilter }
-            ]
-          },
-          orderBy: [{ importance: "desc" }, { updatedAt: "desc" }],
-          take: 4,
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            importance: true,
-            updatedAt: true
-          }
-        }).then((items) => items.map((item) => ({
-          id: `daily-task-${item.id}`,
-          group: "Daily tasks",
-          title: item.title,
-          subtitle: `${item.importance.toLowerCase()} priority${item.description ? ` - ${item.description}` : ""}`,
-          href: req.user.role === "ADMIN"
-            ? `./daily-tasks.html?editTask=${item.id}#adminTaskForm`
-            : "./daily-tasks.html#taskChecklist",
-          tone: item.importance === "HIGH" ? "warn" : item.importance === "MEDIUM" ? "accent" : "neutral",
-          sortAt: item.updatedAt
-        })))
+        ? Promise.all([
+          prisma.dailyTask.findMany({
+            where: {
+              active: true,
+              OR: [
+                { title: containsFilter },
+                { description: containsFilter }
+              ]
+            },
+            orderBy: [{ importance: "desc" }, { updatedAt: "desc" }],
+            take: 4,
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              importance: true,
+              updatedAt: true
+            }
+          }),
+          prisma.weeklyTask.findMany({
+            where: {
+              active: true,
+              OR: [
+                { title: containsFilter },
+                { description: containsFilter }
+              ]
+            },
+            orderBy: [{ importance: "desc" }, { updatedAt: "desc" }],
+            take: 4,
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              importance: true,
+              updatedAt: true
+            }
+          })
+        ]).then(([dailyItems, weeklyItems]) => [
+          ...dailyItems.map((item) => ({
+            id: `daily-task-${item.id}`,
+            group: "Tasks",
+            title: item.title,
+            subtitle: `Daily - ${item.importance.toLowerCase()} priority${item.description ? ` - ${item.description}` : ""}`,
+            href: req.user.role === "ADMIN"
+              ? `./daily-tasks.html?editTask=${item.id}#adminTaskPanel`
+              : "./daily-tasks.html#taskChecklist",
+            tone: item.importance === "HIGH" ? "warn" : item.importance === "MEDIUM" ? "accent" : "neutral",
+            sortAt: item.updatedAt
+          })),
+          ...weeklyItems.map((item) => ({
+            id: `weekly-task-${item.id}`,
+            group: "Tasks",
+            title: item.title,
+            subtitle: `Weekly - ${item.importance.toLowerCase()} priority${item.description ? ` - ${item.description}` : ""}`,
+            href: req.user.role === "ADMIN"
+              ? `./daily-tasks.html?editWeeklyTask=${item.id}#adminTaskPanel`
+              : "./daily-tasks.html#weeklyTaskPanel",
+            tone: item.importance === "HIGH" ? "warn" : item.importance === "MEDIUM" ? "accent" : "neutral",
+            sortAt: item.updatedAt
+          }))
+        ])
         : [],
       canViewBank
         ? prisma.bankTransaction.findMany({

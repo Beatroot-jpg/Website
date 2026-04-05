@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Tasks</title>
+    <title>Tasks</title>
     <link rel="stylesheet" href="./assets/css/styles.css">
     <script src="./assets/js/runtime-config.js"></script>
     <script src="./assets/js/config.js"></script>
@@ -15,18 +15,18 @@
           <img class="brand-logo" src="./assets/images/new_logo.png" alt="YUGO MAFIA logo">
           <div>
             <strong>YUGO MAFIA</strong>
-            <span class="muted">Daily workspace</span>
+            <span class="muted">Task board</span>
           </div>
         </div>
         <p class="sidebar-section-title">Sections</p>
         <nav class="nav-list" id="sidebarNav"></nav>
-        <div class="sidebar-footer">A daily checklist that resets each evening, with a leaderboard to keep people pushing.</div>
+        <div class="sidebar-footer">Personal daily checklists and shared weekly team tasks live together here, without splitting the flow across different pages.</div>
       </aside>
 
       <main class="workspace">
         <header class="workspace-header">
           <div>
-            <p class="eyebrow">Daily Tasks</p>
+            <p class="eyebrow">Tasks</p>
             <h1 id="pageTitle"></h1>
             <p class="muted" id="pageSubtitle"></p>
           </div>
@@ -39,32 +39,33 @@
         <section class="workflow-stack">
           <article class="panel">
             <div class="panel-header">
-              <h2>My progress today</h2>
-              <p id="taskResetLabel">Tasks reset every day at 5:00 PM Australia/Sydney.</p>
-            </div>
-            <div class="metric-grid" id="taskSummary"></div>
-          </article>
-
-          <article class="panel">
-            <div class="panel-header">
               <h2>My position</h2>
-              <p>Your current leaderboard standing sits here so you know exactly how you are tracking.</p>
+              <p>Your all-time place stays visible here so you can quickly see where you sit on the board.</p>
             </div>
             <div class="task-summary-list" id="currentStanding"></div>
           </article>
 
           <article class="panel" id="taskChecklist">
             <div class="panel-header">
-              <h2>Today's checklist</h2>
-              <p>Each task is one clean row. Tick it off, get the highlight, and let the points build.</p>
+              <h2>Daily checklist</h2>
+              <p>These are your personal tasks for the day. Tick them off as you go and keep the points moving.</p>
             </div>
             <div class="task-checklist" id="taskList"></div>
+          </article>
+
+          <article class="panel" id="weeklyTaskPanel">
+            <div class="panel-header">
+              <h2>Weekly team tasks</h2>
+              <p>Everyone can see the shared weekly list. Admins mark these off as the group finishes them.</p>
+            </div>
+            <p class="muted" id="weeklyResetLabel"></p>
+            <div class="task-checklist" id="weeklyTaskList"></div>
           </article>
 
           <article class="panel" id="leaderboardPanel">
             <div class="panel-header">
               <h2>All-time leaderboard</h2>
-              <p>This shows the long-term effort table so everyone can see who is consistently showing up.</p>
+              <p>This is the long-term board so everyone can see who keeps showing up consistently.</p>
             </div>
             <div class="leaderboard-list" id="taskLeaderboard"></div>
           </article>
@@ -72,13 +73,13 @@
           <article class="panel hidden" id="adminTaskPanel">
             <div class="panel-header">
               <h2>Admin task library</h2>
-              <p>Admins can create a new task from a focused popup, then manage the full library directly underneath.</p>
+              <p>Admins can manage the personal daily checklist and the shared weekly team board from one place.</p>
             </div>
 
             <div class="action-launch-card">
               <div class="action-launch-copy">
-                <strong>New daily task</strong>
-                <p class="muted">Open a clean popup to create a task, or click edit on an existing one to reopen that same popup with its current details.</p>
+                <strong>Daily task library</strong>
+                <p class="muted">Create or edit the personal daily tasks people complete for points and leaderboard movement.</p>
               </div>
               <div class="inline-actions">
                 <button class="primary-button" id="openAdminTaskFormButton" type="button">Create daily task</button>
@@ -86,16 +87,37 @@
             </div>
 
             <div class="panel-header section-divider">
-              <h2>Task library</h2>
-              <p>The live task list stays directly here so admins can edit and tidy it without jumping around.</p>
+              <h2>Daily task library</h2>
+              <p>The live daily list stays directly here so admins can edit or pause tasks without jumping around.</p>
             </div>
             <div id="adminTaskLibrary"></div>
+
+            <div class="panel-header section-divider">
+              <h2>Weekly task library</h2>
+              <p>These are the shared group tasks that reset at the start of each new week.</p>
+            </div>
+
+            <div class="action-launch-card">
+              <div class="action-launch-copy">
+                <strong>Weekly team task</strong>
+                <p class="muted">Create or edit the shared weekly checklist the admins mark off for the whole group.</p>
+              </div>
+              <div class="inline-actions">
+                <button class="primary-button" id="openWeeklyTaskFormButton" type="button">Create weekly task</button>
+              </div>
+            </div>
+
+            <div class="panel-header section-divider">
+              <h2>Weekly task library</h2>
+              <p>The current team list stays underneath so admins can keep it clean and easy to understand.</p>
+            </div>
+            <div id="adminWeeklyTaskLibrary"></div>
 
             <div class="modal-form-host" id="adminTaskFormHost">
               <div class="modal-form-content" id="adminTaskFormContent">
                 <div class="panel-header">
                   <h2 id="adminTaskFormTitle">Create daily task</h2>
-                  <p id="adminTaskFormSubtitle">Admins can create or edit the task library from one clean popup.</p>
+                  <p id="adminTaskFormSubtitle">Admins can create or edit the daily task library from one clean popup.</p>
                 </div>
 
                 <form class="stack-form" id="adminTaskForm">
@@ -125,6 +147,44 @@
                     <button class="ghost-button" id="resetAdminTaskForm" type="button">Reset form</button>
                   </div>
                   <p class="form-error hidden" id="adminTaskError"></p>
+                </form>
+              </div>
+            </div>
+
+            <div class="modal-form-host" id="weeklyTaskFormHost">
+              <div class="modal-form-content" id="weeklyTaskFormContent">
+                <div class="panel-header">
+                  <h2 id="weeklyTaskFormTitle">Create weekly task</h2>
+                  <p id="weeklyTaskFormSubtitle">Admins can create or edit the shared weekly team list from one focused popup.</p>
+                </div>
+
+                <form class="stack-form" id="weeklyTaskForm">
+                  <input type="hidden" id="weeklyTaskId" name="weeklyTaskId">
+                  <label class="field-stack">
+                    <span>Task title</span>
+                    <input type="text" name="title" placeholder="Team stocktake, clear weekly payouts, prep next run" required>
+                  </label>
+                  <label class="field-stack">
+                    <span>Importance</span>
+                    <select name="importance">
+                      <option value="HIGH">High</option>
+                      <option value="MEDIUM">Medium</option>
+                      <option value="LOW">Low</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>Description</span>
+                    <textarea name="description" placeholder="Explain what the group needs to finish before the week closes."></textarea>
+                  </label>
+                  <label class="permission-option">
+                    <input type="checkbox" name="active" checked>
+                    <span>Task is active</span>
+                  </label>
+                  <div class="inline-actions">
+                    <button class="primary-button" id="weeklyTaskSubmit" type="submit">Save task</button>
+                    <button class="ghost-button" id="resetWeeklyTaskForm" type="button">Reset form</button>
+                  </div>
+                  <p class="form-error hidden" id="weeklyTaskError"></p>
                 </form>
               </div>
             </div>
