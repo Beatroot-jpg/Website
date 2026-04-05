@@ -71,44 +71,63 @@
 
           <article class="panel hidden" id="adminTaskPanel">
             <div class="panel-header">
-              <h2 id="adminTaskFormTitle">Create daily task</h2>
-              <p id="adminTaskFormSubtitle">Admins can create or edit the task library from one clean section.</p>
+              <h2>Admin task library</h2>
+              <p>Admins can create a new task from a focused popup, then manage the full library directly underneath.</p>
             </div>
 
-            <form class="stack-form" id="adminTaskForm">
-              <input type="hidden" id="adminTaskId" name="adminTaskId">
-              <label class="field-stack">
-                <span>Task title</span>
-                <input type="text" name="title" placeholder="Collect returns, check stock, update records" required>
-              </label>
-              <label class="field-stack">
-                <span>Importance</span>
-                <select name="importance">
-                  <option value="HIGH">High</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="LOW">Low</option>
-                </select>
-              </label>
-              <label class="field-stack">
-                <span>Description</span>
-                <textarea name="description" placeholder="Explain what the task means so users know exactly what to do."></textarea>
-              </label>
-              <label class="permission-option">
-                <input type="checkbox" name="active" checked>
-                <span>Task is active</span>
-              </label>
-              <div class="inline-actions">
-                <button class="primary-button" id="adminTaskSubmit" type="submit">Save task</button>
-                <button class="ghost-button" id="resetAdminTaskForm" type="button">Reset form</button>
+            <div class="action-launch-card">
+              <div class="action-launch-copy">
+                <strong>New daily task</strong>
+                <p class="muted">Open a clean popup to create a task, or click edit on an existing one to reopen that same popup with its current details.</p>
               </div>
-              <p class="form-error hidden" id="adminTaskError"></p>
-            </form>
+              <div class="inline-actions">
+                <button class="primary-button" id="openAdminTaskFormButton" type="button">Create daily task</button>
+              </div>
+            </div>
 
             <div class="panel-header section-divider">
               <h2>Task library</h2>
-              <p>The live task list stays directly underneath the form so admins can edit and tidy it without jumping around.</p>
+              <p>The live task list stays directly here so admins can edit and tidy it without jumping around.</p>
             </div>
             <div id="adminTaskLibrary"></div>
+
+            <div class="modal-form-host" id="adminTaskFormHost">
+              <div class="modal-form-content" id="adminTaskFormContent">
+                <div class="panel-header">
+                  <h2 id="adminTaskFormTitle">Create daily task</h2>
+                  <p id="adminTaskFormSubtitle">Admins can create or edit the task library from one clean popup.</p>
+                </div>
+
+                <form class="stack-form" id="adminTaskForm">
+                  <input type="hidden" id="adminTaskId" name="adminTaskId">
+                  <label class="field-stack">
+                    <span>Task title</span>
+                    <input type="text" name="title" placeholder="Collect returns, check stock, update records" required>
+                  </label>
+                  <label class="field-stack">
+                    <span>Importance</span>
+                    <select name="importance">
+                      <option value="HIGH">High</option>
+                      <option value="MEDIUM">Medium</option>
+                      <option value="LOW">Low</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>Description</span>
+                    <textarea name="description" placeholder="Explain what the task means so users know exactly what to do."></textarea>
+                  </label>
+                  <label class="permission-option">
+                    <input type="checkbox" name="active" checked>
+                    <span>Task is active</span>
+                  </label>
+                  <div class="inline-actions">
+                    <button class="primary-button" id="adminTaskSubmit" type="submit">Save task</button>
+                    <button class="ghost-button" id="resetAdminTaskForm" type="button">Reset form</button>
+                  </div>
+                  <p class="form-error hidden" id="adminTaskError"></p>
+                </form>
+              </div>
+            </div>
           </article>
         </section>
       </main>

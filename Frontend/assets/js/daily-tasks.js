@@ -2,10 +2,11 @@ import { api } from "./api.js";
 import { announceMutation, subscribeToMutations } from "./live.js";
 import {
   badge,
-  focusFormPanel,
+  closeFormModal,
   formatDate,
   initProtectedPage,
   mountFormError,
+  openFormModal,
   renderEmptyState,
   renderMetricSkeleton,
   showToast
@@ -32,6 +33,9 @@ const adminTaskFormSubtitle = document.querySelector("#adminTaskFormSubtitle");
 const adminTaskSubmit = document.querySelector("#adminTaskSubmit");
 const resetAdminTaskFormButton = document.querySelector("#resetAdminTaskForm");
 const adminTaskLibrary = document.querySelector("#adminTaskLibrary");
+const openAdminTaskFormButton = document.querySelector("#openAdminTaskFormButton");
+const adminTaskFormHost = document.querySelector("#adminTaskFormHost");
+const adminTaskFormContent = document.querySelector("#adminTaskFormContent");
 const adminDraft = bindDraftForm(adminTaskForm, "daily-task-admin-form");
 const pageParams = new URLSearchParams(window.location.search);
 let requestedTaskEditId = pageParams.get("editTask") || "";
@@ -103,10 +107,30 @@ function fillAdminForm(task) {
   adminTaskFormTitle.textContent = `Edit ${task.title}`;
   adminTaskFormSubtitle.textContent = "Update the task details here, then review the full task library underneath.";
   adminTaskSubmit.textContent = "Save changes";
+  mountFormError(adminTaskError, "");
   adminTaskForm.elements.title.value = task.title;
   adminTaskForm.elements.importance.value = task.importance;
   adminTaskForm.elements.description.value = task.description || "";
   adminTaskForm.elements.active.checked = task.active;
+}
+
+function showAdminTaskModal(opener = document.activeElement) {
+  if (!adminTaskFormContent || !adminTaskFormHost) {
+    return;
+  }
+
+  openFormModal({
+    content: adminTaskFormContent,
+    host: adminTaskFormHost,
+    focusSelector: '[name="title"]',
+    opener,
+    onClose: () => {
+      if (requestedTaskEditId) {
+        requestedTaskEditId = "";
+        updateUrlParams({ editTask: "" }, ["editTask"]);
+      }
+    }
+  });
 }
 
 function maybeOpenRequestedTask() {
@@ -124,7 +148,7 @@ function maybeOpenRequestedTask() {
   }
 
   fillAdminForm(task);
-  focusFormPanel(adminTaskForm, '[name="title"]');
+  showAdminTaskModal();
 }
 
 function renderSummary(summary) {
@@ -273,7 +297,7 @@ function renderAdminPanel(admin) {
   adminTasksCache = admin.tasks || [];
 
   if (!adminTasksCache.length) {
-    adminTaskLibrary.innerHTML = renderEmptyState("No admin tasks yet", "Create the first daily task from the form above.");
+    adminTaskLibrary.innerHTML = renderEmptyState("No admin tasks yet", "Use the create daily task button above to add the first task.");
     return;
   }
 
@@ -305,7 +329,7 @@ function renderAdminPanel(admin) {
 
       if (task) {
         fillAdminForm(task);
-        focusFormPanel(adminTaskForm, '[name="title"]');
+        showAdminTaskModal(button);
       }
     });
   });
@@ -398,6 +422,7 @@ adminTaskForm?.addEventListener("submit", async (event) => {
     }
 
     resetAdminForm({ clearDraftState: true });
+    closeFormModal();
     await loadDailyTasks(false);
     announceMutation(["daily_tasks"]);
   } catch (error) {
@@ -408,6 +433,11 @@ adminTaskForm?.addEventListener("submit", async (event) => {
 
 resetAdminTaskFormButton?.addEventListener("click", () => {
   resetAdminForm({ clearDraftState: true });
+});
+
+openAdminTaskFormButton?.addEventListener("click", () => {
+  resetAdminForm();
+  showAdminTaskModal(openAdminTaskFormButton);
 });
 
 subscribeToMutations(["daily_tasks"], () => {

@@ -47,51 +47,70 @@
 
           <article class="panel">
             <div class="panel-header">
-              <h2 id="transactionFormTitle">Add transaction</h2>
-              <p id="transactionFormSubtitle">Use add to stack money on top, correction to set an exact balance, or subtract to take money away.</p>
+              <h2>Ledger actions</h2>
+              <p>Keep the live history visible here, and open a focused popup whenever you need to create or edit a manual ledger entry.</p>
             </div>
 
-            <form class="stack-form" id="transactionForm">
-              <input type="hidden" id="transactionId" name="transactionId">
-              <div class="field-grid">
-                <label class="field-stack">
-                  <span>Money type</span>
-                  <select name="moneyType">
-                    <option value="CLEAN">Clean Money</option>
-                    <option value="DIRTY">Dirty Money</option>
-                  </select>
-                </label>
-                <label class="field-stack">
-                  <span>Function</span>
-                  <select name="entryType">
-                    <option value="ADD">Add</option>
-                    <option value="CORRECTION">Correction</option>
-                    <option value="SUBTRACT">Subtract</option>
-                  </select>
-                </label>
+            <div class="action-launch-card">
+              <div class="action-launch-copy">
+                <strong>Manual ledger work</strong>
+                <p class="muted">Use one popup for adds, corrections, and subtracts. Edit on a row reopens that same popup with the current details loaded.</p>
               </div>
-              <label class="field-stack">
-                <span>Amount</span>
-                <input type="number" min="0" step="0.01" name="amount" placeholder="0.00" required>
-              </label>
-              <p class="muted" id="transactionAmountHint">Add increases the selected money balance by this amount.</p>
-              <label class="field-stack">
-                <span>Description</span>
-                <textarea name="description" placeholder="Manual transfer, correction, expense note"></textarea>
-              </label>
               <div class="inline-actions">
-                <button class="primary-button" id="transactionSubmitButton" type="submit">Record transaction</button>
-                <button class="ghost-button" id="resetTransactionForm" type="button">Reset form</button>
+                <button class="primary-button" id="openTransactionFormButton" type="button">New ledger entry</button>
               </div>
-              <p class="form-error hidden" id="transactionError"></p>
-            </form>
+            </div>
 
             <div class="panel-header section-divider">
               <h2>Transaction history</h2>
-              <p>Keep the live ledger directly under the entry form so people can record and confirm in one place.</p>
+              <p>Review the running history here, then edit or revert entries without losing your place.</p>
             </div>
             <div id="transactionTable"></div>
             <div class="pager" id="transactionPagination"></div>
+
+            <div class="modal-form-host" id="transactionFormHost">
+              <div class="modal-form-content" id="transactionFormContent">
+                <div class="panel-header">
+                  <h2 id="transactionFormTitle">Add transaction</h2>
+                  <p id="transactionFormSubtitle">Use add to stack money on top, correction to set an exact balance, or subtract to take money away.</p>
+                </div>
+
+                <form class="stack-form" id="transactionForm">
+                  <input type="hidden" id="transactionId" name="transactionId">
+                  <div class="field-grid">
+                    <label class="field-stack">
+                      <span>Money type</span>
+                      <select name="moneyType">
+                        <option value="CLEAN">Clean Money</option>
+                        <option value="DIRTY">Dirty Money</option>
+                      </select>
+                    </label>
+                    <label class="field-stack">
+                      <span>Function</span>
+                      <select name="entryType">
+                        <option value="ADD">Add</option>
+                        <option value="CORRECTION">Correction</option>
+                        <option value="SUBTRACT">Subtract</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label class="field-stack">
+                    <span>Amount</span>
+                    <input type="number" min="0" step="0.01" name="amount" placeholder="0.00" required>
+                  </label>
+                  <p class="muted" id="transactionAmountHint">Add increases the selected money balance by this amount.</p>
+                  <label class="field-stack">
+                    <span>Description</span>
+                    <textarea name="description" placeholder="Manual transfer, correction, expense note"></textarea>
+                  </label>
+                  <div class="inline-actions">
+                    <button class="primary-button" id="transactionSubmitButton" type="submit">Record transaction</button>
+                    <button class="ghost-button" id="resetTransactionForm" type="button">Reset form</button>
+                  </div>
+                  <p class="form-error hidden" id="transactionError"></p>
+                </form>
+              </div>
+            </div>
           </article>
         </section>
       </main>

@@ -39,120 +39,136 @@
         <section class="workflow-stack">
           <article class="panel">
             <div class="panel-header">
-              <h2 id="runnerFormTitle">Create runner</h2>
-              <p id="runnerFormSubtitle">Enter the runner first, then review the active runner list directly underneath it.</p>
+              <h2>Runner directory</h2>
+              <p>Create a runner from a focused popup, then use edit on the list below when details need to change.</p>
             </div>
 
-            <form class="stack-form" id="runnerForm">
-              <input type="hidden" id="distributorId" name="distributorId">
-              <label class="field-stack">
-                <span>Name</span>
-                <input type="text" name="name" placeholder="Runner name" required>
-              </label>
-              <label class="field-stack">
-                <span>Number</span>
-                <input type="text" name="number" placeholder="0400 000 000" required>
-              </label>
-              <label class="permission-option">
-                <input type="checkbox" name="active" checked>
-                <span>Active runner</span>
-              </label>
-              <div class="inline-actions">
-                <button class="primary-button" id="runnerSubmitButton" type="submit">Save runner</button>
-                <button class="ghost-button" id="resetRunnerForm" type="button">Reset form</button>
+            <div class="action-launch-card">
+              <div class="action-launch-copy">
+                <strong>New runner</strong>
+                <p class="muted">Open a clean popup to add a runner, or use edit on an existing row to reopen that same popup with their details.</p>
               </div>
-              <p class="form-error hidden" id="runnerError"></p>
-            </form>
+              <div class="inline-actions">
+                <button class="primary-button" id="openRunnerFormButton" type="button">Create runner</button>
+              </div>
+            </div>
 
             <div class="panel-header section-divider">
               <h2>Active runners</h2>
-              <p>The saved runner list stays under the form so it reads as one simple management block.</p>
+              <p>The saved runner list stays here so you can open, pause, or update people without leaving the page.</p>
             </div>
             <div id="distributorTable"></div>
+
+            <div class="modal-form-host" id="runnerFormHost">
+              <div class="modal-form-content" id="runnerFormContent">
+                <div class="panel-header">
+                  <h2 id="runnerFormTitle">Create runner</h2>
+                  <p id="runnerFormSubtitle">Enter the runner here, then save to push them into the active runner list.</p>
+                </div>
+
+                <form class="stack-form" id="runnerForm">
+                  <input type="hidden" id="distributorId" name="distributorId">
+                  <label class="field-stack">
+                    <span>Name</span>
+                    <input type="text" name="name" placeholder="Runner name" required>
+                  </label>
+                  <label class="field-stack">
+                    <span>Number</span>
+                    <input type="text" name="number" placeholder="0400 000 000" required>
+                  </label>
+                  <label class="permission-option">
+                    <input type="checkbox" name="active" checked>
+                    <span>Active runner</span>
+                  </label>
+                  <div class="inline-actions">
+                    <button class="primary-button" id="runnerSubmitButton" type="submit">Save runner</button>
+                    <button class="ghost-button" id="resetRunnerForm" type="button">Reset form</button>
+                  </div>
+                  <p class="form-error hidden" id="runnerError"></p>
+                </form>
+              </div>
+            </div>
           </article>
 
           <article class="panel">
             <div class="panel-header">
-              <h2 id="distributionFormTitle">Create distribution</h2>
-              <p id="distributionFormSubtitle">Hand product out here, then review the active distributions in the same section below.</p>
+              <h2>Distribution runs</h2>
+              <p>Create a new handout from a popup, then use the active run list below to edit or collect against it.</p>
             </div>
 
-            <form class="stack-form" id="distributionForm">
-              <input type="hidden" id="distributionId" name="distributionId">
-              <label class="field-stack">
-                <span>Runner</span>
-                <select id="distributionRunnerId" name="distributorId"></select>
-              </label>
-              <label class="field-stack">
-                <span>Item</span>
-                <select id="distributionItemId" name="itemId"></select>
-              </label>
-              <div class="field-grid">
-                <label class="field-stack">
-                  <span>Quantity</span>
-                  <input type="number" min="1" name="quantity" required>
-                </label>
-                <label class="field-stack">
-                  <span>Value per item</span>
-                  <input type="number" min="0" step="0.01" name="unitValue" placeholder="0.00" required>
-                </label>
+            <div class="action-launch-card">
+              <div class="action-launch-copy">
+                <strong>New distribution</strong>
+                <p class="muted">Open a focused popup to hand out product, then come straight back to the active run list to manage it.</p>
               </div>
-              <p class="muted" id="distributionTotalHint">Total owed will calculate here.</p>
-              <label class="field-stack">
-                <span>Notes</span>
-                <textarea name="notes" placeholder="Optional notes about this run"></textarea>
-              </label>
               <div class="inline-actions">
-                <button class="primary-button" id="distributionSubmitButton" type="submit">Save distribution</button>
-                <button class="ghost-button" id="resetDistributionForm" type="button">Reset form</button>
+                <button class="primary-button" id="openDistributionFormButton" type="button">Create distribution</button>
               </div>
-              <p class="form-error hidden" id="distributionError"></p>
-            </form>
+            </div>
 
             <div class="panel-header section-divider">
               <h2>Active distributions</h2>
-              <p>Current runs stay immediately under the handout form so each runner's position is easy to check and edit.</p>
+              <p>Current runs stay here so you can collect, edit, or review each runner's position without losing context.</p>
             </div>
             <div id="distributionTable"></div>
+
+            <div class="modal-form-host" id="distributionFormHost">
+              <div class="modal-form-content" id="distributionFormContent">
+                <div class="panel-header">
+                  <h2 id="distributionFormTitle">Create distribution</h2>
+                  <p id="distributionFormSubtitle">Hand product out here, then save to push it into the active distribution list.</p>
+                </div>
+
+                <form class="stack-form" id="distributionForm">
+                  <input type="hidden" id="distributionId" name="distributionId">
+                  <label class="field-stack">
+                    <span>Runner</span>
+                    <select id="distributionRunnerId" name="distributorId"></select>
+                  </label>
+                  <label class="field-stack">
+                    <span>Item</span>
+                    <select id="distributionItemId" name="itemId"></select>
+                  </label>
+                  <div class="field-grid">
+                    <label class="field-stack">
+                      <span>Quantity</span>
+                      <input type="number" min="1" name="quantity" required>
+                    </label>
+                    <label class="field-stack">
+                      <span>Value per item</span>
+                      <input type="number" min="0" step="0.01" name="unitValue" placeholder="0.00" required>
+                    </label>
+                  </div>
+                  <p class="muted" id="distributionTotalHint">Total owed will calculate here.</p>
+                  <label class="field-stack">
+                    <span>Notes</span>
+                    <textarea name="notes" placeholder="Optional notes about this run"></textarea>
+                  </label>
+                  <div class="inline-actions">
+                    <button class="primary-button" id="distributionSubmitButton" type="submit">Save distribution</button>
+                    <button class="ghost-button" id="resetDistributionForm" type="button">Reset form</button>
+                  </div>
+                  <p class="form-error hidden" id="distributionError"></p>
+                </form>
+              </div>
+            </div>
           </article>
 
           <article class="panel" id="collectionForm">
             <div class="panel-header">
-              <h2 id="collectionFormTitle">Collect payment</h2>
-              <p id="collectionFormSubtitle">Log what comes back first, then work through the active ledger entries underneath.</p>
+              <h2>Collection ledger</h2>
+              <p>Log payments from a focused popup, then keep the active ledger list clean for deposit work and corrections.</p>
             </div>
 
-            <form class="stack-form" id="collectionEntryForm">
-              <input type="hidden" id="collectionEntryId" name="collectionEntryId">
-              <label class="field-stack">
-                <span>Active distribution</span>
-                <select id="collectionDistributionId" name="distributionId"></select>
-              </label>
-              <p class="muted" id="collectionBalanceHint">Select an active distribution to see what is still owed.</p>
-              <div class="field-grid">
-                <label class="field-stack">
-                  <span>Amount returned</span>
-                  <input type="number" min="0" step="0.01" name="amount" placeholder="0.00" required>
-                </label>
-                <label class="field-stack">
-                  <span>Action</span>
-                  <select name="action">
-                    <option value="PARTIAL_PAYMENT">Partial payment</option>
-                    <option value="FULL_CLEAR">Full clear</option>
-                    <option value="FAULTY_CLEAR">Faulty clear</option>
-                  </select>
-                </label>
+            <div class="action-launch-card">
+              <div class="action-launch-copy">
+                <strong>New collection entry</strong>
+                <p class="muted">Open a popup to log a partial payment, full clear, or faulty clear without covering up the ledger below.</p>
               </div>
-              <label class="field-stack">
-                <span>Note</span>
-                <textarea name="note" placeholder="Optional collection note"></textarea>
-              </label>
               <div class="inline-actions">
-                <button class="secondary-button" id="collectionSubmitButton" type="submit">Save ledger entry</button>
-                <button class="ghost-button" id="resetCollectionForm" type="button">Reset form</button>
+                <button class="secondary-button" id="openCollectionFormButton" type="button">Log collection</button>
               </div>
-              <p class="form-error hidden" id="collectionError"></p>
-            </form>
+            </div>
 
             <div class="panel-header section-divider">
               <h2>Active collection ledger</h2>
@@ -160,6 +176,47 @@
             </div>
             <div id="ledgerToolbar"></div>
             <div id="distributionLedgerTable"></div>
+
+            <div class="modal-form-host" id="collectionFormHost">
+              <div class="modal-form-content" id="collectionFormContent">
+                <div class="panel-header">
+                  <h2 id="collectionFormTitle">Collect payment</h2>
+                  <p id="collectionFormSubtitle">Log what comes back here, then save it into the active collection ledger.</p>
+                </div>
+
+                <form class="stack-form" id="collectionEntryForm">
+                  <input type="hidden" id="collectionEntryId" name="collectionEntryId">
+                  <label class="field-stack">
+                    <span>Active distribution</span>
+                    <select id="collectionDistributionId" name="distributionId"></select>
+                  </label>
+                  <p class="muted" id="collectionBalanceHint">Select an active distribution to see what is still owed.</p>
+                  <div class="field-grid">
+                    <label class="field-stack">
+                      <span>Amount returned</span>
+                      <input type="number" min="0" step="0.01" name="amount" placeholder="0.00" required>
+                    </label>
+                    <label class="field-stack">
+                      <span>Action</span>
+                      <select name="action">
+                        <option value="PARTIAL_PAYMENT">Partial payment</option>
+                        <option value="FULL_CLEAR">Full clear</option>
+                        <option value="FAULTY_CLEAR">Faulty clear</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label class="field-stack">
+                    <span>Note</span>
+                    <textarea name="note" placeholder="Optional collection note"></textarea>
+                  </label>
+                  <div class="inline-actions">
+                    <button class="secondary-button" id="collectionSubmitButton" type="submit">Save ledger entry</button>
+                    <button class="ghost-button" id="resetCollectionForm" type="button">Reset form</button>
+                  </div>
+                  <p class="form-error hidden" id="collectionError"></p>
+                </form>
+              </div>
+            </div>
           </article>
         </section>
       </main>

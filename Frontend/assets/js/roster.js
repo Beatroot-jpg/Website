@@ -1,11 +1,12 @@
 import { api } from "./api.js";
 import { announceMutation, subscribeToMutations } from "./live.js";
 import {
-  focusFormPanel,
+  closeFormModal,
   formatDate,
   formatDateOnly,
   initProtectedPage,
   mountFormError,
+  openFormModal,
   renderEmptyState,
   renderMetricSkeleton,
   renderTableSkeleton,
@@ -37,6 +38,9 @@ const rosterFormTitle = document.querySelector("#rosterFormTitle");
 const rosterFormSubtitle = document.querySelector("#rosterFormSubtitle");
 const rosterSubmitButton = document.querySelector("#rosterSubmitButton");
 const resetRosterButton = document.querySelector("#resetRosterForm");
+const openRosterFormButton = document.querySelector("#openRosterFormButton");
+const rosterFormHost = document.querySelector("#rosterFormHost");
+const rosterFormContent = document.querySelector("#rosterFormContent");
 const toolbarHost = document.createElement("div");
 const initialParams = new URLSearchParams(window.location.search);
 const searchQuery = (initialParams.get("search") || "").trim().toLowerCase();
@@ -99,12 +103,28 @@ function fillRosterForm(member) {
   rosterFormTitle.textContent = `Editing ${member.name}`;
   rosterFormSubtitle.textContent = "Update lineup order, rank, Discord name, or status without re-entering the whole record.";
   rosterSubmitButton.textContent = "Save changes";
+  mountFormError(rosterError, "");
   rosterForm.elements.name.value = member.name;
   rosterForm.elements.discordName.value = member.discordName;
   rosterForm.elements.rank.value = member.rank;
   rosterForm.elements.status.value = member.status;
   rosterForm.elements.dateJoined.value = toDateInputValue(member.dateJoined);
   rosterForm.elements.displayOrder.value = member.displayOrder;
+}
+
+function showRosterModal(opener = document.activeElement) {
+  openFormModal({
+    content: rosterFormContent,
+    host: rosterFormHost,
+    focusSelector: '[name="name"]',
+    opener,
+    onClose: () => {
+      if (requestedRosterEditId) {
+        requestedRosterEditId = "";
+        updateUrlParams({ editMember: "" }, ["editMember"]);
+      }
+    }
+  });
 }
 
 function maybeOpenRequestedEdit() {
@@ -122,7 +142,7 @@ function maybeOpenRequestedEdit() {
   }
 
   fillRosterForm(member);
-  focusFormPanel(rosterForm, '[name="name"]');
+  showRosterModal();
 }
 
 function getVisibleMembers(members) {
@@ -275,7 +295,7 @@ function renderMembers(members) {
       members.length ? "No matching roster members" : "No roster entries yet",
       members.length
         ? "Try a broader search or clear the current filter."
-        : "Add the first roster member from the form on this page."
+        : "Use the add roster member button on this page to create the first entry."
     );
     return;
   }
@@ -340,7 +360,7 @@ function renderMembers(members) {
 
       if (member) {
         fillRosterForm(member);
-        focusFormPanel(rosterForm, '[name="name"]');
+        showRosterModal(button);
       }
     });
   });
@@ -396,6 +416,7 @@ rosterForm?.addEventListener("submit", async (event) => {
     }
 
     resetRosterForm({ clearDraftState: true });
+    closeFormModal();
     await loadRoster();
     announceMutation(["roster"]);
   } catch (error) {
@@ -406,6 +427,11 @@ rosterForm?.addEventListener("submit", async (event) => {
 
 resetRosterButton?.addEventListener("click", () => {
   resetRosterForm({ clearDraftState: true });
+});
+
+openRosterFormButton?.addEventListener("click", () => {
+  resetRosterForm();
+  showRosterModal(openRosterFormButton);
 });
 
 subscribeToMutations(["roster"], () => {

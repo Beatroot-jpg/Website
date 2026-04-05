@@ -3,12 +3,13 @@ import { announceMutation, subscribeToMutations } from "./live.js";
 import {
   activeStateBadge,
   badge,
+  closeFormModal,
   distributionStatusBadge,
-  focusFormPanel,
   formatCurrency,
   formatDate,
   initProtectedPage,
   mountFormError,
+  openFormModal,
   renderEmptyState,
   renderMetricSkeleton,
   renderTableSkeleton,
@@ -40,6 +41,9 @@ const runnerFormTitle = document.querySelector("#runnerFormTitle");
 const runnerFormSubtitle = document.querySelector("#runnerFormSubtitle");
 const runnerSubmitButton = document.querySelector("#runnerSubmitButton");
 const resetRunnerButton = document.querySelector("#resetRunnerForm");
+const openRunnerFormButton = document.querySelector("#openRunnerFormButton");
+const runnerFormHost = document.querySelector("#runnerFormHost");
+const runnerFormContent = document.querySelector("#runnerFormContent");
 
 const distributionForm = document.querySelector("#distributionForm");
 const distributionError = document.querySelector("#distributionError");
@@ -51,6 +55,9 @@ const resetDistributionButton = document.querySelector("#resetDistributionForm")
 const distributionRunnerSelect = document.querySelector("#distributionRunnerId");
 const distributionItemSelect = document.querySelector("#distributionItemId");
 const distributionTotalHint = document.querySelector("#distributionTotalHint");
+const openDistributionFormButton = document.querySelector("#openDistributionFormButton");
+const distributionFormHost = document.querySelector("#distributionFormHost");
+const distributionFormContent = document.querySelector("#distributionFormContent");
 
 const collectionForm = document.querySelector("#collectionEntryForm");
 const collectionError = document.querySelector("#collectionError");
@@ -61,6 +68,9 @@ const collectionSubmitButton = document.querySelector("#collectionSubmitButton")
 const resetCollectionButton = document.querySelector("#resetCollectionForm");
 const collectionDistributionSelect = document.querySelector("#collectionDistributionId");
 const collectionBalanceHint = document.querySelector("#collectionBalanceHint");
+const openCollectionFormButton = document.querySelector("#openCollectionFormButton");
+const collectionFormHost = document.querySelector("#collectionFormHost");
+const collectionFormContent = document.querySelector("#collectionFormContent");
 
 const distributionToolbar = document.createElement("div");
 distributionToolbar.className = "collection-tools";
@@ -281,6 +291,7 @@ function fillRunnerForm(distributor) {
   runnerFormTitle.textContent = `Edit ${distributor.name}`;
   runnerFormSubtitle.textContent = "Update the saved runner details used when handing out product.";
   runnerSubmitButton.textContent = "Save runner";
+  mountFormError(runnerError, "");
   runnerForm.elements.name.value = distributor.name;
   runnerForm.elements.number.value = distributor.number;
   runnerForm.elements.active.checked = distributor.active;
@@ -291,6 +302,7 @@ function fillDistributionForm(distribution) {
   distributionIdField.value = distribution.id;
   distributionFormTitle.textContent = `Edit ${distribution.item.name}`;
   distributionSubmitButton.textContent = "Save changes";
+  mountFormError(distributionError, "");
   distributionForm.elements.distributorId.value = distribution.distributorId;
   distributionForm.elements.itemId.value = distribution.itemId;
   distributionForm.elements.quantity.value = distribution.quantity;
@@ -313,6 +325,7 @@ function setCollectionTarget(distribution) {
   collectionFormTitle.textContent = `Collect from ${distribution.distributor.name}`;
   collectionFormSubtitle.textContent = "Log a partial payment, full clear, or faulty clear for this active run.";
   collectionSubmitButton.textContent = "Save ledger entry";
+  mountFormError(collectionError, "");
   populateCollectionOptions();
   collectionDistributionSelect.value = distribution.id;
   collectionForm.elements.amount.value = "";
@@ -326,6 +339,7 @@ function fillCollectionForm(entry) {
   collectionFormTitle.textContent = `Edit ledger entry for ${entry.distribution.distributor.name}`;
   collectionFormSubtitle.textContent = "Update this pending collection before it is deposited into Dirty Money.";
   collectionSubmitButton.textContent = "Save changes";
+  mountFormError(collectionError, "");
   populateCollectionOptions();
   collectionDistributionSelect.value = entry.distributionId;
   collectionForm.elements.amount.value = entry.amount;
@@ -334,13 +348,59 @@ function fillCollectionForm(entry) {
   updateCollectionHint();
 }
 
+function showRunnerModal(opener = document.activeElement) {
+  openFormModal({
+    content: runnerFormContent,
+    host: runnerFormHost,
+    focusSelector: '[name="name"]',
+    opener,
+    onClose: () => {
+      if (requestedDistributorEditId) {
+        requestedDistributorEditId = "";
+        updateUrlParams({ editDistributor: "" }, ["editDistributor"]);
+      }
+    }
+  });
+}
+
+function showDistributionModal(opener = document.activeElement) {
+  openFormModal({
+    content: distributionFormContent,
+    host: distributionFormHost,
+    focusSelector: '[name="quantity"]',
+    opener,
+    onClose: () => {
+      if (requestedDistributionEditId) {
+        requestedDistributionEditId = "";
+        updateUrlParams({ editDistribution: "" }, ["editDistribution"]);
+      }
+    }
+  });
+}
+
+function showCollectionModal(opener = document.activeElement) {
+  openFormModal({
+    content: collectionFormContent,
+    host: collectionFormHost,
+    focusSelector: '[name="amount"]',
+    opener,
+    onClose: () => {
+      if (requestedCollectionEditId || requestedDistributionEditId) {
+        requestedCollectionEditId = "";
+        requestedDistributionEditId = "";
+        updateUrlParams({ editCollection: "", editDistribution: "" }, ["editCollection", "editDistribution"]);
+      }
+    }
+  });
+}
+
 function openRequestedTargets() {
   if (requestedDistributorEditId) {
     const distributor = distributorsCache.find((entry) => entry.id === requestedDistributorEditId);
 
     if (distributor) {
       fillRunnerForm(distributor);
-      focusFormPanel(runnerForm, '[name="name"]');
+      showRunnerModal();
     } else {
       requestedDistributorEditId = "";
       updateUrlParams({ editDistributor: "" }, ["editDistributor"]);
@@ -353,7 +413,7 @@ function openRequestedTargets() {
 
     if (entry) {
       fillCollectionForm(entry);
-      focusFormPanel(collectionForm, '[name="amount"]');
+      showCollectionModal();
       return;
     }
 
@@ -374,12 +434,12 @@ function openRequestedTargets() {
 
     if (window.location.hash === "#collectionForm") {
       setCollectionTarget(distribution);
-      focusFormPanel(collectionForm, '[name="amount"]');
+      showCollectionModal();
       return;
     }
 
     fillDistributionForm(distribution);
-    focusFormPanel(distributionForm, '[name="quantity"]');
+    showDistributionModal();
   }
 }
 
@@ -498,7 +558,7 @@ function renderDistributions() {
   if (!distributions.length) {
     distributionTable.innerHTML = renderEmptyState(
       distributionsCache.length ? "No matching distributions" : "No distributions yet",
-      distributionsCache.length ? "Try another filter or search term." : "Create your first distribution from the form on the left."
+      distributionsCache.length ? "Try another filter or search term." : "Use the create distribution button on this page to hand out the first run."
     );
     return;
   }
@@ -554,7 +614,7 @@ function renderDistributions() {
       if (distribution) {
         setCollectionTarget(distribution);
         window.location.hash = "collectionForm";
-        focusFormPanel(collectionForm, '[name="amount"]');
+        showCollectionModal(button);
       }
     });
   });
@@ -567,7 +627,7 @@ function renderDistributions() {
 
       if (distribution) {
         fillDistributionForm(distribution);
-        focusFormPanel(distributionForm, '[name="quantity"]');
+        showDistributionModal(button);
       }
     });
   });
@@ -575,7 +635,7 @@ function renderDistributions() {
 
 function renderDistributors() {
   if (!distributorsCache.length) {
-    distributorTable.innerHTML = renderEmptyState("No runners yet", "Create the first runner from the form above.");
+    distributorTable.innerHTML = renderEmptyState("No runners yet", "Use the create runner button above to add the first runner.");
     return;
   }
 
@@ -625,7 +685,7 @@ function renderDistributors() {
 
       if (distributor) {
         fillRunnerForm(distributor);
-        focusFormPanel(runnerForm, '[name="name"]');
+        showRunnerModal(button);
       }
     });
   });
@@ -792,7 +852,7 @@ function renderLedgerEntries() {
       if (entry) {
         fillCollectionForm(entry);
         window.location.hash = "collectionForm";
-        focusFormPanel(collectionForm, '[name="amount"]');
+        showCollectionModal(button);
       }
     });
   });
@@ -818,6 +878,7 @@ function renderLedgerEntries() {
 
         if (requestedCollectionEditId === entry.id || collectionEntryIdField.value === entry.id) {
           resetCollectionForm({ clearDraftState: true });
+          closeFormModal();
         }
 
         selectedLedgerIds.delete(entry.id);
@@ -839,7 +900,7 @@ function renderLedgerEntries() {
       if (distribution) {
         setCollectionTarget(distribution);
         window.location.hash = "collectionForm";
-        focusFormPanel(collectionForm, '[name="amount"]');
+        showCollectionModal(button);
       }
     });
   });
@@ -917,6 +978,7 @@ runnerForm?.addEventListener("submit", async (event) => {
     }
 
     resetRunnerForm({ clearDraftState: true });
+    closeFormModal();
     await loadPage();
     announceMutation(["distribution"]);
   } catch (error) {
@@ -956,6 +1018,7 @@ distributionForm?.addEventListener("submit", async (event) => {
     }
 
     resetDistributionForm({ clearDraftState: true });
+    closeFormModal();
     await loadPage();
     announceMutation(["distribution", "inventory"]);
   } catch (error) {
@@ -991,6 +1054,7 @@ collectionForm?.addEventListener("submit", async (event) => {
     }
 
     resetCollectionForm({ clearDraftState: true });
+    closeFormModal();
     await loadPage();
     announceMutation(["distribution", "bank"]);
   } catch (error) {
@@ -1002,6 +1066,26 @@ collectionForm?.addEventListener("submit", async (event) => {
 resetRunnerButton?.addEventListener("click", () => resetRunnerForm({ clearDraftState: true }));
 resetDistributionButton?.addEventListener("click", () => resetDistributionForm({ clearDraftState: true }));
 resetCollectionButton?.addEventListener("click", () => resetCollectionForm({ clearDraftState: true }));
+
+openRunnerFormButton?.addEventListener("click", () => {
+  resetRunnerForm();
+  showRunnerModal(openRunnerFormButton);
+});
+
+openDistributionFormButton?.addEventListener("click", () => {
+  resetDistributionForm();
+  showDistributionModal(openDistributionFormButton);
+});
+
+openCollectionFormButton?.addEventListener("click", () => {
+  if (!distributionsCache.some((distribution) => OPEN_STATUSES.has(distribution.status))) {
+    showToast("Create an active distribution first, then log a collection.", "info");
+    return;
+  }
+
+  resetCollectionForm();
+  showCollectionModal(openCollectionFormButton);
+});
 
 distributionForm.elements.quantity?.addEventListener("input", updateDistributionTotalHint);
 distributionForm.elements.unitValue?.addEventListener("input", updateDistributionTotalHint);

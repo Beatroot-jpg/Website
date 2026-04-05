@@ -2,10 +2,11 @@ import { api } from "./api.js";
 import { announceMutation, subscribeToMutations } from "./live.js";
 import {
   badge,
-  focusFormPanel,
+  closeFormModal,
   formatDate,
   initProtectedPage,
   mountFormError,
+  openFormModal,
   renderEmptyState,
   renderTableSkeleton,
   showToast
@@ -37,6 +38,9 @@ const inventoryFormSubtitle = document.querySelector("#inventoryFormSubtitle");
 const inventorySubmitButton = document.querySelector("#inventorySubmitButton");
 const resetInventoryButton = document.querySelector("#resetInventoryForm");
 const inventoryQuantityHint = document.querySelector("#inventoryQuantityHint");
+const openInventoryFormButton = document.querySelector("#openInventoryFormButton");
+const inventoryFormHost = document.querySelector("#inventoryFormHost");
+const inventoryFormContent = document.querySelector("#inventoryFormContent");
 const quantityField = createForm?.elements.quantity;
 const movementIdField = document.querySelector("#inventoryMovementId");
 const adjustFormTitle = document.querySelector("#adjustFormTitle");
@@ -44,6 +48,9 @@ const adjustFormSubtitle = document.querySelector("#adjustFormSubtitle");
 const adjustSubmitButton = document.querySelector("#adjustSubmitButton");
 const resetAdjustButton = document.querySelector("#resetAdjustForm");
 const adjustQuantityHint = document.querySelector("#adjustQuantityHint");
+const openAdjustFormButton = document.querySelector("#openAdjustFormButton");
+const adjustFormHost = document.querySelector("#adjustFormHost");
+const adjustFormContent = document.querySelector("#adjustFormContent");
 const toolbarHost = document.createElement("div");
 const initialParams = new URLSearchParams(window.location.search);
 const searchQuery = (initialParams.get("search") || "").trim().toLowerCase();
@@ -183,9 +190,10 @@ function resetItemForm({ clearDraftState = false, clearUrl = true } = {}) {
 function fillItemForm(item) {
   inventoryItemIdField.value = item.id;
   inventoryFormTitle.textContent = `Edit ${item.name}`;
-  inventoryFormSubtitle.textContent = "Update the item details here. Use the stock form below to change quantity.";
+  inventoryFormSubtitle.textContent = "Update the item details here. Use the stock popup when you need to change quantity.";
   inventorySubmitButton.textContent = "Save item";
   inventoryQuantityHint.textContent = `Current stock is ${item.quantity} ${item.unit}.`;
+  mountFormError(createError, "");
   createForm.elements.name.value = item.name;
   createForm.elements.category.value = item.category || "";
   createForm.elements.unit.value = item.unit;
@@ -226,11 +234,42 @@ function fillMovementForm(movement) {
   adjustFormTitle.textContent = "Edit stock log";
   adjustFormSubtitle.textContent = "Update this stock movement. Correction sets stock to an exact amount.";
   adjustSubmitButton.textContent = "Save adjustment";
+  mountFormError(adjustError, "");
   adjustForm.elements.itemId.value = movement.itemId;
   adjustForm.elements.quantityDelta.value = movementDisplayQuantity(movement);
   adjustForm.elements.type.value = movement.type;
   adjustForm.elements.reason.value = movement.reason || "";
   updateAdjustmentHint();
+}
+
+function showInventoryItemModal(opener = document.activeElement) {
+  openFormModal({
+    content: inventoryFormContent,
+    host: inventoryFormHost,
+    focusSelector: '[name="name"]',
+    opener,
+    onClose: () => {
+      if (requestedItemEditId) {
+        requestedItemEditId = "";
+        updateUrlParams({ editItem: "" }, ["editItem"]);
+      }
+    }
+  });
+}
+
+function showAdjustmentModal(opener = document.activeElement) {
+  openFormModal({
+    content: adjustFormContent,
+    host: adjustFormHost,
+    focusSelector: '[name="quantityDelta"]',
+    opener,
+    onClose: () => {
+      if (requestedMovementEditId) {
+        requestedMovementEditId = "";
+        updateUrlParams({ editMovement: "" }, ["editMovement"]);
+      }
+    }
+  });
 }
 
 function editableMovementTypes() {
@@ -243,7 +282,7 @@ function maybeOpenRequestedEdit() {
 
     if (item) {
       fillItemForm(item);
-      focusFormPanel(createForm, '[name="name"]');
+      showInventoryItemModal();
     } else {
       requestedItemEditId = "";
       updateUrlParams({ editItem: "" }, ["editItem"]);
@@ -271,7 +310,7 @@ function maybeOpenRequestedEdit() {
     }
 
     fillMovementForm(movement);
-    focusFormPanel(adjustForm, '[name="quantityDelta"]');
+    showAdjustmentModal();
   }
 }
 
@@ -441,7 +480,7 @@ function openItemEditor(itemId) {
 
   if (item) {
     fillItemForm(item);
-    focusFormPanel(createForm, '[name="name"]');
+    showInventoryItemModal();
   }
 }
 
@@ -451,7 +490,7 @@ function openAdjustmentForm(itemId) {
   updateUrlParams({}, ["editItem", "editMovement"]);
   resetAdjustmentForm({ clearUrl: false });
   itemSelect.value = itemId;
-  focusFormPanel(adjustForm, '[name="quantityDelta"]');
+  showAdjustmentModal();
 }
 
 function openMovementEditor(movementId) {
@@ -464,7 +503,7 @@ function openMovementEditor(movementId) {
 
   if (movement) {
     fillMovementForm(movement);
-    focusFormPanel(adjustForm, '[name="quantityDelta"]');
+    showAdjustmentModal();
   }
 }
 
@@ -488,10 +527,12 @@ async function deleteInventoryItem(itemId) {
 
   if (inventoryItemIdField.value === itemId) {
     resetItemForm({ clearDraftState: true });
+    closeFormModal();
   }
 
   if (adjustForm.elements.itemId.value === itemId) {
     resetAdjustmentForm({ clearDraftState: true });
+    closeFormModal();
   }
 
   showToast("Inventory item deleted.", "success");
@@ -505,7 +546,7 @@ function renderTable(items) {
       items.length ? "No matching inventory items" : "No inventory items yet",
       items.length
         ? "Try a broader search or remove the current filter."
-        : "Add your first item with the form below."
+        : "Use the action buttons on this page to add the first item or stock change."
     );
     return;
   }
@@ -661,6 +702,7 @@ createForm?.addEventListener("submit", async (event) => {
     }
 
     resetItemForm({ clearDraftState: true });
+    closeFormModal();
     await loadInventory();
     announceMutation(["inventory"]);
   } catch (error) {
@@ -698,6 +740,7 @@ adjustForm?.addEventListener("submit", async (event) => {
     }
 
     resetAdjustmentForm({ clearDraftState: true });
+    closeFormModal();
     await loadInventory();
     announceMutation(["inventory"]);
   } catch (error) {
@@ -712,6 +755,28 @@ resetInventoryButton?.addEventListener("click", () => {
 
 resetAdjustButton?.addEventListener("click", () => {
   resetAdjustmentForm({ clearDraftState: true });
+});
+
+openInventoryFormButton?.addEventListener("click", () => {
+  requestedItemEditId = "";
+  requestedMovementEditId = "";
+  resetItemForm();
+  updateUrlParams({ editItem: "", editMovement: "" }, ["editItem", "editMovement"]);
+  showInventoryItemModal(openInventoryFormButton);
+});
+
+openAdjustFormButton?.addEventListener("click", () => {
+  if (!itemsCache.length) {
+    showToast("Add an inventory item first, then adjust stock.", "info");
+    return;
+  }
+
+  requestedItemEditId = "";
+  requestedMovementEditId = "";
+  resetAdjustmentForm();
+  updateUrlParams({ editItem: "", editMovement: "" }, ["editItem", "editMovement"]);
+  itemSelect.value = itemsCache[0].id;
+  showAdjustmentModal(openAdjustFormButton);
 });
 
 adjustForm?.elements?.type?.addEventListener("change", updateAdjustmentHint);

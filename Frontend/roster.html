@@ -39,56 +39,19 @@
         <section class="workflow-stack">
           <article class="panel">
             <div class="panel-header">
-              <h2 id="rosterFormTitle">Add roster member</h2>
-              <p id="rosterFormSubtitle">Add or edit a member first, then review the roster summary and full lineup below.</p>
+              <h2>Roster controls</h2>
+              <p>Create or edit members through a focused popup, then review the summary and full lineup in the live sections below.</p>
             </div>
 
-            <form class="stack-form" id="rosterForm">
-              <input type="hidden" id="rosterMemberId" name="rosterMemberId">
-
-              <label class="field-stack">
-                <span>Name</span>
-                <input type="text" name="name" placeholder="Full name" required>
-              </label>
-
-              <label class="field-stack">
-                <span>Discord name</span>
-                <input type="text" name="discordName" placeholder="username#0001" required>
-              </label>
-
-              <div class="field-grid">
-                <label class="field-stack">
-                  <span>Rank</span>
-                  <input type="text" name="rank" placeholder="Associate" required>
-                </label>
-                <label class="field-stack">
-                  <span>Status</span>
-                  <select name="status">
-                    <option value="ACTIVE">Active</option>
-                    <option value="LOA">LOA</option>
-                    <option value="INACTIVE">Inactive</option>
-                  </select>
-                </label>
+            <div class="action-launch-card">
+              <div class="action-launch-copy">
+                <strong>Roster member</strong>
+                <p class="muted">Open a popup to add someone new, or click edit in the lineup to reopen their saved details.</p>
               </div>
-
-              <div class="field-grid">
-                <label class="field-stack">
-                  <span>Date joined</span>
-                  <input type="date" name="dateJoined" required>
-                </label>
-                <label class="field-stack">
-                  <span>Order</span>
-                  <input type="number" min="1" name="displayOrder" placeholder="1" required>
-                </label>
-              </div>
-
               <div class="inline-actions">
-                <button class="primary-button" id="rosterSubmitButton" type="submit">Save member</button>
-                <button class="ghost-button" id="resetRosterForm" type="button">Reset form</button>
+                <button class="primary-button" id="openRosterFormButton" type="button">Add roster member</button>
               </div>
-
-              <p class="form-error hidden" id="rosterError"></p>
-            </form>
+            </div>
 
             <div class="panel-header section-divider">
               <h2>Roster overview</h2>
@@ -101,6 +64,62 @@
               <p>Every entry can be reopened and edited after saving, including status and order.</p>
             </div>
             <div id="rosterTable"></div>
+
+            <div class="modal-form-host" id="rosterFormHost">
+              <div class="modal-form-content" id="rosterFormContent">
+                <div class="panel-header">
+                  <h2 id="rosterFormTitle">Add roster member</h2>
+                  <p id="rosterFormSubtitle">Add or edit a member here, then save to push the change into the live lineup.</p>
+                </div>
+
+                <form class="stack-form" id="rosterForm">
+                  <input type="hidden" id="rosterMemberId" name="rosterMemberId">
+
+                  <label class="field-stack">
+                    <span>Name</span>
+                    <input type="text" name="name" placeholder="Full name" required>
+                  </label>
+
+                  <label class="field-stack">
+                    <span>Discord name</span>
+                    <input type="text" name="discordName" placeholder="username#0001" required>
+                  </label>
+
+                  <div class="field-grid">
+                    <label class="field-stack">
+                      <span>Rank</span>
+                      <input type="text" name="rank" placeholder="Associate" required>
+                    </label>
+                    <label class="field-stack">
+                      <span>Status</span>
+                      <select name="status">
+                        <option value="ACTIVE">Active</option>
+                        <option value="LOA">LOA</option>
+                        <option value="INACTIVE">Inactive</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div class="field-grid">
+                    <label class="field-stack">
+                      <span>Date joined</span>
+                      <input type="date" name="dateJoined" required>
+                    </label>
+                    <label class="field-stack">
+                      <span>Order</span>
+                      <input type="number" min="1" name="displayOrder" placeholder="1" required>
+                    </label>
+                  </div>
+
+                  <div class="inline-actions">
+                    <button class="primary-button" id="rosterSubmitButton" type="submit">Save member</button>
+                    <button class="ghost-button" id="resetRosterForm" type="button">Reset form</button>
+                  </div>
+
+                  <p class="form-error hidden" id="rosterError"></p>
+                </form>
+              </div>
+            </div>
           </article>
         </section>
       </main>

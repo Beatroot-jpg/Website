@@ -48,80 +48,118 @@
 
           <article class="panel">
             <div class="panel-header">
-              <h2 id="inventoryFormTitle">Add new item</h2>
-              <p id="inventoryFormSubtitle">Use this form to add a new stock item or update one that already exists.</p>
+              <h2>Item actions</h2>
+              <p>Create a new item from a focused popup, or click edit on an existing row to reopen it with the current details loaded.</p>
             </div>
 
-            <form class="stack-form" id="inventoryForm">
-              <input type="hidden" id="inventoryItemId" name="inventoryItemId">
-              <label class="field-stack">
-                <span>Name</span>
-                <input type="text" name="name" placeholder="Product name" required>
-              </label>
-              <label class="field-stack">
-                <span>Category</span>
-                <input type="text" name="category" placeholder="Consumables">
-              </label>
-              <div class="field-grid">
-                <label class="field-stack">
-                  <span>Unit</span>
-                  <input type="text" name="unit" value="unit">
-                </label>
-                <label class="field-stack">
-                  <span>Starting quantity</span>
-                  <input type="number" min="0" name="quantity" value="0">
-                </label>
+            <div class="action-launch-card">
+              <div class="action-launch-copy">
+                <strong>New stock item</strong>
+                <p class="muted">Open a clean popup to add something new, then come back to this list to edit or remove it later.</p>
               </div>
-              <label class="field-stack">
-                <span>Notes</span>
-                <textarea name="notes" placeholder="Optional notes about the item"></textarea>
-              </label>
               <div class="inline-actions">
-                <button class="primary-button" id="inventorySubmitButton" type="submit">Create item</button>
-                <button class="ghost-button" id="resetInventoryForm" type="button">Reset form</button>
+                <button class="primary-button" id="openInventoryFormButton" type="button">Add new item</button>
               </div>
-              <p class="muted" id="inventoryQuantityHint">Starting quantity is only used when creating a new item.</p>
-              <p class="form-error hidden" id="inventoryError"></p>
-            </form>
+            </div>
+
+            <div class="modal-form-host" id="inventoryFormHost">
+              <div class="modal-form-content" id="inventoryFormContent">
+                <div class="panel-header">
+                  <h2 id="inventoryFormTitle">Add new item</h2>
+                  <p id="inventoryFormSubtitle">Use this form to add a new stock item or update one that already exists.</p>
+                </div>
+
+                <form class="stack-form" id="inventoryForm">
+                  <input type="hidden" id="inventoryItemId" name="inventoryItemId">
+                  <label class="field-stack">
+                    <span>Name</span>
+                    <input type="text" name="name" placeholder="Product name" required>
+                  </label>
+                  <label class="field-stack">
+                    <span>Category</span>
+                    <input type="text" name="category" placeholder="Consumables">
+                  </label>
+                  <div class="field-grid">
+                    <label class="field-stack">
+                      <span>Unit</span>
+                      <input type="text" name="unit" value="unit">
+                    </label>
+                    <label class="field-stack">
+                      <span>Starting quantity</span>
+                      <input type="number" min="0" name="quantity" value="0">
+                    </label>
+                  </div>
+                  <label class="field-stack">
+                    <span>Notes</span>
+                    <textarea name="notes" placeholder="Optional notes about the item"></textarea>
+                  </label>
+                  <div class="inline-actions">
+                    <button class="primary-button" id="inventorySubmitButton" type="submit">Create item</button>
+                    <button class="ghost-button" id="resetInventoryForm" type="button">Reset form</button>
+                  </div>
+                  <p class="muted" id="inventoryQuantityHint">Starting quantity is only used when creating a new item.</p>
+                  <p class="form-error hidden" id="inventoryError"></p>
+                </form>
+              </div>
+            </div>
           </article>
 
           <article class="panel">
             <div class="panel-header">
-              <h2 id="adjustFormTitle">Adjust stock</h2>
-              <p id="adjustFormSubtitle">Pick an item, enter the amount, and record what happened in plain terms.</p>
+              <h2>Stock log actions</h2>
+              <p>Open a dedicated popup to add, subtract, or correct stock. Editing a stock log uses the same popup with the current values loaded.</p>
             </div>
 
-            <form class="stack-form" id="adjustForm">
-              <input type="hidden" id="inventoryMovementId" name="inventoryMovementId">
-              <label class="field-stack">
-                <span>Item</span>
-                <select id="adjustItemId" name="itemId"></select>
-              </label>
-              <div class="field-grid">
-                <label class="field-stack">
-                  <span>Amount</span>
-                  <input type="number" name="quantityDelta" placeholder="4 or 10" required>
-                </label>
-                <label class="field-stack">
-                  <span>Action</span>
-                  <select name="type">
-                    <option value="STOCK_IN">Add</option>
-                    <option value="STOCK_OUT">Subtract</option>
-                    <option value="CORRECTION">Correction</option>
-                  </select>
-                </label>
+            <div class="action-launch-card">
+              <div class="action-launch-copy">
+                <strong>Adjust stock</strong>
+                <p class="muted">Use the popup to correct numbers quickly without breaking the list view underneath.</p>
               </div>
-              <p class="muted" id="adjustQuantityHint">Add and subtract use the amount entered. Correction sets stock on hand to the exact amount, even if that amount is 0.</p>
-              <label class="field-stack">
-                <span>Reason</span>
-                <input type="text" name="reason" placeholder="Why is stock changing?">
-              </label>
               <div class="inline-actions">
-                <button class="secondary-button" id="adjustSubmitButton" type="submit">Apply adjustment</button>
-                <button class="ghost-button" id="resetAdjustForm" type="button">Reset form</button>
+                <button class="secondary-button" id="openAdjustFormButton" type="button">Adjust stock</button>
               </div>
-              <p class="form-error hidden" id="adjustError"></p>
-            </form>
+            </div>
+
+            <div class="modal-form-host" id="adjustFormHost">
+              <div class="modal-form-content" id="adjustFormContent">
+                <div class="panel-header">
+                  <h2 id="adjustFormTitle">Adjust stock</h2>
+                  <p id="adjustFormSubtitle">Pick an item, enter the amount, and record what happened in plain terms.</p>
+                </div>
+
+                <form class="stack-form" id="adjustForm">
+                  <input type="hidden" id="inventoryMovementId" name="inventoryMovementId">
+                  <label class="field-stack">
+                    <span>Item</span>
+                    <select id="adjustItemId" name="itemId"></select>
+                  </label>
+                  <div class="field-grid">
+                    <label class="field-stack">
+                      <span>Amount</span>
+                      <input type="number" name="quantityDelta" placeholder="4 or 10" required>
+                    </label>
+                    <label class="field-stack">
+                      <span>Action</span>
+                      <select name="type">
+                        <option value="STOCK_IN">Add</option>
+                        <option value="STOCK_OUT">Subtract</option>
+                        <option value="CORRECTION">Correction</option>
+                      </select>
+                    </label>
+                  </div>
+                  <p class="muted" id="adjustQuantityHint">Add and subtract use the amount entered. Correction sets stock on hand to the exact amount, even if that amount is 0.</p>
+                  <label class="field-stack">
+                    <span>Reason</span>
+                    <input type="text" name="reason" placeholder="Why is stock changing?">
+                  </label>
+                  <div class="inline-actions">
+                    <button class="secondary-button" id="adjustSubmitButton" type="submit">Apply adjustment</button>
+                    <button class="ghost-button" id="resetAdjustForm" type="button">Reset form</button>
+                  </div>
+                  <p class="form-error hidden" id="adjustError"></p>
+                </form>
+              </div>
+            </div>
           </article>
 
           <article class="panel">

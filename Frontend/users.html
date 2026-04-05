@@ -39,69 +39,88 @@
         <section class="workflow-stack">
           <article class="panel">
             <div class="panel-header">
-              <h2 id="userFormTitle">Create a user</h2>
-              <p>Set the account up first, then review the user directory in the same section below.</p>
+              <h2>User directory</h2>
+              <p>Create new people from a focused popup, or click edit in the directory to reopen that same popup with their details loaded.</p>
             </div>
 
-            <form class="stack-form" id="userForm">
-              <input type="hidden" id="userId" name="userId">
-
-              <label class="field-stack">
-                <span>Name</span>
-                <input type="text" name="name" placeholder="Team member name" required>
-              </label>
-              <label class="field-stack">
-                <span>Username</span>
-                <input type="text" name="username" placeholder="operator" required>
-              </label>
-              <div class="field-grid">
-                <label class="field-stack">
-                  <span>Role</span>
-                  <select id="userRole" name="role">
-                    <option value="USER">User</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
-                </label>
-                <label class="field-stack">
-                  <span>Permission preset</span>
-                  <select id="permissionPreset" name="permissionPreset">
-                    <option value="">Custom access</option>
-                  </select>
-                </label>
+            <div class="action-launch-card">
+              <div class="action-launch-copy">
+                <strong>People and permissions</strong>
+                <p class="muted">Start with a clean create button, then use edit on any existing account when you need to make a change.</p>
               </div>
-              <label class="field-stack">
-                <span>Password</span>
-                <div class="inline-field">
-                  <input type="password" name="password" placeholder="Create or update password">
-                  <button class="ghost-button" id="generatePassword" type="button">Generate temp</button>
-                </div>
-              </label>
-
-              <p class="muted" id="passwordHint">Password is required for new users.</p>
-
-              <label class="permission-option">
-                <input type="checkbox" name="active" checked>
-                <span>Account is active</span>
-              </label>
-
-              <div class="field-stack">
-                <span>Page permissions</span>
-                <div class="permission-list" id="permissionList"></div>
-              </div>
-
               <div class="inline-actions">
-                <button class="primary-button" type="submit">Save user</button>
-                <button class="ghost-button" id="resetUserForm" type="button">Reset form</button>
+                <button class="primary-button" id="openUserFormButton" type="button">Create new user</button>
               </div>
-
-              <p class="form-error hidden" id="userError"></p>
-            </form>
+            </div>
 
             <div class="panel-header section-divider">
               <h2>User directory</h2>
-              <p>Click edit to load a user into the form and change their permissions without leaving this workflow.</p>
+              <p>Use the table below to edit access, activate people, or review who can see each tab.</p>
             </div>
             <div id="userTable"></div>
+
+            <div class="modal-form-host" id="userFormHost">
+              <div class="modal-form-content" id="userFormContent">
+                <div class="panel-header">
+                  <h2 id="userFormTitle">Create a user</h2>
+                  <p>Set the account up here, then save to push it back into the live directory.</p>
+                </div>
+
+                <form class="stack-form" id="userForm">
+                  <input type="hidden" id="userId" name="userId">
+
+                  <label class="field-stack">
+                    <span>Name</span>
+                    <input type="text" name="name" placeholder="Team member name" required>
+                  </label>
+                  <label class="field-stack">
+                    <span>Username</span>
+                    <input type="text" name="username" placeholder="operator" required>
+                  </label>
+                  <div class="field-grid">
+                    <label class="field-stack">
+                      <span>Role</span>
+                      <select id="userRole" name="role">
+                        <option value="USER">User</option>
+                        <option value="ADMIN">Admin</option>
+                      </select>
+                    </label>
+                    <label class="field-stack">
+                      <span>Permission preset</span>
+                      <select id="permissionPreset" name="permissionPreset">
+                        <option value="">Custom access</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label class="field-stack">
+                    <span>Password</span>
+                    <div class="inline-field">
+                      <input type="password" name="password" placeholder="Create or update password">
+                      <button class="ghost-button" id="generatePassword" type="button">Generate temp</button>
+                    </div>
+                  </label>
+
+                  <p class="muted" id="passwordHint">Password is required for new users.</p>
+
+                  <label class="permission-option">
+                    <input type="checkbox" name="active" checked>
+                    <span>Account is active</span>
+                  </label>
+
+                  <div class="field-stack">
+                    <span>Page permissions</span>
+                    <div class="permission-list" id="permissionList"></div>
+                  </div>
+
+                  <div class="inline-actions">
+                    <button class="primary-button" type="submit">Save user</button>
+                    <button class="ghost-button" id="resetUserForm" type="button">Reset form</button>
+                  </div>
+
+                  <p class="form-error hidden" id="userError"></p>
+                </form>
+              </div>
+            </div>
           </article>
         </section>
       </main>

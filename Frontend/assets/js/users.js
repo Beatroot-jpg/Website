@@ -3,9 +3,10 @@ import { PERMISSION_PRESETS } from "./constants.js";
 import { announceMutation, subscribeToMutations } from "./live.js";
 import {
   activeStateBadge,
-  focusFormPanel,
+  closeFormModal,
   initProtectedPage,
   mountFormError,
+  openFormModal,
   permissionBadges,
   renderEmptyState,
   renderTableSkeleton,
@@ -39,6 +40,9 @@ const roleSelect = document.querySelector("#userRole");
 const presetSelect = document.querySelector("#permissionPreset");
 const userIdField = document.querySelector("#userId");
 const generatePasswordButton = document.querySelector("#generatePassword");
+const openUserFormButton = document.querySelector("#openUserFormButton");
+const userFormHost = document.querySelector("#userFormHost");
+const userFormContent = document.querySelector("#userFormContent");
 const toolbarHost = document.createElement("div");
 const pageParams = new URLSearchParams(window.location.search);
 const searchQuery = (pageParams.get("search") || "").trim().toLowerCase();
@@ -158,6 +162,7 @@ function resetForm() {
   userIdField.value = "";
   formTitle.textContent = "Create a user";
   document.querySelector("#passwordHint").textContent = "Password is required for new users.";
+  mountFormError(userError, "");
   if (presetSelect) {
     presetSelect.value = "";
   }
@@ -169,6 +174,7 @@ function resetForm() {
 function fillForm(user) {
   userIdField.value = user.id;
   formTitle.textContent = `Editing ${user.name}`;
+  mountFormError(userError, "");
   userForm.elements.name.value = user.name;
   userForm.elements.username.value = user.username;
   userForm.elements.role.value = user.role;
@@ -183,6 +189,21 @@ function fillForm(user) {
   }
 
   syncPermissionState();
+}
+
+function showUserFormModal(opener = document.activeElement) {
+  openFormModal({
+    content: userFormContent,
+    host: userFormHost,
+    focusSelector: '[name="name"]',
+    opener,
+    onClose: () => {
+      if (requestedUserEditId) {
+        requestedUserEditId = "";
+        updateUrlParams({ editUser: "" }, ["editUser"]);
+      }
+    }
+  });
 }
 
 function maybeOpenRequestedEdit() {
@@ -200,7 +221,7 @@ function maybeOpenRequestedEdit() {
   }
 
   fillForm(user);
-  focusFormPanel(userForm, '[name="name"]');
+  showUserFormModal();
 }
 
 function getVisibleUsers(users) {
@@ -380,7 +401,7 @@ function renderUsers(users) {
       users.length ? "No matching users" : "No users found",
       users.length
         ? "Try a broader search from the header or dashboard."
-        : "Create the first user from the form on this page."
+        : "Use the create button on this page to add the first user."
     );
     return;
   }
@@ -448,7 +469,7 @@ function renderUsers(users) {
       const user = usersCache.find((entry) => entry.id === button.dataset.editUser);
       if (user) {
         fillForm(user);
-        focusFormPanel(userForm, '[name="name"]');
+        showUserFormModal(button);
       }
     });
   });
@@ -537,6 +558,11 @@ generatePasswordButton?.addEventListener("click", () => {
   showToast(`Temporary password ready: ${temporaryPassword}`, "info");
 });
 
+openUserFormButton?.addEventListener("click", () => {
+  resetForm();
+  showUserFormModal(openUserFormButton);
+});
+
 resetButton?.addEventListener("click", resetForm);
 
 userForm?.addEventListener("submit", async (event) => {
@@ -581,6 +607,7 @@ userForm?.addEventListener("submit", async (event) => {
 
     resetForm();
     userDraft.clearDraft();
+    closeFormModal();
     await loadUsers();
     announceMutation(["users"]);
   } catch (error) {

@@ -334,36 +334,48 @@ export function toggleCheckboxGroup(disabled) {
   });
 }
 
-export function focusFormPanel(formElement, focusSelector) {
-  if (!formElement) {
-    return;
+let modalState = null;
+
+function ensureSharedModal() {
+  let root = document.querySelector("#sharedFormModal");
+
+  if (root) {
+    return root;
   }
 
-  const focusTarget = focusSelector
-    ? formElement.querySelector(focusSelector)
-    : formElement.querySelector("input, select, textarea, button");
-  const panel = formElement.closest(".panel") || formElement;
+  root = document.createElement("div");
+  root.className = "form-modal hidden";
+  root.id = "sharedFormModal";
+  root.innerHTML = `
+    <div class="form-modal-backdrop" data-close-modal></div>
+    <div class="form-modal-dialog" role="dialog" aria-modal="true" aria-label="Focused editor">
+      <div class="form-modal-toolbar">
+        <p class="tool-label">Focused editor</p>
+        <button class="ghost-button form-modal-close" type="button" data-close-modal>Close</button>
+      </div>
+      <div class="form-modal-body" id="sharedFormModalBody"></div>
+    </div>
+  `;
 
-  document.querySelectorAll(".panel.editing-focus").forEach((element) => {
-    if (element !== panel) {
-      element.classList.remove("editing-focus");
+  document.body.appendChild(root);
+
+  root.querySelectorAll("[data-close-modal]").forEach((element) => {
+    element.addEventListener("click", () => closeFormModal());
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && modalState && !root.classList.contains("hidden")) {
+      closeFormModal();
     }
   });
 
-  if (panel) {
-    panel.classList.remove("editing-focus");
-    void panel.offsetWidth;
-    panel.classList.add("editing-focus");
-    window.clearTimeout(panel.__editingFocusTimer);
-    panel.__editingFocusTimer = window.setTimeout(() => {
-      panel.classList.remove("editing-focus");
-    }, 2600);
-  }
+  return root;
+}
 
-  panel.scrollIntoView({
-    behavior: "smooth",
-    block: "center"
-  });
+function focusFormField(formElement, focusSelector) {
+  const focusTarget = focusSelector
+    ? formElement?.querySelector(focusSelector)
+    : formElement?.querySelector("input, select, textarea, button");
 
   window.requestAnimationFrame(() => {
     if (!focusTarget) {
@@ -376,4 +388,59 @@ export function focusFormPanel(formElement, focusSelector) {
       focusTarget.select();
     }
   });
+}
+
+export function openFormModal({ content, host, focusSelector, opener, onClose } = {}) {
+  if (!content || !host) {
+    return;
+  }
+
+  const root = ensureSharedModal();
+  const body = root.querySelector("#sharedFormModalBody");
+
+  if (modalState && modalState.content !== content) {
+    closeFormModal({ restoreFocus: false });
+  }
+
+  modalState = {
+    content,
+    host,
+    opener: opener || document.activeElement,
+    onClose
+  };
+
+  if (content.parentElement !== body) {
+    body.replaceChildren(content);
+  }
+
+  root.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+  focusFormField(content, focusSelector);
+}
+
+export function closeFormModal({ restoreFocus = true } = {}) {
+  if (!modalState) {
+    return;
+  }
+
+  const root = ensureSharedModal();
+  const body = root.querySelector("#sharedFormModalBody");
+  const { content, host, opener, onClose } = modalState;
+
+  if (typeof onClose === "function") {
+    onClose();
+  }
+
+  if (content && host) {
+    host.appendChild(content);
+  }
+
+  body.replaceChildren();
+  root.classList.add("hidden");
+  document.body.classList.remove("modal-open");
+  modalState = null;
+
+  if (restoreFocus && opener && typeof opener.focus === "function" && document.contains(opener)) {
+    opener.focus({ preventScroll: true });
+  }
 }

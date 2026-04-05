@@ -3,11 +3,12 @@ import { announceMutation, subscribeToMutations } from "./live.js";
 import {
   bankMoneyBadge,
   bankTransactionBadge,
-  focusFormPanel,
+  closeFormModal,
   formatCurrency,
   formatDate,
   initProtectedPage,
   mountFormError,
+  openFormModal,
   renderEmptyState,
   renderMetricSkeleton,
   renderTableSkeleton,
@@ -40,6 +41,9 @@ const transactionFormSubtitle = document.querySelector("#transactionFormSubtitle
 const transactionSubmitButton = document.querySelector("#transactionSubmitButton");
 const resetTransactionButton = document.querySelector("#resetTransactionForm");
 const transactionAmountHint = document.querySelector("#transactionAmountHint");
+const openTransactionFormButton = document.querySelector("#openTransactionFormButton");
+const transactionFormHost = document.querySelector("#transactionFormHost");
+const transactionFormContent = document.querySelector("#transactionFormContent");
 const toolbarHost = document.createElement("div");
 const initialParams = new URLSearchParams(window.location.search);
 const searchQuery = (initialParams.get("search") || "").trim().toLowerCase();
@@ -109,11 +113,27 @@ function fillTransactionForm(transaction) {
   transactionFormTitle.textContent = "Edit transaction";
   transactionFormSubtitle.textContent = "Update this manual ledger entry and the live clean/dirty balances will recalculate.";
   transactionSubmitButton.textContent = "Save transaction";
+  mountFormError(transactionError, "");
   transactionForm.elements.moneyType.value = transaction.moneyType || "CLEAN";
   transactionForm.elements.entryType.value = transaction.entryType || "CORRECTION";
   transactionForm.elements.amount.value = transaction.amount;
   transactionForm.elements.description.value = transaction.description || "";
   updateAmountHint();
+}
+
+function showTransactionModal(opener = document.activeElement) {
+  openFormModal({
+    content: transactionFormContent,
+    host: transactionFormHost,
+    focusSelector: '[name="amount"]',
+    opener,
+    onClose: () => {
+      if (requestedTransactionEditId) {
+        requestedTransactionEditId = "";
+        updateUrlParams({ editTransaction: "" }, ["editTransaction"]);
+      }
+    }
+  });
 }
 
 function updateAmountHint() {
@@ -151,7 +171,7 @@ function maybeOpenRequestedEdit() {
   }
 
   fillTransactionForm(transaction);
-  focusFormPanel(transactionForm, '[name="amount"]');
+  showTransactionModal();
 }
 
 function renderSummary(balances, recentTransactions) {
@@ -355,7 +375,7 @@ function renderTransactions(transactions, pagination) {
       pagination.total ? "No matching transactions on this page" : "No transactions yet",
       pagination.total
         ? "Try another page or a broader filter."
-        : "Use the form on this page to add the first clean or dirty money entry."
+        : "Use the new ledger entry button on this page to add the first clean or dirty money record."
     );
     return;
   }
@@ -442,7 +462,7 @@ function renderTransactions(transactions, pagination) {
 
       if (transaction) {
         fillTransactionForm(transaction);
-        focusFormPanel(transactionForm, '[name="amount"]');
+        showTransactionModal(button);
       }
     });
   });
@@ -473,6 +493,7 @@ function renderTransactions(transactions, pagination) {
 
         if (requestedTransactionEditId === transaction.id || transactionIdField.value === transaction.id) {
           resetTransactionForm({ clearDraftState: true });
+          closeFormModal();
         }
 
         currentPage = 1;
@@ -612,6 +633,7 @@ transactionForm?.addEventListener("submit", async (event) => {
     currentPage = 1;
     updateUrlParams({ page: "1", editTransaction: "" }, ["editTransaction"]);
     resetTransactionForm({ clearDraftState: true });
+    closeFormModal();
     await loadBank();
     announceMutation(["bank"]);
   } catch (error) {
@@ -622,6 +644,11 @@ transactionForm?.addEventListener("submit", async (event) => {
 
 resetTransactionButton?.addEventListener("click", () => {
   resetTransactionForm({ clearDraftState: true });
+});
+
+openTransactionFormButton?.addEventListener("click", () => {
+  resetTransactionForm();
+  showTransactionModal(openTransactionFormButton);
 });
 
 transactionForm?.elements.entryType?.addEventListener("change", updateAmountHint);
