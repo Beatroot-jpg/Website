@@ -648,13 +648,19 @@ function renderDistributors() {
             <th>Number</th>
             <th>Status</th>
             <th>Open runs</th>
+            <th>Units moved</th>
+            <th>Made overall</th>
             <th>Action</th>
             <th>Updated</th>
           </tr>
         </thead>
         <tbody>
           ${distributorsCache.map((distributor) => {
-            const openRuns = distributionsCache.filter((distribution) => distribution.distributorId === distributor.id && OPEN_STATUSES.has(distribution.status)).length;
+            const openRuns = typeof distributor.openRuns === "number"
+              ? distributor.openRuns
+              : distributionsCache.filter((distribution) => distribution.distributorId === distributor.id && OPEN_STATUSES.has(distribution.status)).length;
+            const unitsMovedOverall = Number(distributor.unitsMovedOverall || 0);
+            const moneyMadeOverall = Number(distributor.moneyMadeOverall || 0);
 
             return `
               <tr class="${requestedDistributorEditId === distributor.id ? "editing-row" : ""}">
@@ -662,6 +668,8 @@ function renderDistributors() {
                 <td>${distributor.number}</td>
                 <td>${activeStateBadge(distributor.active)}</td>
                 <td>${openRuns}</td>
+                <td><strong>${unitsMovedOverall}</strong><span class="subtle-row">Lifetime units</span></td>
+                <td><strong>${formatCurrency(moneyMadeOverall)}</strong><span class="subtle-row">Collected to date</span></td>
                 <td>
                   <div class="inline-table-actions">
                     <button class="mini-action" type="button" data-edit-distributor="${distributor.id}">Edit</button>
@@ -911,7 +919,7 @@ async function loadPage() {
     summaryGrid.innerHTML = renderMetricSkeleton(5);
   }
   distributionTable.innerHTML = renderTableSkeleton(10, 5);
-  distributorTable.innerHTML = renderTableSkeleton(6, 5);
+  distributorTable.innerHTML = renderTableSkeleton(8, 5);
   ledgerTable.innerHTML = renderTableSkeleton(10, 5);
   ledgerToolbar.innerHTML = "";
 

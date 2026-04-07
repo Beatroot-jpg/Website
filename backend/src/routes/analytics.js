@@ -53,9 +53,16 @@ router.get(
         },
         select: {
           id: true,
+          distributorId: true,
           itemId: true,
           quantity: true,
           createdAt: true,
+          distributor: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
           item: {
             select: {
               id: true,
@@ -73,7 +80,18 @@ router.get(
         select: {
           amount: true,
           action: true,
-          createdAt: true
+          createdAt: true,
+          distribution: {
+            select: {
+              distributorId: true,
+              distributor: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          }
         }
       }),
       prisma.bankTransaction.findMany({
@@ -97,8 +115,15 @@ router.get(
           }
         },
         select: {
+          distributorId: true,
           totalOwed: true,
-          amountReturned: true
+          amountReturned: true,
+          distributor: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
         }
       }),
       prisma.distributionCollection.aggregate({
@@ -127,6 +152,27 @@ router.get(
       DIRTY: { current: 0, previous: 0 }
     };
     const productMap = new Map();
+    const runnerMap = new Map();
+
+    const ensureRunnerStats = (runnerId, runnerName) => {
+      if (!runnerId) {
+        return null;
+      }
+
+      if (!runnerMap.has(runnerId)) {
+        runnerMap.set(runnerId, {
+          id: runnerId,
+          name: runnerName || "Unknown runner",
+          currentUnits: 0,
+          previousUnits: 0,
+          currentMoney: 0,
+          previousMoney: 0,
+          activeRuns: 0
+        });
+      }
+
+      return runnerMap.get(runnerId);
+    };
 
     const resolveWeekSlot = (date) => {
       const weekKey = getWeekStartKey(getSydneyDateKey(date));
@@ -151,6 +197,11 @@ router.get(
 
       const quantity = Number(distribution.quantity || 0);
       unitsByWeek[weekSlot] += quantity;
+      const runnerStats = ensureRunnerStats(distribution.distributorId, distribution.distributor?.name);
+
+      if (runnerStats) {
+        runnerStats[weekSlot === "current" ? "currentUnits" : "previousUnits"] += quantity;
+      }
 
       const existing = productMap.get(distribution.itemId) || {
         label: distribution.item.name,
@@ -174,6 +225,14 @@ router.get(
       }
 
       collectionsByWeek[weekSlot] += toNumber(collection.amount);
+      const runnerStats = ensureRunnerStats(
+        collection.distribution?.distributorId,
+        collection.distribution?.distributor?.name
+      );
+
+      if (runnerStats) {
+        runnerStats[weekSlot === "current" ? "currentMoney" : "previousMoney"] += toNumber(collection.amount);
+      }
     });
 
     const ledgerEffects = replayBankLedger(bankTransactions).effects;
@@ -192,6 +251,14 @@ router.get(
       sum + Math.max(0, toNumber(distribution.totalOwed) - toNumber(distribution.amountReturned))
     ), 0);
 
+    openDistributions.forEach((distribution) => {
+      const runnerStats = ensureRunnerStats(distribution.distributorId, distribution.distributor?.name);
+
+      if (runnerStats) {
+        runnerStats.activeRuns += 1;
+      }
+    });
+
     const productGraph = [...productMap.values()]
       .map((entry) => ({
         ...entry,
@@ -203,6 +270,26 @@ router.get(
         || left.label.localeCompare(right.label)
       ))
       .slice(0, 6);
+    const runnerLeaderboard = [...runnerMap.values()]
+      .filter((runner) => (
+        runner.currentUnits > 0
+        || runner.previousUnits > 0
+        || runner.currentMoney > 0
+        || runner.previousMoney > 0
+        || runner.activeRuns > 0
+      ))
+      .sort((left, right) => (
+        right.currentUnits - left.currentUnits
+        || right.currentMoney - left.currentMoney
+        || right.previousUnits - left.previousUnits
+        || right.previousMoney - left.previousMoney
+        || left.name.localeCompare(right.name)
+      ))
+      .map((runner) => ({
+        ...runner,
+        currentMoney: toMoney(runner.currentMoney),
+        previousMoney: toMoney(runner.previousMoney)
+      }));
 
     res.json({
       snapshot: [
@@ -226,6 +313,7 @@ router.get(
         }
       ],
       productGraph,
+      runnerLeaderboard,
       distributionOverview: {
         activeRuns: openDistributions.length,
         outstandingTotal: toMoney(outstandingTotal),

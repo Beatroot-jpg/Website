@@ -187,6 +187,42 @@ function summarizeDistributionData(distributions, ledgerEntries, distributors) {
   };
 }
 
+function attachDistributorTallies(distributors, distributions) {
+  const distributorStats = new Map();
+
+  distributions.forEach((distribution) => {
+    const existing = distributorStats.get(distribution.distributorId) || {
+      unitsMovedOverall: 0,
+      moneyMadeOverall: 0,
+      openRuns: 0
+    };
+
+    existing.unitsMovedOverall += Number(distribution.quantity || 0);
+    existing.moneyMadeOverall += toMoneyNumber(distribution.amountReturned);
+
+    if (OPEN_STATUSES.has(distribution.status)) {
+      existing.openRuns += 1;
+    }
+
+    distributorStats.set(distribution.distributorId, existing);
+  });
+
+  return distributors.map((distributor) => {
+    const stats = distributorStats.get(distributor.id) || {
+      unitsMovedOverall: 0,
+      moneyMadeOverall: 0,
+      openRuns: 0
+    };
+
+    return {
+      ...distributor,
+      unitsMovedOverall: stats.unitsMovedOverall,
+      moneyMadeOverall: toMoneyString(stats.moneyMadeOverall),
+      openRuns: stats.openRuns
+    };
+  });
+}
+
 async function refreshDistributionState(transaction, distributionId) {
   const distribution = await transaction.runnerDistribution.findUnique({
     where: { id: distributionId },
@@ -255,10 +291,11 @@ router.get(
         include: collectionInclude()
       })
     ]);
+    const distributorsWithTallies = attachDistributorTallies(distributors, distributions);
 
     res.json({
       summary: summarizeDistributionData(distributions, ledgerEntries, distributors),
-      distributors,
+      distributors: distributorsWithTallies,
       distributions,
       ledgerEntries
     });

@@ -6,6 +6,7 @@ import {
   initProtectedPage,
   renderEmptyState,
   renderMetricSkeleton,
+  renderTableSkeleton,
   showToast
 } from "./ui.js";
 
@@ -18,6 +19,7 @@ initProtectedPage({
 const snapshotGrid = document.querySelector("#analyticsSnapshot");
 const moneyGraph = document.querySelector("#analyticsMoneyGraph");
 const productGraph = document.querySelector("#analyticsProductGraph");
+const runnerLeaderboardTable = document.querySelector("#analyticsRunnerLeaderboard");
 const distributionOverviewGrid = document.querySelector("#analyticsDistributionOverview");
 
 function comparisonTone(delta) {
@@ -48,6 +50,7 @@ function renderLoading() {
   distributionOverviewGrid.innerHTML = renderMetricSkeleton(3);
   moneyGraph.innerHTML = "<div class='insight-row skeleton-card'></div><div class='insight-row skeleton-card'></div>";
   productGraph.innerHTML = "<div class='insight-row skeleton-card'></div><div class='insight-row skeleton-card'></div>";
+  runnerLeaderboardTable.innerHTML = renderTableSkeleton(6, 5);
 }
 
 function renderSnapshot(metrics = []) {
@@ -133,6 +136,48 @@ function renderDistributionOverview(overview = {}) {
   `;
 }
 
+function renderRunnerLeaderboard(rows = []) {
+  if (!rows.length) {
+    runnerLeaderboardTable.innerHTML = renderEmptyState(
+      "No runner activity yet",
+      "Once runners start moving product or bringing money back, the weekly leaderboard will appear here."
+    );
+    return;
+  }
+
+  runnerLeaderboardTable.innerHTML = `
+    <div class="table-shell">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Runner</th>
+            <th>This week units</th>
+            <th>Last week units</th>
+            <th>This week made</th>
+            <th>Last week made</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row, index) => `
+            <tr>
+              <td><strong>#${index + 1}</strong></td>
+              <td>
+                <strong>${row.name}</strong>
+                <span class="subtle-row">${row.activeRuns || 0} active runs right now</span>
+              </td>
+              <td><strong>${row.currentUnits || 0}</strong></td>
+              <td>${row.previousUnits || 0}</td>
+              <td><strong>${formatCurrency(row.currentMoney || 0)}</strong></td>
+              <td>${formatCurrency(row.previousMoney || 0)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 async function loadAnalytics() {
   renderLoading();
 
@@ -153,11 +198,13 @@ async function loadAnalytics() {
       "Product movement will appear here once distributions go out.",
       (value) => `${value}`
     );
+    renderRunnerLeaderboard(data.runnerLeaderboard || []);
     renderDistributionOverview(data.distributionOverview || {});
   } catch (error) {
     snapshotGrid.innerHTML = renderEmptyState("Unable to load analytics", error.message);
     moneyGraph.innerHTML = "";
     productGraph.innerHTML = "";
+    runnerLeaderboardTable.innerHTML = "";
     distributionOverviewGrid.innerHTML = "";
     showToast(error.message, "error");
   }
