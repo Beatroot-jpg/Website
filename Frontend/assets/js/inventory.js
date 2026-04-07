@@ -95,6 +95,49 @@ function populateItemSelect(items) {
   adjustForm.querySelector("button").disabled = items.length === 0;
 }
 
+function formatWholeNumber(value) {
+  return new Intl.NumberFormat().format(Number(value || 0));
+}
+
+function getLowPoint(item) {
+  return Math.max(0, Number(item?.reorderLevel || 0));
+}
+
+function getStockState(item) {
+  const quantity = Number(item?.quantity || 0);
+  const lowPoint = getLowPoint(item);
+
+  if (!lowPoint) {
+    return {
+      tone: "neutral",
+      label: "No low point",
+      detail: "Set a low point to colour-code this stock level."
+    };
+  }
+
+  if (quantity <= lowPoint) {
+    return {
+      tone: "danger",
+      label: "Low",
+      detail: `At or below ${formatWholeNumber(lowPoint)} ${item.unit}.`
+    };
+  }
+
+  if (quantity <= lowPoint * 2) {
+    return {
+      tone: "warn",
+      label: "Watch",
+      detail: `Below ${formatWholeNumber(lowPoint * 2)} ${item.unit}.`
+    };
+  }
+
+  return {
+    tone: "good",
+    label: "Healthy",
+    detail: `Above ${formatWholeNumber(lowPoint * 2)} ${item.unit}.`
+  };
+}
+
 function formatMovementType(type) {
   switch (`${type || ""}`.toUpperCase()) {
     case "STOCK_IN":
@@ -168,7 +211,8 @@ function resetItemForm({ clearDraftState = false, clearUrl = true } = {}) {
   inventoryFormTitle.textContent = "Add new item";
   inventoryFormSubtitle.textContent = "Use this form to add a new stock item or update one that already exists.";
   inventorySubmitButton.textContent = "Create item";
-  inventoryQuantityHint.textContent = "Starting quantity is only used when creating a new item.";
+  inventoryQuantityHint.textContent = "Starting quantity is only used when creating a new item. Low point can be edited any time.";
+  createForm.elements.lowPoint.value = "0";
 
   if (quantityField) {
     quantityField.disabled = false;
@@ -190,14 +234,15 @@ function resetItemForm({ clearDraftState = false, clearUrl = true } = {}) {
 function fillItemForm(item) {
   inventoryItemIdField.value = item.id;
   inventoryFormTitle.textContent = `Edit ${item.name}`;
-  inventoryFormSubtitle.textContent = "Update the item details here. Use the stock popup when you need to change quantity.";
+  inventoryFormSubtitle.textContent = "Update the item details here, including the low point used for stock colour warnings. Use the stock popup when you need to change quantity.";
   inventorySubmitButton.textContent = "Save item";
-  inventoryQuantityHint.textContent = `Current stock is ${item.quantity} ${item.unit}.`;
+  inventoryQuantityHint.textContent = `Current stock is ${formatWholeNumber(item.quantity)} ${item.unit}.`;
   mountFormError(createError, "");
   createForm.elements.name.value = item.name;
   createForm.elements.category.value = item.category || "";
   createForm.elements.unit.value = item.unit;
   createForm.elements.quantity.value = item.quantity;
+  createForm.elements.lowPoint.value = getLowPoint(item);
   createForm.elements.notes.value = item.notes || "";
 
   if (quantityField) {
@@ -413,6 +458,10 @@ function renderSummary(items) {
       && updated.getMonth() === now.getMonth()
       && updated.getDate() === now.getDate();
   }).length;
+  const lowItems = visibleItems.filter((item) => {
+    const lowPoint = getLowPoint(item);
+    return lowPoint > 0 && Number(item.quantity || 0) <= lowPoint;
+  }).length;
 
   summaryContainer.innerHTML = `
     <div class="inventory-summary-strip">
@@ -431,6 +480,10 @@ function renderSummary(items) {
       <article class="inventory-summary-card">
         <span class="inventory-summary-label">Updated today</span>
         <strong>${updatedToday}</strong>
+      </article>
+      <article class="inventory-summary-card ${lowItems ? "danger" : "good"}">
+        <span class="inventory-summary-label">At low point</span>
+        <strong>${lowItems}</strong>
       </article>
     </div>
   `;
@@ -464,6 +517,7 @@ function renderToolbar(items) {
         { label: "Category", value: (item) => item.category || "" },
         { label: "Unit", value: (item) => item.unit },
         { label: "Quantity", value: (item) => item.quantity },
+        { label: "Low Point", value: (item) => getLowPoint(item) },
         { label: "Notes", value: (item) => item.notes || "" }
       ],
       visibleItems
@@ -585,6 +639,8 @@ function renderTable(items) {
             const canEditMovement = latestMovement && editableMovementTypes().has(latestMovement.type);
             const isEditingItem = requestedItemEditId === item.id;
             const isEditingMovement = (item.movements || []).some((movement) => movement.id === requestedMovementEditId);
+            const stockState = getStockState(item);
+            const lowPoint = getLowPoint(item);
 
             return `
               <tr class="${isEditingItem || isEditingMovement ? "editing-row" : ""}">
@@ -594,8 +650,13 @@ function renderTable(items) {
                 </td>
                 <td>
                   <div class="stock-readout">
-                    <span class="stock-number">${item.quantity}</span>
+                    <span class="stock-number ${stockState.tone}">${formatWholeNumber(item.quantity)}</span>
                     <span class="stock-unit">${item.unit}</span>
+                    <div class="badge-group">
+                      ${badge(stockState.label, stockState.tone)}
+                      ${lowPoint ? badge(`Low point ${formatWholeNumber(lowPoint)}`, "neutral") : badge("No low point set", "neutral")}
+                    </div>
+                    <span class="subtle-row">${stockState.detail}</span>
                   </div>
                 </td>
                 <td>${item.category || "Uncategorised"}</td>
@@ -679,6 +740,7 @@ createForm?.addEventListener("submit", async (event) => {
     name: formData.get("name"),
     category: formData.get("category"),
     unit: formData.get("unit"),
+    lowPoint: Number(formData.get("lowPoint") || 0),
     notes: formData.get("notes")
   };
 

@@ -1261,6 +1261,25 @@ label span,
   text-shadow: 0 0 18px rgba(106, 139, 255, 0.16);
 }
 
+.stock-number.good {
+  color: var(--good);
+  text-shadow: 0 0 18px rgba(129, 216, 175, 0.18);
+}
+
+.stock-number.warn {
+  color: var(--warn);
+  text-shadow: 0 0 18px rgba(241, 192, 109, 0.18);
+}
+
+.stock-number.danger {
+  color: var(--danger);
+  text-shadow: 0 0 18px rgba(240, 154, 167, 0.18);
+}
+
+.stock-number.neutral {
+  color: var(--signal-strong);
+}
+
 .stock-unit {
   color: var(--muted);
   font-size: 0.78rem;
@@ -1289,6 +1308,14 @@ label span,
   background:
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.05), transparent 0 8rem),
     rgba(14, 16, 20, 0.98);
+}
+
+.inventory-summary-card.good {
+  border-color: rgba(31, 122, 84, 0.2);
+}
+
+.inventory-summary-card.danger {
+  border-color: rgba(177, 64, 82, 0.22);
 }
 
 .inventory-summary-label,

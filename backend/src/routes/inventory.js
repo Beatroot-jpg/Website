@@ -103,9 +103,16 @@ router.post(
     const quantity = req.body.quantity !== undefined && req.body.quantity !== ""
       ? requireInt(req.body.quantity, "Quantity")
       : 0;
+    const lowPoint = req.body.lowPoint !== undefined && req.body.lowPoint !== ""
+      ? requireInt(req.body.lowPoint, "Low point")
+      : 0;
 
     if (quantity < 0) {
       throw createError(400, "Quantity cannot be negative.");
+    }
+
+    if (lowPoint < 0) {
+      throw createError(400, "Low point cannot be negative.");
     }
 
     const item = await prisma.inventoryItem.create({
@@ -114,6 +121,7 @@ router.post(
         category: normalizeOptionalString(req.body.category),
         unit: requireString(req.body.unit || "unit", "Unit"),
         quantity,
+        reorderLevel: lowPoint,
         notes: normalizeOptionalString(req.body.notes),
         movements: quantity > 0 ? {
           create: {
@@ -162,10 +170,17 @@ router.patch(
       unit: req.body.unit !== undefined
         ? requireString(req.body.unit || "unit", "Unit")
         : existingItem.unit,
+      reorderLevel: req.body.lowPoint !== undefined
+        ? requireInt(req.body.lowPoint, "Low point")
+        : existingItem.reorderLevel,
       notes: req.body.notes !== undefined
         ? normalizeOptionalString(req.body.notes)
         : existingItem.notes
     };
+
+    if (updateData.reorderLevel < 0) {
+      throw createError(400, "Low point cannot be negative.");
+    }
 
     const item = await prisma.inventoryItem.update({
       where: { id: existingItem.id },
