@@ -18,6 +18,12 @@ export const NAV_ITEMS = [
     description: "Daily and weekly"
   },
   {
+    key: "SECRETARY",
+    label: "Secretary",
+    href: "./secretary.html",
+    description: "Meetings and records"
+  },
+  {
     key: "INVENTORY",
     label: "Inventory",
     href: "./inventory.html",
@@ -57,6 +63,12 @@ export const QUICK_ACTIONS = [
     description: "Daily and team view"
   },
   {
+    permission: "SECRETARY",
+    label: "Secretary workspace",
+    href: "./secretary.html",
+    description: "Meetings and records"
+  },
+  {
     permission: "INVENTORY",
     label: "Add item",
     href: "./inventory.html#inventoryForm",
@@ -92,6 +104,7 @@ export const PERMISSION_LABELS = {
   DASHBOARD: "Dashboard",
   ANALYTICS: "Analytics",
   DAILY_TASKS: "Tasks",
+  SECRETARY: "Secretary",
   INVENTORY: "Inventory",
   BANK: "Bank",
   DISTRIBUTION: "Distribution",
@@ -99,6 +112,11 @@ export const PERMISSION_LABELS = {
 };
 
 export const PERMISSION_PRESETS = [
+  {
+    key: "SECRETARY",
+    label: "Secretary",
+    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "SECRETARY"]
+  },
   {
     key: "INVENTORY_STAFF",
     label: "Inventory Staff",

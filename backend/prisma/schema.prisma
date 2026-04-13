@@ -17,6 +17,7 @@ enum PermissionKey {
   ROSTER
   ANALYTICS
   DAILY_TASKS
+  SECRETARY
   INVENTORY
   BANK
   DISTRIBUTION
@@ -77,6 +78,18 @@ enum DailyTaskImportance {
   HIGH
 }
 
+enum SecretaryMeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum SecretaryRecordType {
+  MEETING_MINUTES
+  JOURNAL_ENTRY
+  NOTICE
+}
+
 model User {
   id                     String            @id @default(cuid())
   email                  String            @unique
@@ -95,6 +108,8 @@ model User {
   createdWeeklyTasks     WeeklyTask[]      @relation("WeeklyTaskCreatedBy")
   completedWeeklyTasks   WeeklyTaskCompletion[] @relation("WeeklyTaskCompletedBy")
   weeklyTaskAwards       WeeklyTaskAward[]
+  createdSecretaryMeetings SecretaryMeeting[] @relation("SecretaryMeetingCreatedBy")
+  createdSecretaryRecords SecretaryRecord[] @relation("SecretaryRecordCreatedBy")
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 }
@@ -308,4 +323,41 @@ model WeeklyTaskAward {
   @@unique([completionId, userId])
   @@index([userId])
   @@index([weekKey])
+}
+
+model SecretaryMeeting {
+  id          String                 @id @default(cuid())
+  title       String
+  startsAt    DateTime
+  endsAt      DateTime?
+  location    String?
+  audience    String?
+  details     String?
+  status      SecretaryMeetingStatus @default(SCHEDULED)
+  createdById String?
+  createdBy   User?                  @relation("SecretaryMeetingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  records     SecretaryRecord[]
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@index([startsAt])
+  @@index([status])
+}
+
+model SecretaryRecord {
+  id          String             @id @default(cuid())
+  type        SecretaryRecordType
+  title       String
+  summary     String?
+  content     String
+  audience    String?
+  meetingId   String?
+  createdById String?
+  meeting     SecretaryMeeting?  @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  createdBy   User?              @relation("SecretaryRecordCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([type])
+  @@index([meetingId])
 }

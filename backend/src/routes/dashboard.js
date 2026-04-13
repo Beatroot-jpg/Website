@@ -45,6 +45,7 @@ router.get(
     const canViewInventory = allowed.has("INVENTORY") || req.user.role === "ADMIN";
     const canViewAnalytics = allowed.has("ANALYTICS") || req.user.role === "ADMIN";
     const canViewDailyTasks = allowed.has("DAILY_TASKS") || req.user.role === "ADMIN";
+    const canViewSecretary = allowed.has("SECRETARY") || req.user.role === "ADMIN";
     const canViewBank = allowed.has("BANK") || req.user.role === "ADMIN";
     const canViewDistribution = allowed.has("DISTRIBUTION") || req.user.role === "ADMIN";
     const recentActivity = [];
@@ -335,6 +336,79 @@ router.get(
           note: "See task board",
           href: "./daily-tasks.html#leaderboardPanel"
         }
+      );
+    }
+
+    if (canViewSecretary) {
+      const [upcomingMeetingCount, upcomingMeetings, recentSecretaryRecords] = await Promise.all([
+        prisma.secretaryMeeting.count({
+          where: {
+            startsAt: {
+              gte: new Date()
+            },
+            status: "SCHEDULED"
+          }
+        }),
+        prisma.secretaryMeeting.findMany({
+          where: {
+            startsAt: {
+              gte: new Date()
+            },
+            status: "SCHEDULED"
+          },
+          orderBy: { startsAt: "asc" },
+          take: 3,
+          select: {
+            id: true,
+            title: true,
+            startsAt: true,
+            audience: true,
+            location: true
+          }
+        }),
+        prisma.secretaryRecord.findMany({
+          orderBy: { updatedAt: "desc" },
+          take: 3,
+          include: {
+            meeting: {
+              select: {
+                id: true,
+                title: true
+              }
+            }
+          }
+        })
+      ]);
+
+      metrics.push({
+        label: "Upcoming meetings",
+        value: upcomingMeetingCount,
+        tone: "accent",
+        note: "Open secretary",
+        href: "./secretary.html#meetingTable"
+      });
+
+      recentActivity.push(
+        ...upcomingMeetings.map((meeting) => ({
+          id: `secretary-meeting-${meeting.id}`,
+          category: "Secretary",
+          title: meeting.title,
+          detail: `${meeting.location || "Meeting slot"}${meeting.audience ? ` - ${meeting.audience}` : ""}`,
+          badgeLabel: "Scheduled",
+          tone: "accent",
+          createdAt: meeting.startsAt,
+          href: `./secretary.html?editMeeting=${meeting.id}#meetingTable`
+        })),
+        ...recentSecretaryRecords.map((record) => ({
+          id: `secretary-record-${record.id}`,
+          category: "Secretary",
+          title: record.title,
+          detail: record.meeting?.title || `${record.type.replaceAll("_", " ")}`,
+          badgeLabel: record.type.replaceAll("_", " "),
+          tone: record.type === "NOTICE" ? "accent" : record.type === "MEETING_MINUTES" ? "good" : "neutral",
+          createdAt: record.updatedAt,
+          href: `./secretary.html?editRecord=${record.id}#recordTable`
+        }))
       );
     }
 

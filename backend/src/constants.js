@@ -2,6 +2,7 @@ export const APP_PERMISSIONS = [
   "DASHBOARD",
   "ANALYTICS",
   "DAILY_TASKS",
+  "SECRETARY",
   "INVENTORY",
   "BANK",
   "DISTRIBUTION",

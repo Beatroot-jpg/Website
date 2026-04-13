@@ -40,6 +40,7 @@ router.get(
     const canViewInventory = allowed.has("INVENTORY") || req.user.role === "ADMIN";
     const canViewAnalytics = allowed.has("ANALYTICS") || req.user.role === "ADMIN";
     const canViewDailyTasks = allowed.has("DAILY_TASKS") || req.user.role === "ADMIN";
+    const canViewSecretary = allowed.has("SECRETARY") || req.user.role === "ADMIN";
     const canViewBank = allowed.has("BANK") || req.user.role === "ADMIN";
     const canViewDistribution = allowed.has("DISTRIBUTION") || req.user.role === "ADMIN";
     const canViewUsers = allowed.has("USERS") || req.user.role === "ADMIN";
@@ -189,6 +190,69 @@ router.get(
               ? `./daily-tasks.html?editWeeklyTask=${item.id}#adminTaskPanel`
               : "./daily-tasks.html#weeklyTaskPanel",
             tone: item.importance === "HIGH" ? "warn" : item.importance === "MEDIUM" ? "accent" : "neutral",
+            sortAt: item.updatedAt
+          }))
+        ])
+        : [],
+      canViewSecretary
+        ? Promise.all([
+          prisma.secretaryMeeting.findMany({
+            where: {
+              OR: [
+                { title: containsFilter },
+                { location: containsFilter },
+                { audience: containsFilter },
+                { details: containsFilter }
+              ]
+            },
+            orderBy: [{ startsAt: "asc" }, { updatedAt: "desc" }],
+            take: 4,
+            select: {
+              id: true,
+              title: true,
+              location: true,
+              audience: true,
+              status: true,
+              startsAt: true,
+              updatedAt: true
+            }
+          }),
+          prisma.secretaryRecord.findMany({
+            where: {
+              OR: [
+                { title: containsFilter },
+                { summary: containsFilter },
+                { content: containsFilter },
+                { audience: containsFilter }
+              ]
+            },
+            orderBy: { updatedAt: "desc" },
+            take: 4,
+            select: {
+              id: true,
+              type: true,
+              title: true,
+              summary: true,
+              updatedAt: true
+            }
+          })
+        ]).then(([meetingItems, recordItems]) => [
+          ...meetingItems.map((item) => ({
+            id: `secretary-meeting-${item.id}`,
+            group: "Secretary",
+            title: item.title,
+            subtitle: `${item.status} - ${item.location || item.audience || "Meeting details"}`,
+            href: `./secretary.html?editMeeting=${item.id}#meetingTable`,
+            tone: item.status === "COMPLETED" ? "good" : item.status === "CANCELLED" ? "danger" : "accent",
+            sortAt: item.updatedAt || item.startsAt
+          })),
+          ...recordItems.map((item) => ({
+            id: `secretary-record-${item.id}`,
+            group: "Secretary",
+            title: item.title,
+            subtitle: `${item.type.replaceAll("_", " ")}${item.summary ? ` - ${item.summary}` : ""}`,
+            href: `./secretary.html?editRecord=${item.id}#recordTable`,
+            tone: item.type === "NOTICE" ? "accent" : item.type === "MEETING_MINUTES" ? "good" : "neutral",
             sortAt: item.updatedAt
           }))
         ])

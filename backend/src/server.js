@@ -14,6 +14,7 @@ import dashboardRoutes from "./routes/dashboard.js";
 import rosterRoutes from "./routes/roster.js";
 import analyticsRoutes from "./routes/analytics.js";
 import dailyTaskRoutes from "./routes/daily-tasks.js";
+import secretaryRoutes from "./routes/secretary.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -52,6 +53,7 @@ app.use("/api/roster", rosterRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/daily-tasks", dailyTaskRoutes);
+app.use("/api/secretary", secretaryRoutes);
 
 app.use((error, _req, res, _next) => {
   console.error(error);

@@ -70,7 +70,7 @@ function mountWorkspaceTools({ showQuickActions = false } = {}) {
         <input
           type="search"
           id="globalSearchInput"
-          placeholder="Search inventory, distributions, bank records, users, or tasks"
+          placeholder="Search inventory, distributions, bank records, meetings, records, users, or tasks"
           autocomplete="off"
         >
       </div>
