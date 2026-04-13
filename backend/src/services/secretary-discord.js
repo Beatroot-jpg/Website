@@ -26,6 +26,16 @@ const DEFAULT_AUDIENCES = [
   }
 ];
 
+const BRAND_NAME = "YUGO MAFIA";
+const WEBHOOK_NAME = "YUGO MAFIA Secretary";
+const IMAGE_URL_PATTERN = /https?:\/\/\S+\.(?:png|jpe?g|gif|webp)(?:\?\S*)?/i;
+const DISCORD_COLORS = {
+  meeting: 0x1d4ed8,
+  minutes: 0x15803d,
+  journal: 0x64748b,
+  notice: 0xf59e0b
+};
+
 function normalizeKey(value) {
   return `${value || ""}`.trim().toUpperCase();
 }
@@ -81,6 +91,40 @@ function truncate(value, maxLength = 1900) {
   return `${text.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
 }
 
+function extractImageUrl(value) {
+  const text = `${value || ""}`;
+  const match = text.match(IMAGE_URL_PATTERN);
+  return match?.[0] || "";
+}
+
+function stripImageUrls(value) {
+  return `${value || ""}`.replace(new RegExp(IMAGE_URL_PATTERN, "gi"), "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function buildDiscordTimestamp(value, style = "F") {
+  const date = new Date(value);
+  const seconds = Math.floor(date.getTime() / 1000);
+
+  if (!Number.isFinite(seconds)) {
+    return "Not set";
+  }
+
+  return `<t:${seconds}:${style}>`;
+}
+
+function formatZonedDate(value, timeZone) {
+  return new Intl.DateTimeFormat("en-AU", {
+    timeZone,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short"
+  }).format(new Date(value));
+}
+
 function buildMention(audience) {
   if (!audience?.roleId) {
     return "";
@@ -99,22 +143,76 @@ function buildAllowedMentions(audience) {
   };
 }
 
-function buildMeetingMessage(meeting, audienceLabel) {
-  return [
-    `**Meeting Scheduled**`,
-    `**Title:** ${meeting.title}`,
-    `**When:** ${new Intl.DateTimeFormat("en-AU", {
-      dateStyle: "medium",
-      timeStyle: "short"
-    }).format(new Date(meeting.startsAt))}`,
-    meeting.endsAt ? `**Ends:** ${new Intl.DateTimeFormat("en-AU", {
-      dateStyle: "medium",
-      timeStyle: "short"
-    }).format(new Date(meeting.endsAt))}` : "",
-    meeting.location ? `**Location:** ${meeting.location}` : "",
-    audienceLabel ? `**Audience:** ${audienceLabel}` : "",
-    meeting.details ? `**Details:** ${truncate(meeting.details, 900)}` : ""
+function buildMeetingPayload(meeting, audience) {
+  const mention = buildMention(audience);
+  const content = [
+    mention,
+    `# 📅 ${BRAND_NAME} MEETING`,
+    `## ${truncate(meeting.title, 180)}`,
+    `> Local for you: ${buildDiscordTimestamp(meeting.startsAt, "F")} (${buildDiscordTimestamp(meeting.startsAt, "R")})`
   ].filter(Boolean).join("\n");
+  const cleanedDetails = stripImageUrls(meeting.details);
+  const imageUrl = extractImageUrl(meeting.details);
+  const fields = [
+    {
+      name: "Melbourne Time",
+      value: formatZonedDate(meeting.startsAt, "Australia/Melbourne"),
+      inline: true
+    },
+    {
+      name: "New Zealand Time",
+      value: formatZonedDate(meeting.startsAt, "Pacific/Auckland"),
+      inline: true
+    },
+    {
+      name: "Audience",
+      value: audience?.key && audience.key !== "NONE" ? audience.label : "No ping",
+      inline: true
+    }
+  ];
+
+  if (meeting.endsAt) {
+    fields.push({
+      name: "Meeting Ends",
+      value: formatZonedDate(meeting.endsAt, "Australia/Melbourne"),
+      inline: true
+    });
+  }
+
+  if (meeting.location) {
+    fields.push({
+      name: "Location",
+      value: truncate(meeting.location, 900),
+      inline: true
+    });
+  }
+
+  fields.push({
+    name: "Status",
+    value: `${meeting.status || "SCHEDULED"}`.replaceAll("_", " "),
+    inline: true
+  });
+
+  return {
+    username: WEBHOOK_NAME,
+    content,
+    embeds: [
+      {
+        title: truncate(meeting.title, 256),
+        description: cleanedDetails
+          ? truncate(cleanedDetails, 1800)
+          : "Meeting scheduled through the YUGO MAFIA secretary workspace.",
+        color: DISCORD_COLORS.meeting,
+        fields,
+        footer: {
+          text: "YUGO MAFIA Secretary"
+        },
+        timestamp: new Date(meeting.startsAt).toISOString(),
+        ...(imageUrl ? { image: { url: imageUrl } } : {})
+      }
+    ],
+    allowed_mentions: buildAllowedMentions(audience)
+  };
 }
 
 function humanizeRecordType(type) {
@@ -131,15 +229,87 @@ function humanizeRecordType(type) {
   return "Notice";
 }
 
-function buildRecordMessage(record, audienceLabel) {
-  return [
-    `**${humanizeRecordType(record.type)}**`,
-    `**Title:** ${record.title}`,
-    audienceLabel ? `**Audience:** ${audienceLabel}` : "",
-    record.meeting?.title ? `**Meeting:** ${record.meeting.title}` : "",
-    record.summary ? `**Summary:** ${truncate(record.summary, 500)}` : "",
-    truncate(record.content, 1300)
+function recordStyle(type) {
+  const normalized = `${type || ""}`.toUpperCase();
+
+  if (normalized === "MEETING_MINUTES") {
+    return {
+      emoji: "📝",
+      heading: "MINUTES",
+      color: DISCORD_COLORS.minutes
+    };
+  }
+
+  if (normalized === "JOURNAL_ENTRY") {
+    return {
+      emoji: "📓",
+      heading: "JOURNAL ENTRY",
+      color: DISCORD_COLORS.journal
+    };
+  }
+
+  return {
+    emoji: "📢",
+    heading: "NOTICE",
+    color: DISCORD_COLORS.notice
+  };
+}
+
+function buildRecordPayload(record, audience) {
+  const style = recordStyle(record.type);
+  const mention = buildMention(audience);
+  const cleanedSummary = stripImageUrls(record.summary);
+  const cleanedContent = stripImageUrls(record.content);
+  const imageUrl = extractImageUrl(`${record.summary || ""}\n${record.content || ""}`);
+  const content = [
+    mention,
+    `# ${style.emoji} ${BRAND_NAME} ${style.heading}`,
+    `## ${truncate(record.title, 180)}`,
+    record.meeting?.title ? `> Linked meeting: ${truncate(record.meeting.title, 180)}` : ""
   ].filter(Boolean).join("\n");
+  const descriptionParts = [
+    cleanedSummary ? `> ${truncate(cleanedSummary, 500)}` : "",
+    cleanedContent ? truncate(cleanedContent, 1800) : ""
+  ].filter(Boolean);
+  const fields = [
+    {
+      name: "Audience",
+      value: audience?.key && audience.key !== "NONE" ? audience.label : "No ping",
+      inline: true
+    },
+    {
+      name: "Type",
+      value: humanizeRecordType(record.type),
+      inline: true
+    }
+  ];
+
+  if (record.meeting?.title) {
+    fields.push({
+      name: "Meeting",
+      value: truncate(record.meeting.title, 900),
+      inline: true
+    });
+  }
+
+  return {
+    username: WEBHOOK_NAME,
+    content,
+    embeds: [
+      {
+        title: truncate(record.title, 256),
+        description: descriptionParts.join("\n\n") || "Organization record posted from the YUGO MAFIA secretary workspace.",
+        color: style.color,
+        fields,
+        footer: {
+          text: "YUGO MAFIA Secretary"
+        },
+        timestamp: new Date(record.updatedAt || record.createdAt || Date.now()).toISOString(),
+        ...(imageUrl ? { image: { url: imageUrl } } : {})
+      }
+    ],
+    allowed_mentions: buildAllowedMentions(audience)
+  };
 }
 
 async function executeWebhook(payload) {
@@ -182,22 +352,10 @@ async function executeWebhook(payload) {
 
 export async function postMeetingToDiscord(meeting) {
   const audience = getSecretaryAudienceByKey(meeting.audience);
-  const mention = buildMention(audience);
-  const content = [mention, buildMeetingMessage(meeting, audience?.label && audience.key !== "NONE" ? audience.label : "")].filter(Boolean).join("\n\n");
-
-  return executeWebhook({
-    content,
-    allowed_mentions: buildAllowedMentions(audience)
-  });
+  return executeWebhook(buildMeetingPayload(meeting, audience));
 }
 
 export async function postRecordToDiscord(record) {
   const audience = getSecretaryAudienceByKey(record.audience);
-  const mention = buildMention(audience);
-  const content = [mention, buildRecordMessage(record, audience?.label && audience.key !== "NONE" ? audience.label : "")].filter(Boolean).join("\n\n");
-
-  return executeWebhook({
-    content,
-    allowed_mentions: buildAllowedMentions(audience)
-  });
+  return executeWebhook(buildRecordPayload(record, audience));
 }
