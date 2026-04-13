@@ -98,7 +98,10 @@ function extractImageUrl(value) {
 }
 
 function stripImageUrls(value) {
-  return `${value || ""}`.replace(new RegExp(IMAGE_URL_PATTERN, "gi"), "").replace(/\n{3,}/g, "\n\n").trim();
+  return `${value || ""}`
+    .replace(new RegExp(IMAGE_URL_PATTERN, "gi"), "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function buildDiscordTimestamp(value, style = "F") {
@@ -143,67 +146,59 @@ function buildAllowedMentions(audience) {
   };
 }
 
+function readableLine(label, value) {
+  if (!value) {
+    return "";
+  }
+
+  return `**${label}:** ${value}`;
+}
+
+function formatAudienceLabel(audience) {
+  return audience?.key && audience.key !== "NONE" ? audience.label : "No ping";
+}
+
+function formatStatusLabel(value) {
+  return `${value || ""}`.replaceAll("_", " ").trim() || "Unknown";
+}
+
 function buildMeetingPayload(meeting, audience) {
   const mention = buildMention(audience);
-  const content = [
-    mention,
-    `# 📅 ${BRAND_NAME} MEETING`,
-    `## ${truncate(meeting.title, 180)}`,
-    `> Local for you: ${buildDiscordTimestamp(meeting.startsAt, "F")} (${buildDiscordTimestamp(meeting.startsAt, "R")})`
-  ].filter(Boolean).join("\n");
+  const audienceLabel = formatAudienceLabel(audience);
   const cleanedDetails = stripImageUrls(meeting.details);
   const imageUrl = extractImageUrl(meeting.details);
-  const fields = [
-    {
-      name: "Melbourne Time",
-      value: formatZonedDate(meeting.startsAt, "Australia/Melbourne"),
-      inline: true
-    },
-    {
-      name: "New Zealand Time",
-      value: formatZonedDate(meeting.startsAt, "Pacific/Auckland"),
-      inline: true
-    },
-    {
-      name: "Audience",
-      value: audience?.key && audience.key !== "NONE" ? audience.label : "No ping",
-      inline: true
-    }
-  ];
-
-  if (meeting.endsAt) {
-    fields.push({
-      name: "Meeting Ends",
-      value: formatZonedDate(meeting.endsAt, "Australia/Melbourne"),
-      inline: true
-    });
-  }
+  const content = [
+    mention,
+    `# \uD83D\uDCC5 ${BRAND_NAME} MEETING`,
+    `## ${truncate(meeting.title, 180)}`,
+    readableLine("When", `${buildDiscordTimestamp(meeting.startsAt, "F")} (${buildDiscordTimestamp(meeting.startsAt, "R")})`),
+    readableLine("Melbourne", formatZonedDate(meeting.startsAt, "Australia/Melbourne")),
+    readableLine("Ends", meeting.endsAt ? formatZonedDate(meeting.endsAt, "Australia/Melbourne") : ""),
+    readableLine("Where", meeting.location ? truncate(meeting.location, 280) : ""),
+    readableLine("Audience", audienceLabel),
+    readableLine("Status", formatStatusLabel(meeting.status || "SCHEDULED"))
+  ].filter(Boolean).join("\n");
+  const embedFields = [];
 
   if (meeting.location) {
-    fields.push({
+    embedFields.push({
       name: "Location",
       value: truncate(meeting.location, 900),
-      inline: true
+      inline: false
     });
   }
-
-  fields.push({
-    name: "Status",
-    value: `${meeting.status || "SCHEDULED"}`.replaceAll("_", " "),
-    inline: true
-  });
 
   return {
     username: WEBHOOK_NAME,
     content,
     embeds: [
       {
-        title: truncate(meeting.title, 256),
+        title: "Meeting details",
         description: cleanedDetails
           ? truncate(cleanedDetails, 1800)
           : "Meeting scheduled through the YUGO MAFIA secretary workspace.",
         color: DISCORD_COLORS.meeting,
-        fields,
+        ...(embedFields.length ? { fields: embedFields } : {}),
         footer: {
           text: "YUGO MAFIA Secretary"
         },
@@ -234,7 +229,7 @@ function recordStyle(type) {
 
   if (normalized === "MEETING_MINUTES") {
     return {
-      emoji: "📝",
+      emoji: "\uD83D\uDCDD",
       heading: "MINUTES",
       color: DISCORD_COLORS.minutes
     };
@@ -242,14 +237,14 @@ function recordStyle(type) {
 
   if (normalized === "JOURNAL_ENTRY") {
     return {
-      emoji: "📓",
+      emoji: "\uD83D\uDCD3",
       heading: "JOURNAL ENTRY",
       color: DISCORD_COLORS.journal
     };
   }
 
   return {
-    emoji: "📢",
+    emoji: "\uD83D\uDCE2",
     heading: "NOTICE",
     color: DISCORD_COLORS.notice
   };
@@ -261,34 +256,23 @@ function buildRecordPayload(record, audience) {
   const cleanedSummary = stripImageUrls(record.summary);
   const cleanedContent = stripImageUrls(record.content);
   const imageUrl = extractImageUrl(`${record.summary || ""}\n${record.content || ""}`);
+  const audienceLabel = formatAudienceLabel(audience);
   const content = [
     mention,
     `# ${style.emoji} ${BRAND_NAME} ${style.heading}`,
     `## ${truncate(record.title, 180)}`,
-    record.meeting?.title ? `> Linked meeting: ${truncate(record.meeting.title, 180)}` : ""
+    readableLine("Type", humanizeRecordType(record.type)),
+    readableLine("Audience", audienceLabel),
+    record.meeting?.title ? readableLine("Linked meeting", truncate(record.meeting.title, 180)) : "",
+    cleanedSummary ? `> ${truncate(cleanedSummary, 500)}` : ""
   ].filter(Boolean).join("\n");
-  const descriptionParts = [
-    cleanedSummary ? `> ${truncate(cleanedSummary, 500)}` : "",
-    cleanedContent ? truncate(cleanedContent, 1800) : ""
-  ].filter(Boolean);
-  const fields = [
-    {
-      name: "Audience",
-      value: audience?.key && audience.key !== "NONE" ? audience.label : "No ping",
-      inline: true
-    },
-    {
-      name: "Type",
-      value: humanizeRecordType(record.type),
-      inline: true
-    }
-  ];
+  const embedFields = [];
 
   if (record.meeting?.title) {
-    fields.push({
-      name: "Meeting",
+    embedFields.push({
+      name: "Linked meeting",
       value: truncate(record.meeting.title, 900),
-      inline: true
+      inline: false
     });
   }
 
@@ -297,10 +281,14 @@ function buildRecordPayload(record, audience) {
     content,
     embeds: [
       {
-        title: truncate(record.title, 256),
-        description: descriptionParts.join("\n\n") || "Organization record posted from the YUGO MAFIA secretary workspace.",
+        title: "Full details",
+        description: cleanedContent
+          ? truncate(cleanedContent, 1800)
+          : cleanedSummary
+            ? truncate(cleanedSummary, 1800)
+            : "Organization record posted from the YUGO MAFIA secretary workspace.",
         color: style.color,
-        fields,
+        ...(embedFields.length ? { fields: embedFields } : {}),
         footer: {
           text: "YUGO MAFIA Secretary"
         },

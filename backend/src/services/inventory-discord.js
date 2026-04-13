@@ -26,6 +26,14 @@ function formatMelbourneTime(value) {
   }).format(new Date(value));
 }
 
+function readableLine(label, value) {
+  if (!value) {
+    return "";
+  }
+
+  return `**${label}:** ${value}`;
+}
+
 async function executeWebhook(payload) {
   const webhookUrl = process.env.INVENTORY_DISCORD_WEBHOOK_URL;
 
@@ -70,30 +78,17 @@ export async function postInventoryUpdateToDiscord(snapshot = {}) {
     username: WEBHOOK_NAME,
     content: [
       `# \uD83D\uDCE6 ${BRAND_NAME} STOCK UPDATE`,
-      `> Website updated as of ${buildDiscordTimestamp(sentAt, "F")} (${buildDiscordTimestamp(sentAt, "R")})`
+      "## Stock take submitted",
+      readableLine("Updated", `${buildDiscordTimestamp(sentAt, "F")} (${buildDiscordTimestamp(sentAt, "R")})`),
+      readableLine("Melbourne", formatMelbourneTime(sentAt)),
+      readableLine("Items tracked", new Intl.NumberFormat("en-AU").format(Number(snapshot.itemCount || 0))),
+      readableLine("Units on hand", new Intl.NumberFormat("en-AU").format(Number(snapshot.unitsOnHand || 0)))
     ].join("\n"),
     embeds: [
       {
-        title: "Stock take submitted",
+        title: "Inventory website refresh",
         description: "The website inventory has been refreshed and is now up to date.",
         color: EMBED_COLOR,
-        fields: [
-          {
-            name: "Melbourne Time",
-            value: formatMelbourneTime(sentAt),
-            inline: true
-          },
-          {
-            name: "Items Tracked",
-            value: new Intl.NumberFormat("en-AU").format(Number(snapshot.itemCount || 0)),
-            inline: true
-          },
-          {
-            name: "Units On Hand",
-            value: new Intl.NumberFormat("en-AU").format(Number(snapshot.unitsOnHand || 0)),
-            inline: true
-          }
-        ],
         footer: {
           text: "YUGO MAFIA Inventory"
         },
