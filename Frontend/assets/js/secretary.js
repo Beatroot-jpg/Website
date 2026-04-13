@@ -30,6 +30,7 @@ const calendarGrid = document.querySelector("#calendarGrid");
 const meetingForm = document.querySelector("#meetingForm");
 const meetingError = document.querySelector("#meetingError");
 const meetingIdField = document.querySelector("#meetingId");
+const meetingAudienceSelect = document.querySelector("#meetingAudience");
 const meetingFormTitle = document.querySelector("#meetingFormTitle");
 const meetingFormSubtitle = document.querySelector("#meetingFormSubtitle");
 const meetingSubmitButton = document.querySelector("#meetingSubmitButton");
@@ -42,6 +43,7 @@ const recordForm = document.querySelector("#recordForm");
 const recordError = document.querySelector("#recordError");
 const recordIdField = document.querySelector("#recordId");
 const recordMeetingSelect = document.querySelector("#recordMeetingId");
+const recordAudienceSelect = document.querySelector("#recordAudience");
 const recordFormTitle = document.querySelector("#recordFormTitle");
 const recordFormSubtitle = document.querySelector("#recordFormSubtitle");
 const recordSubmitButton = document.querySelector("#recordSubmitButton");
@@ -55,6 +57,7 @@ let requestedMeetingEditId = params.get("editMeeting") || "";
 let requestedRecordEditId = params.get("editRecord") || "";
 let meetingsCache = [];
 let recordsCache = [];
+let audienceOptions = [];
 let currentCalendarMonth = new Date();
 
 const meetingDraft = bindDraftForm(meetingForm, "secretary-meeting-form-v1");
@@ -121,6 +124,14 @@ function recordTypeBadge(type) {
   return badge(label, tone);
 }
 
+function audienceLabel(value) {
+  if (!value) {
+    return "No ping";
+  }
+
+  return audienceOptions.find((entry) => entry.key === value)?.label || value;
+}
+
 function summarizeMeetingTime(meeting) {
   const start = formatDate(meeting.startsAt);
   const end = meeting.endsAt ? formatDate(meeting.endsAt) : "";
@@ -184,6 +195,15 @@ function populateRecordMeetingOptions(selectedMeeting = null) {
   `;
 }
 
+function populateAudienceOptions() {
+  const optionsMarkup = (audienceOptions.length ? audienceOptions : [{ key: "NONE", label: "No ping" }]).map((option) => `
+    <option value="${option.key}">${option.label}</option>
+  `).join("");
+
+  meetingAudienceSelect.innerHTML = optionsMarkup;
+  recordAudienceSelect.innerHTML = optionsMarkup;
+}
+
 function resetMeetingForm({ clearDraftState = false, clearUrl = true } = {}) {
   meetingForm.reset();
   meetingIdField.value = "";
@@ -191,6 +211,9 @@ function resetMeetingForm({ clearDraftState = false, clearUrl = true } = {}) {
   meetingFormSubtitle.textContent = "Add the core meeting details here, then save to push it into the schedule and calendar.";
   meetingSubmitButton.textContent = "Save meeting";
   meetingForm.elements.status.value = "SCHEDULED";
+  meetingForm.elements.broadcastToDiscord.checked = false;
+  populateAudienceOptions();
+  meetingForm.elements.audience.value = "NONE";
   mountFormError(meetingError, "");
 
   if (clearDraftState) {
@@ -211,6 +234,9 @@ function resetRecordForm({ clearDraftState = false, clearUrl = true } = {}) {
   recordSubmitButton.textContent = "Save record";
   recordForm.elements.type.value = "MEETING_MINUTES";
   populateRecordMeetingOptions();
+  populateAudienceOptions();
+  recordForm.elements.audience.value = "NONE";
+  recordForm.elements.broadcastToDiscord.checked = false;
   mountFormError(recordError, "");
 
   if (clearDraftState) {
@@ -233,9 +259,11 @@ function fillMeetingForm(meeting) {
   meetingForm.elements.startsAt.value = toInputDateTimeValue(meeting.startsAt);
   meetingForm.elements.endsAt.value = toInputDateTimeValue(meeting.endsAt);
   meetingForm.elements.location.value = meeting.location || "";
-  meetingForm.elements.audience.value = meeting.audience || "";
+  populateAudienceOptions();
+  meetingForm.elements.audience.value = meeting.audience || "NONE";
   meetingForm.elements.details.value = meeting.details || "";
   meetingForm.elements.status.value = meeting.status;
+  meetingForm.elements.broadcastToDiscord.checked = false;
 }
 
 function fillRecordForm(record) {
@@ -244,13 +272,15 @@ function fillRecordForm(record) {
   recordFormSubtitle.textContent = "Update the organization record here so the archive stays accurate and easy to trust.";
   recordSubmitButton.textContent = "Save changes";
   populateRecordMeetingOptions(record.meeting);
+  populateAudienceOptions();
   mountFormError(recordError, "");
   recordForm.elements.type.value = record.type;
   recordForm.elements.title.value = record.title;
   recordForm.elements.meetingId.value = record.meetingId || "";
-  recordForm.elements.audience.value = record.audience || "";
+  recordForm.elements.audience.value = record.audience || "NONE";
   recordForm.elements.summary.value = record.summary || "";
   recordForm.elements.content.value = record.content || "";
+  recordForm.elements.broadcastToDiscord.checked = false;
 }
 
 function showMeetingModal(opener = document.activeElement) {
@@ -342,11 +372,12 @@ function renderMeetings() {
                 <span class="subtle-row">${meeting.location || "Location not set"}</span>
               </td>
               <td>${summarizeMeetingTime(meeting)}</td>
-              <td>${meeting.audience || "Not set"}</td>
+              <td>${audienceLabel(meeting.audience)}</td>
               <td>${meetingStatusBadge(meeting.status)}</td>
               <td>${meeting._count?.records || 0}</td>
               <td>
                 <div class="inline-table-actions">
+                  <button class="mini-action" type="button" data-broadcast-meeting="${meeting.id}">Broadcast</button>
                   <button class="mini-action" type="button" data-edit-meeting="${meeting.id}">Edit</button>
                   <button class="mini-action danger-action" type="button" data-delete-meeting="${meeting.id}">Delete</button>
                 </div>
@@ -367,6 +398,30 @@ function renderMeetings() {
       if (meeting) {
         fillMeetingForm(meeting);
         showMeetingModal(button);
+      }
+    });
+  });
+
+  meetingTable.querySelectorAll("[data-broadcast-meeting]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const meeting = meetingsCache.find((entry) => entry.id === button.dataset.broadcastMeeting);
+
+      if (!meeting) {
+        return;
+      }
+
+      try {
+        const response = await api(`/secretary/meetings/${meeting.id}/broadcast`, {
+          method: "POST"
+        });
+
+        if (response.discord?.posted) {
+          showToast("Meeting posted to Discord.", "success");
+        } else {
+          showToast(response.discord?.message || "Meeting saved, but Discord could not be reached.", "warn");
+        }
+      } catch (error) {
+        showToast(error.message, "error");
       }
     });
   });
@@ -522,10 +577,11 @@ function renderRecords() {
                 <span class="subtle-row">${record.summary || `${record.content.slice(0, 120)}${record.content.length > 120 ? "..." : ""}`}</span>
               </td>
               <td>${record.meeting ? `<strong>${record.meeting.title}</strong><span class="subtle-row">${formatDate(record.meeting.startsAt)}</span>` : "No linked meeting"}</td>
-              <td>${record.audience || "Not set"}</td>
+              <td>${audienceLabel(record.audience)}</td>
               <td>${formatDate(record.updatedAt)}</td>
               <td>
                 <div class="inline-table-actions">
+                  <button class="mini-action" type="button" data-broadcast-record="${record.id}">Broadcast</button>
                   <button class="mini-action" type="button" data-edit-record="${record.id}">Edit</button>
                   <button class="mini-action danger-action" type="button" data-delete-record="${record.id}">Delete</button>
                 </div>
@@ -546,6 +602,30 @@ function renderRecords() {
       if (record) {
         fillRecordForm(record);
         showRecordModal(button);
+      }
+    });
+  });
+
+  recordTable.querySelectorAll("[data-broadcast-record]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const record = recordsCache.find((entry) => entry.id === button.dataset.broadcastRecord);
+
+      if (!record) {
+        return;
+      }
+
+      try {
+        const response = await api(`/secretary/records/${record.id}/broadcast`, {
+          method: "POST"
+        });
+
+        if (response.discord?.posted) {
+          showToast("Record posted to Discord.", "success");
+        } else {
+          showToast(response.discord?.message || "Record saved, but Discord could not be reached.", "warn");
+        }
+      } catch (error) {
+        showToast(error.message, "error");
       }
     });
   });
@@ -594,8 +674,10 @@ async function loadPage() {
 
     meetingsCache = data.meetings || [];
     recordsCache = data.records || [];
+    audienceOptions = data.options?.audiences || [];
     currentCalendarMonth = monthStart(new Date());
     renderSummary(data.summary || {});
+    populateAudienceOptions();
     populateRecordMeetingOptions();
     restoreDraftForm(meetingForm, "secretary-meeting-form-v1");
     restoreDraftForm(recordForm, "secretary-record-form-v1");
@@ -625,22 +707,31 @@ meetingForm?.addEventListener("submit", async (event) => {
     location: meetingForm.elements.location.value,
     audience: meetingForm.elements.audience.value,
     details: meetingForm.elements.details.value,
-    status: meetingForm.elements.status.value
+    status: meetingForm.elements.status.value,
+    broadcastToDiscord: meetingForm.elements.broadcastToDiscord.checked
   };
 
   try {
+    let response;
+
     if (meetingIdField.value) {
-      await api(`/secretary/meetings/${meetingIdField.value}`, {
+      response = await api(`/secretary/meetings/${meetingIdField.value}`, {
         method: "PATCH",
         body: payload
       });
-      showToast("Meeting updated.", "success");
     } else {
-      await api("/secretary/meetings", {
+      response = await api("/secretary/meetings", {
         method: "POST",
         body: payload
       });
-      showToast("Meeting created.", "success");
+    }
+
+    if (payload.broadcastToDiscord && !response.discord?.posted) {
+      showToast(response.discord?.message || "Meeting saved, but Discord could not be reached.", "warn");
+    } else if (payload.broadcastToDiscord) {
+      showToast("Meeting saved and posted to Discord.", "success");
+    } else {
+      showToast(meetingIdField.value ? "Meeting updated." : "Meeting created.", "success");
     }
 
     resetMeetingForm({ clearDraftState: true });
@@ -663,22 +754,31 @@ recordForm?.addEventListener("submit", async (event) => {
     meetingId: recordForm.elements.meetingId.value,
     audience: recordForm.elements.audience.value,
     summary: recordForm.elements.summary.value,
-    content: recordForm.elements.content.value
+    content: recordForm.elements.content.value,
+    broadcastToDiscord: recordForm.elements.broadcastToDiscord.checked
   };
 
   try {
+    let response;
+
     if (recordIdField.value) {
-      await api(`/secretary/records/${recordIdField.value}`, {
+      response = await api(`/secretary/records/${recordIdField.value}`, {
         method: "PATCH",
         body: payload
       });
-      showToast("Record updated.", "success");
     } else {
-      await api("/secretary/records", {
+      response = await api("/secretary/records", {
         method: "POST",
         body: payload
       });
-      showToast("Record created.", "success");
+    }
+
+    if (payload.broadcastToDiscord && !response.discord?.posted) {
+      showToast(response.discord?.message || "Record saved, but Discord could not be reached.", "warn");
+    } else if (payload.broadcastToDiscord) {
+      showToast("Record saved and posted to Discord.", "success");
+    } else {
+      showToast(recordIdField.value ? "Record updated." : "Record created.", "success");
     }
 
     resetRecordForm({ clearDraftState: true });

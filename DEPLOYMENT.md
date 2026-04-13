@@ -22,6 +22,8 @@ Create a GitHub repository, then push the project so Railway and Netlify can bot
    - `ADMIN_USERNAME` to your first admin login username
    - `ADMIN_NAME` to your first admin display name
    - `ADMIN_PASSWORD` to your first admin password
+   - `SECRETARY_DISCORD_WEBHOOK_URL` to your Discord incoming webhook URL if you want Secretary posts to broadcast into Discord
+   - optionally `SECRETARY_DISCORD_AUDIENCES` to a JSON array of `{ key, label, roleId }` entries if you want to override the built-in audience presets
 
 [`railway.json`](/C:/Users/User/Desktop/Website/railway.json) is already configured to:
 

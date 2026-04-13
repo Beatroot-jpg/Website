@@ -3,6 +3,11 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { asyncHandler, createError } from "../http.js";
 import { authenticateToken, requirePermission } from "../middleware/auth.js";
+import {
+  getSecretaryAudienceOptions,
+  postMeetingToDiscord,
+  postRecordToDiscord
+} from "../services/secretary-discord.js";
 import { getSydneyDateKey, getWeekStartKey, shiftDateKey } from "../services/time.js";
 import { normalizeOptionalString, requireString } from "../validators.js";
 
@@ -81,6 +86,10 @@ function recordInclude() {
   };
 }
 
+function parseBroadcastFlag(value) {
+  return value === true || value === "true" || value === "on" || value === 1 || value === "1";
+}
+
 function buildSummary(meetings, { recordCount = 0, minutesCount = 0 } = {}) {
   const weekKey = getWeekStartKey(getSydneyDateKey());
   const now = new Date();
@@ -134,6 +143,7 @@ router.get(
       meetings,
       records,
       options: {
+        audiences: getSecretaryAudienceOptions(),
         meetings: meetings.map((meeting) => ({
           id: meeting.id,
           title: meeting.title,
@@ -168,8 +178,11 @@ router.post(
       },
       include: meetingInclude()
     });
+    const discord = parseBroadcastFlag(req.body.broadcastToDiscord)
+      ? await postMeetingToDiscord(meeting)
+      : { posted: false };
 
-    res.status(201).json({ meeting });
+    res.status(201).json({ meeting, discord });
   })
 );
 
@@ -218,8 +231,28 @@ router.patch(
       },
       include: meetingInclude()
     });
+    const discord = parseBroadcastFlag(req.body.broadcastToDiscord)
+      ? await postMeetingToDiscord(meeting)
+      : { posted: false };
 
-    res.json({ meeting });
+    res.json({ meeting, discord });
+  })
+);
+
+router.post(
+  "/meetings/:id/broadcast",
+  asyncHandler(async (req, res) => {
+    const meeting = await prisma.secretaryMeeting.findUnique({
+      where: { id: req.params.id },
+      include: meetingInclude()
+    });
+
+    if (!meeting) {
+      throw createError(404, "Meeting not found.");
+    }
+
+    const discord = await postMeetingToDiscord(meeting);
+    res.json({ meeting, discord });
   })
 );
 
@@ -269,8 +302,11 @@ router.post(
       },
       include: recordInclude()
     });
+    const discord = parseBroadcastFlag(req.body.broadcastToDiscord)
+      ? await postRecordToDiscord(record)
+      : { posted: false };
 
-    res.status(201).json({ record });
+    res.status(201).json({ record, discord });
   })
 );
 
@@ -321,8 +357,28 @@ router.patch(
       },
       include: recordInclude()
     });
+    const discord = parseBroadcastFlag(req.body.broadcastToDiscord)
+      ? await postRecordToDiscord(record)
+      : { posted: false };
 
-    res.json({ record });
+    res.json({ record, discord });
+  })
+);
+
+router.post(
+  "/records/:id/broadcast",
+  asyncHandler(async (req, res) => {
+    const record = await prisma.secretaryRecord.findUnique({
+      where: { id: req.params.id },
+      include: recordInclude()
+    });
+
+    if (!record) {
+      throw createError(404, "Record not found.");
+    }
+
+    const discord = await postRecordToDiscord(record);
+    res.json({ record, discord });
   })
 );
 
