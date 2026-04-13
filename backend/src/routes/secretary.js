@@ -127,7 +127,6 @@ router.get(
       }),
       prisma.secretaryRecord.findMany({
         orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
-        take: 40,
         include: recordInclude()
       }),
       prisma.secretaryRecord.count(),

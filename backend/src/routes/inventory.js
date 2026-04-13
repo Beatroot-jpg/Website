@@ -44,6 +44,16 @@ function requireAmount(value, type) {
   return amount;
 }
 
+function readPositivePage(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
 async function resolveQuantityDelta({ rawAmount, type, currentQuantity, itemId, movementId = null, createdAt = null }) {
   const amount = requireAmount(rawAmount, type);
 
@@ -94,6 +104,73 @@ router.get(
     });
 
     res.json({ items });
+  })
+);
+
+router.get(
+  "/movements",
+  asyncHandler(async (req, res) => {
+    const page = readPositivePage(req.query.page, 1);
+    const pageSize = Math.min(readPositivePage(req.query.pageSize, 8), 50);
+    const skip = (page - 1) * pageSize;
+
+    const [total, movements] = await Promise.all([
+      prisma.inventoryMovement.count(),
+      prisma.inventoryMovement.findMany({
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: pageSize,
+        include: {
+          item: {
+            select: {
+              id: true,
+              name: true,
+              unit: true,
+              quantity: true
+            }
+          }
+        }
+      })
+    ]);
+
+    const movementsWithDisplayQuantity = await Promise.all(movements.map(async (movement) => {
+      if (movement.type !== "CORRECTION") {
+        return {
+          ...movement,
+          displayQuantity: Math.abs(Number(movement.quantityDelta || 0))
+        };
+      }
+
+      const laterMovementAggregate = await prisma.inventoryMovement.aggregate({
+        where: {
+          itemId: movement.itemId,
+          createdAt: {
+            gt: movement.createdAt
+          }
+        },
+        _sum: {
+          quantityDelta: true
+        }
+      });
+      const laterNet = Number(laterMovementAggregate._sum.quantityDelta || 0);
+
+      return {
+        ...movement,
+        displayQuantity: Number(movement.item?.quantity || 0) - laterNet
+      };
+    }));
+
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+    res.json({
+      movements: movementsWithDisplayQuantity,
+      pagination: {
+        page: Math.min(page, totalPages),
+        pageSize,
+        total,
+        totalPages
+      }
+    });
   })
 );
 

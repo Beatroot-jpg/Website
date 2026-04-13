@@ -23,7 +23,9 @@ initProtectedPage({
 
 const summaryGrid = document.querySelector("#secretarySummary");
 const meetingTable = document.querySelector("#meetingTable");
+const meetingPaginationContainer = document.querySelector("#meetingPagination");
 const recordTable = document.querySelector("#recordTable");
+const recordPaginationContainer = document.querySelector("#recordPagination");
 const calendarToolbar = document.querySelector("#calendarToolbar");
 const calendarGrid = document.querySelector("#calendarGrid");
 
@@ -53,18 +55,30 @@ const recordFormHost = document.querySelector("#recordFormHost");
 const recordFormContent = document.querySelector("#recordFormContent");
 
 const params = new URLSearchParams(window.location.search);
+let currentMeetingPage = Number.parseInt(params.get("meetingPage") || "1", 10);
+let currentRecordPage = Number.parseInt(params.get("recordPage") || "1", 10);
 let requestedMeetingEditId = params.get("editMeeting") || "";
 let requestedRecordEditId = params.get("editRecord") || "";
 let meetingsCache = [];
 let recordsCache = [];
 let audienceOptions = [];
 let currentCalendarMonth = new Date();
+const meetingPageSize = 8;
+const recordPageSize = 8;
 
 const meetingDraft = bindDraftForm(meetingForm, "secretary-meeting-form-v1");
 const recordDraft = bindDraftForm(recordForm, "secretary-record-form-v1");
 
 if (meetingDraft.restored || recordDraft.restored) {
   showToast("Restored saved secretary drafts.", "info");
+}
+
+if (!Number.isFinite(currentMeetingPage) || currentMeetingPage < 1) {
+  currentMeetingPage = 1;
+}
+
+if (!Number.isFinite(currentRecordPage) || currentRecordPage < 1) {
+  currentRecordPage = 1;
 }
 
 function updateUrlParams(updates = {}, removeKeys = []) {
@@ -89,6 +103,31 @@ function monthStart(date = new Date()) {
 
 function shiftMonth(date, delta) {
   return new Date(date.getFullYear(), date.getMonth() + delta, 1);
+}
+
+function clampPage(page, totalPages) {
+  if (!Number.isFinite(page) || page < 1) {
+    return 1;
+  }
+
+  return Math.min(page, Math.max(1, totalPages || 1));
+}
+
+function paginateArray(items, page, pageSize) {
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = clampPage(page, totalPages);
+  const start = (safePage - 1) * pageSize;
+
+  return {
+    items: items.slice(start, start + pageSize),
+    pagination: {
+      page: safePage,
+      pageSize,
+      total,
+      totalPages
+    }
+  };
 }
 
 function toInputDateTimeValue(value) {
@@ -173,7 +212,7 @@ function visibleMeetings() {
 
   return meetingsCache
     .filter((meeting) => new Date(meeting.startsAt) >= floor || meeting.status === "SCHEDULED")
-    .slice(0, 18);
+    .sort((left, right) => new Date(left.startsAt) - new Date(right.startsAt));
 }
 
 function populateRecordMeetingOptions(selectedMeeting = null) {
@@ -344,10 +383,18 @@ function maybeOpenRequestedEdit() {
 }
 
 function renderMeetings() {
-  const meetings = visibleMeetings();
+  const allMeetings = visibleMeetings();
+  const previousPage = currentMeetingPage;
+  const { items: meetings, pagination } = paginateArray(allMeetings, currentMeetingPage, meetingPageSize);
+  currentMeetingPage = pagination.page;
+
+  if (currentMeetingPage !== previousPage) {
+    updateUrlParams({ meetingPage: `${currentMeetingPage}` });
+  }
 
   if (!meetings.length) {
     meetingTable.innerHTML = renderEmptyState("No meetings scheduled", "Use the create meeting button above to add the first meeting slot.");
+    renderMeetingPagination(pagination);
     return;
   }
 
@@ -456,6 +503,8 @@ function renderMeetings() {
       }
     });
   });
+
+  renderMeetingPagination(pagination);
 }
 
 function renderCalendarToolbar() {
@@ -550,8 +599,17 @@ function renderCalendar() {
 }
 
 function renderRecords() {
-  if (!recordsCache.length) {
+  const previousPage = currentRecordPage;
+  const { items: records, pagination } = paginateArray(recordsCache, currentRecordPage, recordPageSize);
+  currentRecordPage = pagination.page;
+
+  if (currentRecordPage !== previousPage) {
+    updateUrlParams({ recordPage: `${currentRecordPage}` });
+  }
+
+  if (!records.length) {
     recordTable.innerHTML = renderEmptyState("No records yet", "Create meeting minutes, journal entries, or notices to begin the organization archive.");
+    renderRecordPagination(pagination);
     return;
   }
 
@@ -569,7 +627,7 @@ function renderRecords() {
           </tr>
         </thead>
         <tbody>
-          ${recordsCache.map((record) => `
+          ${records.map((record) => `
             <tr class="${requestedRecordEditId === record.id ? "editing-row" : ""}">
               <td>${recordTypeBadge(record.type)}</td>
               <td>
@@ -660,12 +718,86 @@ function renderRecords() {
       }
     });
   });
+
+  renderRecordPagination(pagination);
+}
+
+function renderMeetingPagination(pagination) {
+  if (!meetingPaginationContainer) {
+    return;
+  }
+
+  if (pagination.totalPages <= 1) {
+    meetingPaginationContainer.innerHTML = pagination.total
+      ? `<span class="pager-label">${pagination.total} total meetings</span>`
+      : "";
+    return;
+  }
+
+  meetingPaginationContainer.innerHTML = `
+    <span class="pager-label">Page ${pagination.page} of ${pagination.totalPages}</span>
+    <button class="ghost-button pager-button" type="button" data-meeting-page="${pagination.page - 1}" ${pagination.page <= 1 ? "disabled" : ""}>Prev</button>
+    <button class="ghost-button pager-button" type="button" data-meeting-page="${pagination.page + 1}" ${pagination.page >= pagination.totalPages ? "disabled" : ""}>Next</button>
+  `;
+
+  meetingPaginationContainer.querySelectorAll("[data-meeting-page]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const nextPage = Number(button.dataset.meetingPage);
+
+      if (!Number.isFinite(nextPage) || nextPage < 1 || nextPage > pagination.totalPages) {
+        return;
+      }
+
+      currentMeetingPage = nextPage;
+      updateUrlParams({ meetingPage: `${currentMeetingPage}` });
+      renderMeetings();
+    });
+  });
+}
+
+function renderRecordPagination(pagination) {
+  if (!recordPaginationContainer) {
+    return;
+  }
+
+  if (pagination.totalPages <= 1) {
+    recordPaginationContainer.innerHTML = pagination.total
+      ? `<span class="pager-label">${pagination.total} total records</span>`
+      : "";
+    return;
+  }
+
+  recordPaginationContainer.innerHTML = `
+    <span class="pager-label">Page ${pagination.page} of ${pagination.totalPages}</span>
+    <button class="ghost-button pager-button" type="button" data-record-page="${pagination.page - 1}" ${pagination.page <= 1 ? "disabled" : ""}>Prev</button>
+    <button class="ghost-button pager-button" type="button" data-record-page="${pagination.page + 1}" ${pagination.page >= pagination.totalPages ? "disabled" : ""}>Next</button>
+  `;
+
+  recordPaginationContainer.querySelectorAll("[data-record-page]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const nextPage = Number(button.dataset.recordPage);
+
+      if (!Number.isFinite(nextPage) || nextPage < 1 || nextPage > pagination.totalPages) {
+        return;
+      }
+
+      currentRecordPage = nextPage;
+      updateUrlParams({ recordPage: `${currentRecordPage}` });
+      renderRecords();
+    });
+  });
 }
 
 async function loadPage() {
   summaryGrid.innerHTML = renderMetricSkeleton(4);
   meetingTable.innerHTML = renderTableSkeleton(6, 5);
+  if (meetingPaginationContainer) {
+    meetingPaginationContainer.innerHTML = "";
+  }
   recordTable.innerHTML = renderTableSkeleton(6, 5);
+  if (recordPaginationContainer) {
+    recordPaginationContainer.innerHTML = "";
+  }
   calendarToolbar.innerHTML = "";
   calendarGrid.innerHTML = "<div class='calendar-loading'>Loading calendar...</div>";
 

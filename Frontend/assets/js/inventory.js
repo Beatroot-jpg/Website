@@ -31,6 +31,7 @@ const adjustError = document.querySelector("#adjustError");
 const summaryContainer = document.querySelector("#inventorySummary");
 const tableContainer = document.querySelector("#inventoryTable");
 const recentMovementFeed = document.querySelector("#recentMovementFeed");
+const movementPaginationContainer = document.querySelector("#movementPagination");
 const itemSelect = document.querySelector("#adjustItemId");
 const inventoryItemIdField = document.querySelector("#inventoryItemId");
 const inventoryFormTitle = document.querySelector("#inventoryFormTitle");
@@ -55,16 +56,29 @@ const toolbarHost = document.createElement("div");
 const initialParams = new URLSearchParams(window.location.search);
 const searchQuery = (initialParams.get("search") || "").trim().toLowerCase();
 const activeView = initialParams.get("view") || "";
+let currentMovementPage = Number.parseInt(initialParams.get("movementPage") || "1", 10);
 let requestedItemEditId = initialParams.get("editItem") || "";
 let requestedMovementEditId = initialParams.get("editMovement") || "";
 const createDraft = bindDraftForm(createForm, "inventory-create");
 const adjustDraft = bindDraftForm(adjustForm, "inventory-adjust");
+const movementPageSize = 8;
 
 toolbarHost.className = "collection-tools";
 tableContainer.before(toolbarHost);
 
 let itemsCache = [];
+let movementFeedCache = [];
+let movementPaginationState = {
+  page: 1,
+  pageSize: movementPageSize,
+  total: 0,
+  totalPages: 1
+};
 let hasShownFilterMessage = false;
+
+if (!Number.isFinite(currentMovementPage) || currentMovementPage < 1) {
+  currentMovementPage = 1;
+}
 
 if (createDraft.restored || adjustDraft.restored) {
   showToast("Restored saved inventory drafts.", "info");
@@ -338,7 +352,8 @@ function maybeOpenRequestedEdit() {
   if (requestedMovementEditId) {
     const movement = itemsCache
       .flatMap((item) => item.movements || [])
-      .find((entry) => entry.id === requestedMovementEditId);
+      .find((entry) => entry.id === requestedMovementEditId)
+      || movementFeedCache.find((entry) => entry.id === requestedMovementEditId);
 
     if (!movement) {
       requestedMovementEditId = "";
@@ -393,28 +408,64 @@ function rerenderCollection() {
   renderSummary(itemsCache);
   renderToolbar(itemsCache);
   renderTable(itemsCache);
-  renderRecentMovementFeed(itemsCache);
+  renderRecentMovementFeed(movementFeedCache, movementPaginationState);
+  renderMovementPagination(movementPaginationState);
 }
 
-function renderRecentMovementFeed(items) {
-  const recentMovements = items
-    .flatMap((item) => (item.movements || []).map((movement) => ({
-      ...movement,
-      itemName: item.name,
-      itemUnit: item.unit,
-      itemId: item.id
-    })))
-    .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt))
-    .slice(0, 8);
+function clampPage(page, totalPages) {
+  if (!Number.isFinite(page) || page < 1) {
+    return 1;
+  }
 
+  return Math.min(page, Math.max(1, totalPages || 1));
+}
+
+function renderMovementPagination(pagination) {
+  if (!movementPaginationContainer) {
+    return;
+  }
+
+  const safePage = clampPage(pagination.page, pagination.totalPages);
+
+  if (pagination.totalPages <= 1) {
+    movementPaginationContainer.innerHTML = pagination.total
+      ? `<span class="pager-label">${pagination.total} total stock logs</span>`
+      : "";
+    return;
+  }
+
+  movementPaginationContainer.innerHTML = `
+    <span class="pager-label">Page ${safePage} of ${pagination.totalPages}</span>
+    <button class="ghost-button pager-button" type="button" data-movement-page="${safePage - 1}" ${safePage <= 1 ? "disabled" : ""}>Prev</button>
+    <button class="ghost-button pager-button" type="button" data-movement-page="${safePage + 1}" ${safePage >= pagination.totalPages ? "disabled" : ""}>Next</button>
+  `;
+
+  movementPaginationContainer.querySelectorAll("[data-movement-page]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const nextPage = Number(button.dataset.movementPage);
+
+      if (!Number.isFinite(nextPage) || nextPage < 1 || nextPage > pagination.totalPages) {
+        return;
+      }
+
+      currentMovementPage = nextPage;
+      updateUrlParams({ movementPage: `${currentMovementPage}` });
+      await loadInventory();
+    });
+  });
+}
+
+function renderRecentMovementFeed(recentMovements, pagination) {
   if (!recentMovementFeed) {
     return;
   }
 
   if (!recentMovements.length) {
     recentMovementFeed.innerHTML = renderEmptyState(
-      "No recent stock logs",
-      "New adds, subtracts, and corrections will appear here."
+      pagination.total ? "No stock logs on this page" : "No recent stock logs",
+      pagination.total
+        ? "Try moving back a page to see earlier stock activity."
+        : "New adds, subtracts, and corrections will appear here."
     );
     return;
   }
@@ -422,15 +473,15 @@ function renderRecentMovementFeed(items) {
   recentMovementFeed.innerHTML = recentMovements.map((movement) => {
     const editable = editableMovementTypes().has(movement.type);
     const href = editable
-      ? `./inventory.html?editMovement=${movement.id}#adjustForm`
+      ? `./inventory.html?editMovement=${movement.id}&movementPage=${movementPaginationState.page}#adjustForm`
       : `./inventory.html?editItem=${movement.itemId}#inventoryForm`;
 
     return `
       <a class="activity-link" href="${href}">
         <article class="activity-card ${requestedMovementEditId === movement.id ? "editing-card" : ""}">
           <div>
-            <strong>${movement.itemName}</strong>
-            <p>${formatMovementType(movement.type)} <span class="emphasis-inline">${movementDisplayQuantity(movement)} ${movement.itemUnit}</span></p>
+            <strong>${movement.item?.name || movement.itemName}</strong>
+            <p>${formatMovementType(movement.type)} <span class="emphasis-inline">${movementDisplayQuantity(movement)} ${movement.item?.unit || movement.itemUnit}</span></p>
           </div>
           <div class="activity-meta">
             ${badge(editable ? "Edit log" : "Source-linked", editable ? "accent" : "neutral")}
@@ -549,11 +600,12 @@ function openAdjustmentForm(itemId) {
 
 function openMovementEditor(movementId) {
   requestedMovementEditId = movementId;
-  updateUrlParams({ editMovement: requestedMovementEditId }, ["editItem"]);
+  updateUrlParams({ editMovement: requestedMovementEditId, movementPage: `${currentMovementPage}` }, ["editItem"]);
   requestedItemEditId = "";
   const movement = itemsCache
     .flatMap((item) => item.movements || [])
-    .find((entry) => entry.id === requestedMovementEditId);
+    .find((entry) => entry.id === requestedMovementEditId)
+    || movementFeedCache.find((entry) => entry.id === requestedMovementEditId);
 
   if (movement) {
     fillMovementForm(movement);
@@ -714,11 +766,26 @@ async function loadInventory() {
   if (recentMovementFeed) {
     recentMovementFeed.innerHTML = "<div class='activity-card skeleton-card'></div><div class='activity-card skeleton-card'></div>";
   }
+  if (movementPaginationContainer) {
+    movementPaginationContainer.innerHTML = "";
+  }
   tableContainer.innerHTML = renderTableSkeleton(6, 5);
 
   try {
-    const { items } = await api("/inventory");
+    const [{ items }, movementResponse] = await Promise.all([
+      api("/inventory"),
+      api(`/inventory/movements?page=${currentMovementPage}&pageSize=${movementPageSize}`)
+    ]);
     itemsCache = decorateItems(items);
+    movementPaginationState = movementResponse.pagination || movementPaginationState;
+    movementFeedCache = movementResponse.movements || [];
+
+    if (movementPaginationState.totalPages && currentMovementPage > movementPaginationState.totalPages) {
+      currentMovementPage = movementPaginationState.totalPages;
+      updateUrlParams({ movementPage: `${currentMovementPage}` });
+      return loadInventory();
+    }
+
     populateItemSelect(itemsCache);
     restoreDraftForm(adjustForm, "inventory-adjust");
     updateAdjustmentHint();
