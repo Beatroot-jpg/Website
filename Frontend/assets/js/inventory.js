@@ -40,6 +40,7 @@ const inventorySubmitButton = document.querySelector("#inventorySubmitButton");
 const resetInventoryButton = document.querySelector("#resetInventoryForm");
 const inventoryQuantityHint = document.querySelector("#inventoryQuantityHint");
 const openInventoryFormButton = document.querySelector("#openInventoryFormButton");
+const broadcastInventoryUpdateButton = document.querySelector("#broadcastInventoryUpdateButton");
 const inventoryFormHost = document.querySelector("#inventoryFormHost");
 const inventoryFormContent = document.querySelector("#inventoryFormContent");
 const quantityField = createForm?.elements.quantity;
@@ -644,6 +645,32 @@ async function deleteInventoryItem(itemId) {
   showToast("Inventory item deleted.", "success");
 }
 
+async function broadcastInventoryUpdate() {
+  if (!broadcastInventoryUpdateButton) {
+    return;
+  }
+
+  const originalLabel = broadcastInventoryUpdateButton.textContent;
+  broadcastInventoryUpdateButton.disabled = true;
+  broadcastInventoryUpdateButton.textContent = "Broadcasting...";
+
+  try {
+    const response = await api("/inventory/broadcast-update", {
+      method: "POST"
+    });
+    const snapshot = response.snapshot || {};
+    showToast(
+      `Inventory update broadcast sent. ${formatWholeNumber(snapshot.itemCount)} items / ${formatWholeNumber(snapshot.unitsOnHand)} units.`,
+      "success"
+    );
+  } catch (error) {
+    showToast(error.message, "error");
+  } finally {
+    broadcastInventoryUpdateButton.disabled = false;
+    broadcastInventoryUpdateButton.textContent = originalLabel;
+  }
+}
+
 function renderTable(items) {
   const visibleItems = getVisibleItems(items);
 
@@ -892,6 +919,10 @@ openInventoryFormButton?.addEventListener("click", () => {
   resetItemForm();
   updateUrlParams({ editItem: "", editMovement: "" }, ["editItem", "editMovement"]);
   showInventoryItemModal(openInventoryFormButton);
+});
+
+broadcastInventoryUpdateButton?.addEventListener("click", () => {
+  broadcastInventoryUpdate();
 });
 
 openAdjustFormButton?.addEventListener("click", () => {

@@ -3,6 +3,7 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { asyncHandler, createError } from "../http.js";
 import { authenticateToken, requirePermission } from "../middleware/auth.js";
+import { postInventoryUpdateToDiscord } from "../services/inventory-discord.js";
 import {
   requireIdList,
   normalizeOptionalString,
@@ -169,6 +170,40 @@ router.get(
         pageSize,
         total,
         totalPages
+      }
+    });
+  })
+);
+
+router.post(
+  "/broadcast-update",
+  asyncHandler(async (_req, res) => {
+    const [itemCount, totals] = await Promise.all([
+      prisma.inventoryItem.count(),
+      prisma.inventoryItem.aggregate({
+        _sum: {
+          quantity: true
+        }
+      })
+    ]);
+
+    const sentAt = new Date().toISOString();
+    const result = await postInventoryUpdateToDiscord({
+      sentAt,
+      itemCount,
+      unitsOnHand: Number(totals._sum.quantity || 0)
+    });
+
+    if (!result.posted) {
+      throw createError(502, result.message || "Unable to broadcast the inventory update.");
+    }
+
+    res.json({
+      message: "Inventory update broadcast sent.",
+      sentAt,
+      snapshot: {
+        itemCount,
+        unitsOnHand: Number(totals._sum.quantity || 0)
       }
     });
   })
