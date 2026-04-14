@@ -176,7 +176,8 @@ function buildMeetingPayload(meeting, audience) {
     readableLine("Ends", meeting.endsAt ? formatZonedDate(meeting.endsAt, "Australia/Melbourne") : ""),
     readableLine("Where", meeting.location ? truncate(meeting.location, 280) : ""),
     readableLine("Audience", audienceLabel),
-    readableLine("Status", formatStatusLabel(meeting.status || "SCHEDULED"))
+    readableLine("Status", formatStatusLabel(meeting.status || "SCHEDULED")),
+    meeting.syncToDiscordEvents ? "> RSVP through the Discord Events tab." : ""
   ].filter(Boolean).join("\n");
   const embedFields = [];
 

@@ -21,7 +21,8 @@ export const NAV_ITEMS = [
     key: "SECRETARY",
     label: "Secretary",
     href: "./secretary.html",
-    description: "Meetings and records"
+    description: "Meetings and records",
+    visibleToAllAuthenticated: true
   },
   {
     key: "INVENTORY",

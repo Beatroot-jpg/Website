@@ -8,12 +8,18 @@ import {
   postMeetingToDiscord,
   postRecordToDiscord
 } from "../services/secretary-discord.js";
+import {
+  deleteDiscordScheduledEvent,
+  discordScheduledEventsEnabled,
+  syncDiscordScheduledEvent
+} from "../services/secretary-discord-events.js";
 import { getSydneyDateKey, getWeekStartKey, shiftDateKey } from "../services/time.js";
 import { normalizeOptionalString, requireString } from "../validators.js";
 
 const router = Router();
 
-router.use(authenticateToken, requirePermission("SECRETARY"));
+router.use(authenticateToken);
+const requireSecretaryWriteAccess = requirePermission("SECRETARY");
 
 const MEETING_STATUSES = new Set(["SCHEDULED", "COMPLETED", "CANCELLED"]);
 const RECORD_TYPES = new Set(["MEETING_MINUTES", "JOURNAL_ENTRY", "NOTICE"]);
@@ -90,6 +96,18 @@ function parseBroadcastFlag(value) {
   return value === true || value === "true" || value === "on" || value === 1 || value === "1";
 }
 
+function buildDiscordEventPatch(syncResult) {
+  if (!syncResult?.synced) {
+    return null;
+  }
+
+  return {
+    discordEventId: syncResult.eventId || null,
+    discordEventStatus: `${syncResult.status || ""}` || null,
+    discordEventSyncedAt: new Date()
+  };
+}
+
 function buildSummary(meetings, { recordCount = 0, minutesCount = 0 } = {}) {
   const weekKey = getWeekStartKey(getSydneyDateKey());
   const now = new Date();
@@ -141,6 +159,10 @@ router.get(
       summary: buildSummary(meetings, { recordCount, minutesCount }),
       meetings,
       records,
+      viewer: {
+        canEdit: _req.user.role === "ADMIN" || _req.user.permissions.includes("SECRETARY"),
+        discordScheduledEventsEnabled: discordScheduledEventsEnabled()
+      },
       options: {
         audiences: getSecretaryAudienceOptions(),
         meetings: meetings.map((meeting) => ({
@@ -156,15 +178,17 @@ router.get(
 
 router.post(
   "/meetings",
+  requireSecretaryWriteAccess,
   asyncHandler(async (req, res) => {
     const startsAt = requireDateTime(req.body.startsAt, "Meeting time");
     const endsAt = req.body.endsAt ? requireDateTime(req.body.endsAt, "Meeting end time") : null;
+    const syncToDiscordEvents = parseBroadcastFlag(req.body.syncDiscordEvent);
 
     if (endsAt && endsAt < startsAt) {
       throw createError(400, "Meeting end time must be after the start time.");
     }
 
-    const meeting = await prisma.secretaryMeeting.create({
+    let meeting = await prisma.secretaryMeeting.create({
       data: {
         title: requireString(req.body.title, "Meeting title"),
         startsAt,
@@ -173,20 +197,38 @@ router.post(
         audience: normalizeOptionalString(req.body.audience),
         details: normalizeOptionalString(req.body.details),
         status: normalizeMeetingStatus(req.body.status),
+        syncToDiscordEvents,
         createdById: req.user.id
       },
       include: meetingInclude()
     });
+    let discordEvent = { synced: false };
+
+    if (meeting.syncToDiscordEvents) {
+      discordEvent = await syncDiscordScheduledEvent(meeting);
+
+      const discordEventPatch = buildDiscordEventPatch(discordEvent);
+
+      if (discordEventPatch) {
+        meeting = await prisma.secretaryMeeting.update({
+          where: { id: meeting.id },
+          data: discordEventPatch,
+          include: meetingInclude()
+        });
+      }
+    }
+
     const discord = parseBroadcastFlag(req.body.broadcastToDiscord)
       ? await postMeetingToDiscord(meeting)
       : { posted: false };
 
-    res.status(201).json({ meeting, discord });
+    res.status(201).json({ meeting, discord, discordEvent });
   })
 );
 
 router.patch(
   "/meetings/:id",
+  requireSecretaryWriteAccess,
   asyncHandler(async (req, res) => {
     const existingMeeting = await prisma.secretaryMeeting.findUnique({
       where: { id: req.params.id }
@@ -202,12 +244,15 @@ router.patch(
     const endsAt = req.body.endsAt !== undefined
       ? (req.body.endsAt ? requireDateTime(req.body.endsAt, "Meeting end time") : null)
       : existingMeeting.endsAt;
+    const syncToDiscordEvents = req.body.syncDiscordEvent !== undefined
+      ? parseBroadcastFlag(req.body.syncDiscordEvent)
+      : existingMeeting.syncToDiscordEvents;
 
     if (endsAt && endsAt < startsAt) {
       throw createError(400, "Meeting end time must be after the start time.");
     }
 
-    const meeting = await prisma.secretaryMeeting.update({
+    let meeting = await prisma.secretaryMeeting.update({
       where: { id: existingMeeting.id },
       data: {
         title: req.body.title !== undefined
@@ -226,22 +271,54 @@ router.patch(
           : existingMeeting.details,
         status: req.body.status !== undefined
           ? normalizeMeetingStatus(req.body.status, existingMeeting.status)
-          : existingMeeting.status
+          : existingMeeting.status,
+        syncToDiscordEvents
       },
       include: meetingInclude()
     });
+    let discordEvent = { synced: false };
+
+    if (!meeting.syncToDiscordEvents && existingMeeting.discordEventId) {
+      discordEvent = await deleteDiscordScheduledEvent(existingMeeting);
+      meeting = await prisma.secretaryMeeting.update({
+        where: { id: meeting.id },
+        data: {
+          discordEventId: null,
+          discordEventStatus: null,
+          discordEventSyncedAt: null
+        },
+        include: meetingInclude()
+      });
+    } else if (meeting.syncToDiscordEvents || existingMeeting.discordEventId) {
+      discordEvent = await syncDiscordScheduledEvent({
+        ...meeting,
+        discordEventId: meeting.discordEventId || existingMeeting.discordEventId
+      });
+
+      const discordEventPatch = buildDiscordEventPatch(discordEvent);
+
+      if (discordEventPatch) {
+        meeting = await prisma.secretaryMeeting.update({
+          where: { id: meeting.id },
+          data: discordEventPatch,
+          include: meetingInclude()
+        });
+      }
+    }
+
     const discord = parseBroadcastFlag(req.body.broadcastToDiscord)
       ? await postMeetingToDiscord(meeting)
       : { posted: false };
 
-    res.json({ meeting, discord });
+    res.json({ meeting, discord, discordEvent });
   })
 );
 
 router.post(
   "/meetings/:id/broadcast",
+  requireSecretaryWriteAccess,
   asyncHandler(async (req, res) => {
-    const meeting = await prisma.secretaryMeeting.findUnique({
+    let meeting = await prisma.secretaryMeeting.findUnique({
       where: { id: req.params.id },
       include: meetingInclude()
     });
@@ -250,13 +327,30 @@ router.post(
       throw createError(404, "Meeting not found.");
     }
 
+    let discordEvent = { synced: false };
+
+    if (meeting.syncToDiscordEvents || meeting.discordEventId) {
+      discordEvent = await syncDiscordScheduledEvent(meeting);
+
+      const discordEventPatch = buildDiscordEventPatch(discordEvent);
+
+      if (discordEventPatch) {
+        meeting = await prisma.secretaryMeeting.update({
+          where: { id: meeting.id },
+          data: discordEventPatch,
+          include: meetingInclude()
+        });
+      }
+    }
+
     const discord = await postMeetingToDiscord(meeting);
-    res.json({ meeting, discord });
+    res.json({ meeting, discord, discordEvent });
   })
 );
 
 router.delete(
   "/meetings/:id",
+  requireSecretaryWriteAccess,
   asyncHandler(async (req, res) => {
     const existingMeeting = await prisma.secretaryMeeting.findUnique({
       where: { id: req.params.id }
@@ -266,16 +360,19 @@ router.delete(
       throw createError(404, "Meeting not found.");
     }
 
+    const discordEvent = await deleteDiscordScheduledEvent(existingMeeting);
+
     await prisma.secretaryMeeting.delete({
       where: { id: existingMeeting.id }
     });
 
-    res.json({ deleted: true });
+    res.json({ deleted: true, discordEvent });
   })
 );
 
 router.post(
   "/records",
+  requireSecretaryWriteAccess,
   asyncHandler(async (req, res) => {
     const meetingId = `${req.body.meetingId ?? ""}`.trim() || null;
 
@@ -311,6 +408,7 @@ router.post(
 
 router.patch(
   "/records/:id",
+  requireSecretaryWriteAccess,
   asyncHandler(async (req, res) => {
     const existingRecord = await prisma.secretaryRecord.findUnique({
       where: { id: req.params.id }
@@ -366,6 +464,7 @@ router.patch(
 
 router.post(
   "/records/:id/broadcast",
+  requireSecretaryWriteAccess,
   asyncHandler(async (req, res) => {
     const record = await prisma.secretaryRecord.findUnique({
       where: { id: req.params.id },
@@ -383,6 +482,7 @@ router.post(
 
 router.delete(
   "/records/:id",
+  requireSecretaryWriteAccess,
   asyncHandler(async (req, res) => {
     const existingRecord = await prisma.secretaryRecord.findUnique({
       where: { id: req.params.id }

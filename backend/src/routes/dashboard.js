@@ -45,7 +45,8 @@ router.get(
     const canViewInventory = allowed.has("INVENTORY") || req.user.role === "ADMIN";
     const canViewAnalytics = allowed.has("ANALYTICS") || req.user.role === "ADMIN";
     const canViewDailyTasks = allowed.has("DAILY_TASKS") || req.user.role === "ADMIN";
-    const canViewSecretary = allowed.has("SECRETARY") || req.user.role === "ADMIN";
+    const canEditSecretary = allowed.has("SECRETARY") || req.user.role === "ADMIN";
+    const canViewSecretary = true;
     const canViewBank = allowed.has("BANK") || req.user.role === "ADMIN";
     const canViewDistribution = allowed.has("DISTRIBUTION") || req.user.role === "ADMIN";
     const recentActivity = [];
@@ -397,7 +398,9 @@ router.get(
           badgeLabel: "Scheduled",
           tone: "accent",
           createdAt: meeting.startsAt,
-          href: `./secretary.html?editMeeting=${meeting.id}#meetingTable`
+          href: canEditSecretary
+            ? `./secretary.html?editMeeting=${meeting.id}#meetingTable`
+            : `./secretary.html?viewMeeting=${meeting.id}#meetingTable`
         })),
         ...recentSecretaryRecords.map((record) => ({
           id: `secretary-record-${record.id}`,
@@ -407,7 +410,9 @@ router.get(
           badgeLabel: record.type.replaceAll("_", " "),
           tone: record.type === "NOTICE" ? "accent" : record.type === "MEETING_MINUTES" ? "good" : "neutral",
           createdAt: record.updatedAt,
-          href: `./secretary.html?editRecord=${record.id}#recordTable`
+          href: canEditSecretary
+            ? `./secretary.html?editRecord=${record.id}#recordTable`
+            : `./secretary.html?viewRecord=${record.id}#recordTable`
         }))
       );
     }

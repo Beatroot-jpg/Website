@@ -1,9 +1,15 @@
 import { api } from "./api.js";
 import { NAV_ITEMS, PERMISSION_LABELS, QUICK_ACTIONS } from "./constants.js";
-import { clearSession, hasPermission, requireAuth } from "./session.js";
+import { clearSession, getUser, hasPermission, requireAuth } from "./session.js";
 
-export function initProtectedPage({ pageKey, title, subtitle, showQuickActions = pageKey === "DASHBOARD" }) {
-  const user = requireAuth(pageKey);
+export function initProtectedPage({
+  pageKey,
+  title,
+  subtitle,
+  requiredPermission = pageKey,
+  showQuickActions = pageKey === "DASHBOARD"
+}) {
+  const user = requiredPermission ? requireAuth(requiredPermission) : (getUser() || requireAuth());
 
   const titleElement = document.querySelector("#pageTitle");
   const subtitleElement = document.querySelector("#pageSubtitle");
@@ -21,7 +27,7 @@ export function initProtectedPage({ pageKey, title, subtitle, showQuickActions =
 
   if (navElement) {
     navElement.innerHTML = NAV_ITEMS
-      .filter((item) => hasPermission(item.key))
+      .filter((item) => item.visibleToAllAuthenticated || hasPermission(item.key))
       .map((item) => `
         <a class="nav-link ${item.key === pageKey ? "active" : ""}" href="${item.href}">
           <span>${item.label}</span>

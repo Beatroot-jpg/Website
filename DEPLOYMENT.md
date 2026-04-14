@@ -23,8 +23,12 @@ Create a GitHub repository, then push the project so Railway and Netlify can bot
    - `ADMIN_NAME` to your first admin display name
    - `ADMIN_PASSWORD` to your first admin password
    - `SECRETARY_DISCORD_WEBHOOK_URL` to your Discord incoming webhook URL if you want Secretary posts to broadcast into Discord
+   - `SECRETARY_DISCORD_BOT_TOKEN` to your Discord bot token if you want the Secretary meeting flow to create real Discord RSVP events
+   - `SECRETARY_DISCORD_GUILD_ID` to the Discord server ID where those scheduled events should be created
    - `INVENTORY_DISCORD_WEBHOOK_URL` to your Discord incoming webhook URL if you want one-click stock-take updates from the Inventory page
    - optionally `SECRETARY_DISCORD_AUDIENCES` to a JSON array of `{ key, label, roleId }` entries if you want to override the built-in audience presets
+
+Discord scheduled events use the official Discord scheduled-event API, so they need bot credentials and a guild ID. For the current implementation, meetings also need both an `End time` and a `Location or VC link` if you want the RSVP event to sync cleanly.
 
 [`railway.json`](/C:/Users/User/Desktop/Website/railway.json) is already configured to:
 

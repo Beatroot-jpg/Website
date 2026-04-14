@@ -334,6 +334,10 @@ model SecretaryMeeting {
   audience    String?
   details     String?
   status      SecretaryMeetingStatus @default(SCHEDULED)
+  syncToDiscordEvents Boolean        @default(false)
+  discordEventId String?             @unique
+  discordEventStatus String?
+  discordEventSyncedAt DateTime?
   createdById String?
   createdBy   User?                  @relation("SecretaryMeetingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   records     SecretaryRecord[]

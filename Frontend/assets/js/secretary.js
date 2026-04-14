@@ -13,10 +13,12 @@ import {
   renderTableSkeleton,
   showToast
 } from "./ui.js";
+import { hasPermission } from "./session.js";
 import { bindDraftForm, restoreDraftForm } from "./workflow.js";
 
 initProtectedPage({
   pageKey: "SECRETARY",
+  requiredPermission: null,
   title: "Secretary workspace",
   subtitle: "Organize meetings, write records, and keep the organization aligned from one simple panel."
 });
@@ -38,6 +40,7 @@ const meetingFormSubtitle = document.querySelector("#meetingFormSubtitle");
 const meetingSubmitButton = document.querySelector("#meetingSubmitButton");
 const resetMeetingButton = document.querySelector("#resetMeetingForm");
 const openMeetingFormButton = document.querySelector("#openMeetingFormButton");
+const meetingCreateCard = document.querySelector("#meetingCreateCard");
 const meetingFormHost = document.querySelector("#meetingFormHost");
 const meetingFormContent = document.querySelector("#meetingFormContent");
 
@@ -51,20 +54,29 @@ const recordFormSubtitle = document.querySelector("#recordFormSubtitle");
 const recordSubmitButton = document.querySelector("#recordSubmitButton");
 const resetRecordButton = document.querySelector("#resetRecordForm");
 const openRecordFormButton = document.querySelector("#openRecordFormButton");
+const recordCreateCard = document.querySelector("#recordCreateCard");
 const recordFormHost = document.querySelector("#recordFormHost");
 const recordFormContent = document.querySelector("#recordFormContent");
+const detailHost = document.querySelector("#secretaryDetailHost");
+const detailContent = document.querySelector("#secretaryDetailContent");
 
 const params = new URLSearchParams(window.location.search);
 let currentMeetingPage = Number.parseInt(params.get("meetingPage") || "1", 10);
 let currentRecordPage = Number.parseInt(params.get("recordPage") || "1", 10);
 let requestedMeetingEditId = params.get("editMeeting") || "";
 let requestedRecordEditId = params.get("editRecord") || "";
+let requestedMeetingViewId = params.get("viewMeeting") || "";
+let requestedRecordViewId = params.get("viewRecord") || "";
 let meetingsCache = [];
 let recordsCache = [];
 let audienceOptions = [];
 let currentCalendarMonth = new Date();
 const meetingPageSize = 8;
 const recordPageSize = 8;
+let viewerState = {
+  canEdit: hasPermission("SECRETARY"),
+  discordScheduledEventsEnabled: false
+};
 
 const meetingDraft = bindDraftForm(meetingForm, "secretary-meeting-form-v1");
 const recordDraft = bindDraftForm(recordForm, "secretary-record-form-v1");
@@ -171,10 +183,124 @@ function audienceLabel(value) {
   return audienceOptions.find((entry) => entry.key === value)?.label || value;
 }
 
+function applyAccessState() {
+  meetingCreateCard?.classList.toggle("hidden", !viewerState.canEdit);
+  recordCreateCard?.classList.toggle("hidden", !viewerState.canEdit);
+
+  if (!viewerState.canEdit) {
+    meetingFormHost?.classList.add("hidden");
+    recordFormHost?.classList.add("hidden");
+  } else {
+    meetingFormHost?.classList.remove("hidden");
+    recordFormHost?.classList.remove("hidden");
+  }
+}
+
 function summarizeMeetingTime(meeting) {
   const start = formatDate(meeting.startsAt);
   const end = meeting.endsAt ? formatDate(meeting.endsAt) : "";
   return end ? `${start} to ${end}` : start;
+}
+
+function meetingDiscordBadge(meeting) {
+  if (!meeting.syncToDiscordEvents) {
+    return "";
+  }
+
+  return meeting.discordEventId
+    ? badge("Discord RSVP event synced", "accent")
+    : badge("Discord RSVP event pending", "warn");
+}
+
+function fillMeetingDetail(meeting) {
+  detailContent.innerHTML = `
+    <div class="panel-header">
+      <h2>${meeting.title}</h2>
+      <p>Read the meeting details here without opening the edit workflow.</p>
+    </div>
+    <div class="stack-list">
+      <article class="activity-card">
+        <div>
+          <strong>When</strong>
+          <p>${summarizeMeetingTime(meeting)}</p>
+        </div>
+        <div class="activity-meta">
+          ${meetingStatusBadge(meeting.status)}
+        </div>
+      </article>
+      <article class="activity-card">
+        <div>
+          <strong>Location</strong>
+          <p>${meeting.location || "Location not set"}</p>
+        </div>
+      </article>
+      <article class="activity-card">
+        <div>
+          <strong>Audience</strong>
+          <p>${audienceLabel(meeting.audience)}</p>
+        </div>
+      </article>
+      <article class="activity-card">
+        <div>
+          <strong>Agenda / details</strong>
+          <p>${meeting.details || "No agenda saved yet."}</p>
+        </div>
+      </article>
+      <article class="activity-card">
+        <div>
+          <strong>Discord RSVP event</strong>
+          <p>${meeting.syncToDiscordEvents ? "Enabled for this meeting." : "Not enabled for this meeting."}</p>
+        </div>
+        <div class="activity-meta">
+          ${meetingDiscordBadge(meeting) || badge("Not enabled", "neutral")}
+        </div>
+      </article>
+    </div>
+  `;
+}
+
+function fillRecordDetail(record) {
+  detailContent.innerHTML = `
+    <div class="panel-header">
+      <h2>${record.title}</h2>
+      <p>Read the full archive entry here without opening the edit workflow.</p>
+    </div>
+    <div class="stack-list">
+      <article class="activity-card">
+        <div>
+          <strong>Type</strong>
+          <p>${record.type.replaceAll("_", " ")}</p>
+        </div>
+        <div class="activity-meta">
+          ${recordTypeBadge(record.type)}
+        </div>
+      </article>
+      <article class="activity-card">
+        <div>
+          <strong>Linked meeting</strong>
+          <p>${record.meeting ? `${record.meeting.title} - ${formatDate(record.meeting.startsAt)}` : "No linked meeting"}</p>
+        </div>
+      </article>
+      <article class="activity-card">
+        <div>
+          <strong>Audience</strong>
+          <p>${audienceLabel(record.audience)}</p>
+        </div>
+      </article>
+      <article class="activity-card">
+        <div>
+          <strong>Summary</strong>
+          <p>${record.summary || "No short summary saved."}</p>
+        </div>
+      </article>
+      <article class="activity-card">
+        <div>
+          <strong>Full content</strong>
+          <p>${record.content}</p>
+        </div>
+      </article>
+    </div>
+  `;
 }
 
 function toIsoFromLocalInput(value) {
@@ -251,6 +377,7 @@ function resetMeetingForm({ clearDraftState = false, clearUrl = true } = {}) {
   meetingSubmitButton.textContent = "Save meeting";
   meetingForm.elements.status.value = "SCHEDULED";
   meetingForm.elements.broadcastToDiscord.checked = false;
+  meetingForm.elements.syncDiscordEvent.checked = false;
   populateAudienceOptions();
   meetingForm.elements.audience.value = "NONE";
   mountFormError(meetingError, "");
@@ -303,6 +430,7 @@ function fillMeetingForm(meeting) {
   meetingForm.elements.details.value = meeting.details || "";
   meetingForm.elements.status.value = meeting.status;
   meetingForm.elements.broadcastToDiscord.checked = false;
+  meetingForm.elements.syncDiscordEvent.checked = Boolean(meeting.syncToDiscordEvents);
 }
 
 function fillRecordForm(record) {
@@ -352,7 +480,69 @@ function showRecordModal(opener = document.activeElement) {
   });
 }
 
+function showDetailModal(opener = document.activeElement, clearKeys = []) {
+  openFormModal({
+    content: detailContent,
+    host: detailHost,
+    focusSelector: ".form-modal-close",
+    opener,
+    onClose: () => {
+      const updates = {};
+      clearKeys.forEach((key) => {
+        updates[key] = "";
+      });
+      updateUrlParams(updates, clearKeys);
+      if (clearKeys.includes("viewMeeting")) {
+        requestedMeetingViewId = "";
+      }
+      if (clearKeys.includes("viewRecord")) {
+        requestedRecordViewId = "";
+      }
+    }
+  });
+}
+
 function maybeOpenRequestedEdit() {
+  if (!viewerState.canEdit && requestedMeetingEditId) {
+    requestedMeetingViewId = requestedMeetingEditId;
+    requestedMeetingEditId = "";
+    updateUrlParams({ editMeeting: "", viewMeeting: requestedMeetingViewId }, ["editMeeting"]);
+  }
+
+  if (!viewerState.canEdit && requestedRecordEditId) {
+    requestedRecordViewId = requestedRecordEditId;
+    requestedRecordEditId = "";
+    updateUrlParams({ editRecord: "", viewRecord: requestedRecordViewId }, ["editRecord"]);
+  }
+
+  if (requestedMeetingViewId) {
+    const meeting = meetingsCache.find((entry) => entry.id === requestedMeetingViewId);
+
+    if (meeting) {
+      fillMeetingDetail(meeting);
+      showDetailModal(undefined, ["viewMeeting"]);
+      return;
+    }
+
+    requestedMeetingViewId = "";
+    updateUrlParams({ viewMeeting: "" }, ["viewMeeting"]);
+    showToast("That meeting could not be found.", "error");
+  }
+
+  if (requestedRecordViewId) {
+    const record = recordsCache.find((entry) => entry.id === requestedRecordViewId);
+
+    if (record) {
+      fillRecordDetail(record);
+      showDetailModal(undefined, ["viewRecord"]);
+      return;
+    }
+
+    requestedRecordViewId = "";
+    updateUrlParams({ viewRecord: "" }, ["viewRecord"]);
+    showToast("That record could not be found.", "error");
+  }
+
   if (requestedMeetingEditId) {
     const meeting = meetingsCache.find((entry) => entry.id === requestedMeetingEditId);
 
@@ -417,6 +607,7 @@ function renderMeetings() {
               <td>
                 <strong>${meeting.title}</strong>
                 <span class="subtle-row">${meeting.location || "Location not set"}</span>
+                ${meeting.syncToDiscordEvents ? `<div class="badge-group">${meetingDiscordBadge(meeting)}</div>` : ""}
               </td>
               <td>${summarizeMeetingTime(meeting)}</td>
               <td>${audienceLabel(meeting.audience)}</td>
@@ -424,9 +615,10 @@ function renderMeetings() {
               <td>${meeting._count?.records || 0}</td>
               <td>
                 <div class="inline-table-actions">
-                  <button class="mini-action" type="button" data-broadcast-meeting="${meeting.id}">Broadcast</button>
-                  <button class="mini-action" type="button" data-edit-meeting="${meeting.id}">Edit</button>
-                  <button class="mini-action danger-action" type="button" data-delete-meeting="${meeting.id}">Delete</button>
+                  <button class="mini-action" type="button" data-view-meeting="${meeting.id}">View</button>
+                  ${viewerState.canEdit ? `<button class="mini-action" type="button" data-broadcast-meeting="${meeting.id}">Broadcast</button>` : ""}
+                  ${viewerState.canEdit ? `<button class="mini-action" type="button" data-edit-meeting="${meeting.id}">Edit</button>` : ""}
+                  ${viewerState.canEdit ? `<button class="mini-action danger-action" type="button" data-delete-meeting="${meeting.id}">Delete</button>` : ""}
                 </div>
               </td>
             </tr>
@@ -449,6 +641,19 @@ function renderMeetings() {
     });
   });
 
+  meetingTable.querySelectorAll("[data-view-meeting]").forEach((button) => {
+    button.addEventListener("click", () => {
+      requestedMeetingViewId = button.dataset.viewMeeting;
+      updateUrlParams({ viewMeeting: requestedMeetingViewId }, ["editMeeting"]);
+      const meeting = meetingsCache.find((entry) => entry.id === requestedMeetingViewId);
+
+      if (meeting) {
+        fillMeetingDetail(meeting);
+        showDetailModal(button, ["viewMeeting"]);
+      }
+    });
+  });
+
   meetingTable.querySelectorAll("[data-broadcast-meeting]").forEach((button) => {
     button.addEventListener("click", async () => {
       const meeting = meetingsCache.find((entry) => entry.id === button.dataset.broadcastMeeting);
@@ -462,10 +667,17 @@ function renderMeetings() {
           method: "POST"
         });
 
-        if (response.discord?.posted) {
+        if (response.discord?.posted && response.discordEvent?.synced) {
+          showToast("Meeting posted to Discord and synced to Discord Events.", "success");
+        } else if (response.discord?.posted) {
           showToast("Meeting posted to Discord.", "success");
+          if (response.discordEvent?.message && meeting.syncToDiscordEvents) {
+            showToast(response.discordEvent.message, "warn");
+          }
+        } else if (response.discord?.message) {
+          showToast(response.discord.message, "warn");
         } else {
-          showToast(response.discord?.message || "Meeting saved, but Discord could not be reached.", "warn");
+          showToast("Discord broadcast did not complete.", "warn");
         }
       } catch (error) {
         showToast(error.message, "error");
@@ -586,13 +798,13 @@ function renderCalendar() {
 
   calendarGrid.querySelectorAll("[data-calendar-meeting]").forEach((button) => {
     button.addEventListener("click", () => {
-      requestedMeetingEditId = button.dataset.calendarMeeting;
-      updateUrlParams({ editMeeting: requestedMeetingEditId });
-      const meeting = meetingsCache.find((entry) => entry.id === requestedMeetingEditId);
+      requestedMeetingViewId = button.dataset.calendarMeeting;
+      updateUrlParams({ viewMeeting: requestedMeetingViewId }, ["editMeeting"]);
+      const meeting = meetingsCache.find((entry) => entry.id === requestedMeetingViewId);
 
       if (meeting) {
-        fillMeetingForm(meeting);
-        showMeetingModal(button);
+        fillMeetingDetail(meeting);
+        showDetailModal(button, ["viewMeeting"]);
       }
     });
   });
@@ -639,9 +851,10 @@ function renderRecords() {
               <td>${formatDate(record.updatedAt)}</td>
               <td>
                 <div class="inline-table-actions">
-                  <button class="mini-action" type="button" data-broadcast-record="${record.id}">Broadcast</button>
-                  <button class="mini-action" type="button" data-edit-record="${record.id}">Edit</button>
-                  <button class="mini-action danger-action" type="button" data-delete-record="${record.id}">Delete</button>
+                  <button class="mini-action" type="button" data-view-record="${record.id}">View</button>
+                  ${viewerState.canEdit ? `<button class="mini-action" type="button" data-broadcast-record="${record.id}">Broadcast</button>` : ""}
+                  ${viewerState.canEdit ? `<button class="mini-action" type="button" data-edit-record="${record.id}">Edit</button>` : ""}
+                  ${viewerState.canEdit ? `<button class="mini-action danger-action" type="button" data-delete-record="${record.id}">Delete</button>` : ""}
                 </div>
               </td>
             </tr>
@@ -660,6 +873,19 @@ function renderRecords() {
       if (record) {
         fillRecordForm(record);
         showRecordModal(button);
+      }
+    });
+  });
+
+  recordTable.querySelectorAll("[data-view-record]").forEach((button) => {
+    button.addEventListener("click", () => {
+      requestedRecordViewId = button.dataset.viewRecord;
+      updateUrlParams({ viewRecord: requestedRecordViewId }, ["editRecord"]);
+      const record = recordsCache.find((entry) => entry.id === requestedRecordViewId);
+
+      if (record) {
+        fillRecordDetail(record);
+        showDetailModal(button, ["viewRecord"]);
       }
     });
   });
@@ -807,12 +1033,19 @@ async function loadPage() {
     meetingsCache = data.meetings || [];
     recordsCache = data.records || [];
     audienceOptions = data.options?.audiences || [];
+    viewerState = {
+      canEdit: Boolean(data.viewer?.canEdit ?? viewerState.canEdit),
+      discordScheduledEventsEnabled: Boolean(data.viewer?.discordScheduledEventsEnabled)
+    };
     currentCalendarMonth = monthStart(new Date());
     renderSummary(data.summary || {});
+    applyAccessState();
     populateAudienceOptions();
     populateRecordMeetingOptions();
-    restoreDraftForm(meetingForm, "secretary-meeting-form-v1");
-    restoreDraftForm(recordForm, "secretary-record-form-v1");
+    if (viewerState.canEdit) {
+      restoreDraftForm(meetingForm, "secretary-meeting-form-v1");
+      restoreDraftForm(recordForm, "secretary-record-form-v1");
+    }
     renderMeetings();
     renderCalendarToolbar();
     renderCalendar();
@@ -832,6 +1065,11 @@ meetingForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   mountFormError(meetingError, "");
 
+  if (!viewerState.canEdit) {
+    showToast("You can view this page, but only secretary-enabled users can change meetings.", "warn");
+    return;
+  }
+
   const payload = {
     title: meetingForm.elements.title.value,
     startsAt: toIsoFromLocalInput(meetingForm.elements.startsAt.value),
@@ -840,7 +1078,8 @@ meetingForm?.addEventListener("submit", async (event) => {
     audience: meetingForm.elements.audience.value,
     details: meetingForm.elements.details.value,
     status: meetingForm.elements.status.value,
-    broadcastToDiscord: meetingForm.elements.broadcastToDiscord.checked
+    broadcastToDiscord: meetingForm.elements.broadcastToDiscord.checked,
+    syncDiscordEvent: meetingForm.elements.syncDiscordEvent.checked
   };
 
   try {
@@ -858,10 +1097,23 @@ meetingForm?.addEventListener("submit", async (event) => {
       });
     }
 
-    if (payload.broadcastToDiscord && !response.discord?.posted) {
-      showToast(response.discord?.message || "Meeting saved, but Discord could not be reached.", "warn");
-    } else if (payload.broadcastToDiscord) {
+    if (payload.broadcastToDiscord && response.discord?.posted && response.discordEvent?.synced) {
+      showToast("Meeting saved, posted to Discord, and synced to Discord Events.", "success");
+    } else if (payload.broadcastToDiscord && response.discord?.posted) {
       showToast("Meeting saved and posted to Discord.", "success");
+      if (payload.syncDiscordEvent && response.discordEvent?.message) {
+        showToast(response.discordEvent.message, "warn");
+      }
+    } else if (payload.syncDiscordEvent && response.discordEvent?.synced) {
+      showToast("Meeting saved and Discord RSVP event synced.", "success");
+    } else if (payload.broadcastToDiscord && !response.discord?.posted) {
+      showToast(response.discord?.message || "Meeting saved, but Discord could not be reached.", "warn");
+      if (payload.syncDiscordEvent && response.discordEvent?.message) {
+        showToast(response.discordEvent.message, "warn");
+      }
+    } else if (payload.syncDiscordEvent && response.discordEvent?.message) {
+      showToast(response.discordEvent.message, "warn");
+      showToast(meetingIdField.value ? "Meeting updated." : "Meeting created.", "success");
     } else {
       showToast(meetingIdField.value ? "Meeting updated." : "Meeting created.", "success");
     }
@@ -879,6 +1131,11 @@ meetingForm?.addEventListener("submit", async (event) => {
 recordForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   mountFormError(recordError, "");
+
+  if (!viewerState.canEdit) {
+    showToast("You can view this page, but only secretary-enabled users can change records.", "warn");
+    return;
+  }
 
   const payload = {
     type: recordForm.elements.type.value,
@@ -924,11 +1181,17 @@ recordForm?.addEventListener("submit", async (event) => {
 });
 
 openMeetingFormButton?.addEventListener("click", () => {
+  if (!viewerState.canEdit) {
+    return;
+  }
   resetMeetingForm();
   showMeetingModal(openMeetingFormButton);
 });
 
 openRecordFormButton?.addEventListener("click", () => {
+  if (!viewerState.canEdit) {
+    return;
+  }
   resetRecordForm();
   showRecordModal(openRecordFormButton);
 });
@@ -943,4 +1206,5 @@ subscribeToMutations(["secretary"], () => {
 
 resetMeetingForm({ clearUrl: false });
 resetRecordForm({ clearUrl: false });
+applyAccessState();
 loadPage();
