@@ -162,11 +162,22 @@ function formatStatusLabel(value) {
   return `${value || ""}`.replaceAll("_", " ").trim() || "Unknown";
 }
 
+function buildDiscordEventUrl(meeting) {
+  const guildId = `${process.env.SECRETARY_DISCORD_GUILD_ID || ""}`.trim();
+
+  if (!guildId || !meeting?.discordEventId) {
+    return "";
+  }
+
+  return `https://discord.com/events/${guildId}/${meeting.discordEventId}`;
+}
+
 function buildMeetingPayload(meeting, audience) {
   const mention = buildMention(audience);
   const audienceLabel = formatAudienceLabel(audience);
   const cleanedDetails = stripImageUrls(meeting.details);
   const imageUrl = extractImageUrl(meeting.details);
+  const eventUrl = buildDiscordEventUrl(meeting);
   const content = [
     mention,
     `# \uD83D\uDCC5 ${BRAND_NAME} MEETING`,
@@ -177,7 +188,8 @@ function buildMeetingPayload(meeting, audience) {
     readableLine("Where", meeting.location ? truncate(meeting.location, 280) : ""),
     readableLine("Audience", audienceLabel),
     readableLine("Status", formatStatusLabel(meeting.status || "SCHEDULED")),
-    meeting.syncToDiscordEvents ? "> RSVP through the Discord Events tab." : ""
+    eventUrl ? `**RSVP:** ${eventUrl}` : "",
+    meeting.syncToDiscordEvents && !eventUrl ? "> RSVP through the Discord Events tab." : ""
   ].filter(Boolean).join("\n");
   const embedFields = [];
 
