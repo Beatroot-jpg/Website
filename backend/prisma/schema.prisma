@@ -335,7 +335,7 @@ model SecretaryMeeting {
   details     String?
   status      SecretaryMeetingStatus @default(SCHEDULED)
   syncToDiscordEvents Boolean        @default(false)
-  discordEventId String?             @unique
+  discordEventId String?
   discordEventStatus String?
   discordEventSyncedAt DateTime?
   createdById String?
