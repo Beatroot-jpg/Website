@@ -82,7 +82,6 @@ function serializeTaxMember(member, now = new Date()) {
   const latestPeriod = periods[0] || null;
   const expiresAt = latestPeriod ? new Date(latestPeriod.expiresAt) : null;
   const active = Boolean(expiresAt && expiresAt >= now);
-  const expiringSoon = Boolean(active && expiresAt.getTime() <= now.getTime() + (7 * DAY_IN_MS));
   const daysRemaining = active
     ? Math.max(0, Math.ceil((expiresAt.getTime() - now.getTime()) / DAY_IN_MS))
     : 0;
@@ -99,9 +98,8 @@ function serializeTaxMember(member, now = new Date()) {
     currentAmount: latestPeriod ? Number(latestPeriod.amount || 0) : 0,
     currentDurationDays: latestPeriod ? Number(latestPeriod.durationDays || 0) : 0,
     expiresAt: latestPeriod?.expiresAt || null,
-    status: active ? (expiringSoon ? "EXPIRING_SOON" : "ACTIVE") : "INACTIVE",
+    status: active ? "ACTIVE" : "INACTIVE",
     active,
-    expiringSoon,
     daysRemaining,
     history: periods.map((period, index) => ({
       id: period.id,
@@ -177,8 +175,7 @@ router.get(
       summary: {
         tracked: serializedMembers.length,
         active: activeMembers.length,
-        inactive: inactiveMembers.length,
-        expiringSoon: activeMembers.filter((member) => member.expiringSoon).length
+        inactive: inactiveMembers.length
       },
       activeMembers,
       inactiveMembers

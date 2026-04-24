@@ -111,15 +111,7 @@ function employmentBadge(employmentType) {
 }
 
 function taxStatusBadge(member) {
-  if (member.status === "ACTIVE") {
-    return badge("Active", "good");
-  }
-
-  if (member.status === "EXPIRING_SOON") {
-    return badge("Expiring soon", "warn");
-  }
-
-  return badge("Inactive", "neutral");
+  return badge(member.status === "ACTIVE" ? "Active" : "Inactive", member.status === "ACTIVE" ? "good" : "neutral");
 }
 
 function formatExpiryMeta(member) {
@@ -175,11 +167,6 @@ function renderSummary(summary = {}) {
         <p>Active now</p>
         <strong>${summary.active || 0}</strong>
         <small>Currently covered by a live tax period</small>
-      </article>
-      <article class="metric-card warn">
-        <p>Expiring soon</p>
-        <strong>${summary.expiringSoon || 0}</strong>
-        <small>Due to expire within the next 7 days</small>
       </article>
       <article class="metric-card neutral">
         <p>Inactive</p>

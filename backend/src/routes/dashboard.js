@@ -207,9 +207,9 @@ router.get(
         const expiry = member.periods[0]?.expiresAt ? new Date(member.periods[0].expiresAt) : null;
         return Boolean(expiry && expiry >= now);
       });
-      const expiringSoonTaxMembers = activeTaxMembers.filter((member) => {
-        const expiry = new Date(member.periods[0].expiresAt);
-        return expiry.getTime() <= now.getTime() + (7 * 24 * 60 * 60 * 1000);
+      const inactiveTaxMembers = taxMembers.filter((member) => {
+        const expiry = member.periods[0]?.expiresAt ? new Date(member.periods[0].expiresAt) : null;
+        return !expiry || expiry < now;
       });
       const recentTaxPeriods = await prisma.taxPeriod.findMany({
         orderBy: { createdAt: "desc" },
@@ -233,11 +233,11 @@ router.get(
           href: "./tax.html#activeTaxTable"
         },
         {
-          label: "Tax expiring soon",
-          value: expiringSoonTaxMembers.length,
-          tone: expiringSoonTaxMembers.length ? "warn" : "good",
-          note: "Renew if needed",
-          href: "./tax.html#activeTaxTable"
+          label: "Inactive tax",
+          value: inactiveTaxMembers.length,
+          tone: inactiveTaxMembers.length ? "warn" : "neutral",
+          note: "Ready for renewal",
+          href: "./tax.html#inactiveTaxTable"
         }
       );
 
