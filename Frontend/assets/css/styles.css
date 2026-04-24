@@ -1858,6 +1858,31 @@ label span,
   gap: 1rem;
 }
 
+.panel-divider {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, var(--line-strong), transparent);
+}
+
+.section-label {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.compact-panel-header {
+  gap: 0.35rem;
+  padding-bottom: 0.4rem;
+}
+
+.compact-panel-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
 .toast-stack {
   position: fixed;
   top: 1rem;

@@ -43,6 +43,7 @@ router.get(
     const canEditSecretary = allowed.has("SECRETARY") || req.user.role === "ADMIN";
     const canViewSecretary = true;
     const canViewBank = allowed.has("BANK") || req.user.role === "ADMIN";
+    const canViewTax = allowed.has("TAX") || req.user.role === "ADMIN";
     const canViewDistribution = allowed.has("DISTRIBUTION") || req.user.role === "ADMIN";
     const canViewUsers = allowed.has("USERS") || req.user.role === "ADMIN";
     const containsFilter = { contains: query, mode: "insensitive" };
@@ -292,6 +293,40 @@ router.get(
           tone: item.type === "DEBIT" ? "danger" : "good",
           sortAt: item.createdAt
         })))
+        : [],
+      canViewTax
+        ? prisma.taxMember.findMany({
+          where: {
+            OR: [
+              { fullName: containsFilter },
+              { mobileNumber: containsFilter },
+              { organizationName: containsFilter },
+              { notes: containsFilter }
+            ]
+          },
+          orderBy: { updatedAt: "desc" },
+          take: 4,
+          include: {
+            periods: {
+              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+              take: 1
+            }
+          }
+        }).then((items) => items.map((item) => {
+          const latestPeriod = item.periods[0] || null;
+          const expiry = latestPeriod?.expiresAt ? new Date(latestPeriod.expiresAt) : null;
+          const active = Boolean(expiry && expiry >= new Date());
+
+          return {
+            id: `tax-${item.id}`,
+            group: "Tax",
+            title: item.fullName,
+            subtitle: `${item.mobileNumber}${item.organizationName ? ` - ${item.organizationName}` : ""}${expiry ? ` - ${active ? "Active until" : "Expired"} ${expiry.toLocaleDateString()}` : " - No renewal history"}`,
+            href: `./tax.html?editMember=${item.id}${active ? "#activeTaxTable" : "#inactiveTaxTable"}`,
+            tone: active ? "accent" : "neutral",
+            sortAt: latestPeriod?.createdAt || item.updatedAt
+          };
+        }))
         : [],
       canViewUsers
         ? prisma.user.findMany({

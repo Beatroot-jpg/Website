@@ -5,6 +5,7 @@ export const APP_PERMISSIONS = [
   "SECRETARY",
   "INVENTORY",
   "BANK",
+  "TAX",
   "DISTRIBUTION",
   "USERS"
 ];

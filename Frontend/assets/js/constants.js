@@ -31,6 +31,12 @@ export const NAV_ITEMS = [
     description: "Stock and adjustments"
   },
   {
+    key: "TAX",
+    label: "Tax",
+    href: "./tax.html",
+    description: "Access trackers"
+  },
+  {
     key: "BANK",
     label: "Bank",
     href: "./bank.html",
@@ -88,6 +94,12 @@ export const QUICK_ACTIONS = [
     description: "Clean or dirty money"
   },
   {
+    permission: "TAX",
+    label: "Open tax",
+    href: "./tax.html",
+    description: "Access periods"
+  },
+  {
     permission: "DISTRIBUTION",
     label: "New distribution",
     href: "./distribution.html#distributionForm",
@@ -108,6 +120,7 @@ export const PERMISSION_LABELS = {
   SECRETARY: "Secretary",
   INVENTORY: "Inventory",
   BANK: "Bank",
+  TAX: "Tax",
   DISTRIBUTION: "Distribution",
   USERS: "Users"
 };
@@ -126,7 +139,12 @@ export const PERMISSION_PRESETS = [
   {
     key: "FINANCE",
     label: "Finance",
-    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "BANK"]
+    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "BANK", "TAX"]
+  },
+  {
+    key: "TAX_DESK",
+    label: "Tax Desk",
+    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "TAX"]
   },
   {
     key: "DISTRIBUTOR",
@@ -136,6 +154,6 @@ export const PERMISSION_PRESETS = [
   {
     key: "OPERATIONS",
     label: "Operations",
-    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "INVENTORY", "BANK", "DISTRIBUTION"]
+    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "INVENTORY", "BANK", "TAX", "DISTRIBUTION"]
   }
 ];

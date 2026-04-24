@@ -20,8 +20,14 @@ enum PermissionKey {
   SECRETARY
   INVENTORY
   BANK
+  TAX
   DISTRIBUTION
   USERS
+}
+
+enum TaxEmploymentType {
+  FREELANCER
+  ORGANIZATION
 }
 
 enum InventoryAdjustmentType {
@@ -110,6 +116,8 @@ model User {
   weeklyTaskAwards       WeeklyTaskAward[]
   createdSecretaryMeetings SecretaryMeeting[] @relation("SecretaryMeetingCreatedBy")
   createdSecretaryRecords SecretaryRecord[] @relation("SecretaryRecordCreatedBy")
+  createdTaxMembers      TaxMember[]       @relation("TaxMemberCreatedBy")
+  createdTaxPeriods      TaxPeriod[]       @relation("TaxPeriodCreatedBy")
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 }
@@ -364,4 +372,39 @@ model SecretaryRecord {
 
   @@index([type])
   @@index([meetingId])
+}
+
+model TaxMember {
+  id               String             @id @default(cuid())
+  fullName         String
+  mobileNumber     String
+  employmentType   TaxEmploymentType
+  organizationName String?
+  notes            String?
+  createdById      String?
+  createdBy        User?              @relation("TaxMemberCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  periods          TaxPeriod[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([fullName])
+  @@index([mobileNumber])
+  @@index([employmentType])
+}
+
+model TaxPeriod {
+  id          String    @id @default(cuid())
+  memberId    String
+  amount      Decimal   @db.Decimal(12, 2)
+  durationDays Int
+  expiresAt   DateTime
+  notes       String?
+  createdById String?
+  member      TaxMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdBy   User?     @relation("TaxPeriodCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([memberId, createdAt])
+  @@index([expiresAt])
 }

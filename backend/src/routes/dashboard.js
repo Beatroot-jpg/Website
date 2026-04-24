@@ -48,6 +48,7 @@ router.get(
     const canEditSecretary = allowed.has("SECRETARY") || req.user.role === "ADMIN";
     const canViewSecretary = true;
     const canViewBank = allowed.has("BANK") || req.user.role === "ADMIN";
+    const canViewTax = allowed.has("TAX") || req.user.role === "ADMIN";
     const canViewDistribution = allowed.has("DISTRIBUTION") || req.user.role === "ADMIN";
     const recentActivity = [];
     let lowStockItems = [];
@@ -187,6 +188,69 @@ router.get(
           tone: transaction.entryType === "SUBTRACT" ? "danger" : transaction.moneyType === "DIRTY" ? "accent" : "good",
           createdAt: transaction.createdAt,
           href: buildBankTransactionHref(transaction)
+        }))
+      );
+    }
+
+    if (canViewTax) {
+      const now = new Date();
+      const taxMembers = await prisma.taxMember.findMany({
+        include: {
+          periods: {
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: 1
+          }
+        }
+      });
+
+      const activeTaxMembers = taxMembers.filter((member) => {
+        const expiry = member.periods[0]?.expiresAt ? new Date(member.periods[0].expiresAt) : null;
+        return Boolean(expiry && expiry >= now);
+      });
+      const expiringSoonTaxMembers = activeTaxMembers.filter((member) => {
+        const expiry = new Date(member.periods[0].expiresAt);
+        return expiry.getTime() <= now.getTime() + (7 * 24 * 60 * 60 * 1000);
+      });
+      const recentTaxPeriods = await prisma.taxPeriod.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 4,
+        include: {
+          member: {
+            select: {
+              id: true,
+              fullName: true
+            }
+          }
+        }
+      });
+
+      metrics.push(
+        {
+          label: "Active tax",
+          value: activeTaxMembers.length,
+          tone: "accent",
+          note: "Open tax tracker",
+          href: "./tax.html#activeTaxTable"
+        },
+        {
+          label: "Tax expiring soon",
+          value: expiringSoonTaxMembers.length,
+          tone: expiringSoonTaxMembers.length ? "warn" : "good",
+          note: "Renew if needed",
+          href: "./tax.html#activeTaxTable"
+        }
+      );
+
+      recentActivity.push(
+        ...recentTaxPeriods.map((period) => ({
+          id: `tax-period-${period.id}`,
+          category: "Tax",
+          title: period.member.fullName,
+          detail: `${period.durationDays} day renewal for $${Number(period.amount || 0).toFixed(2)}`,
+          badgeLabel: "Renewed",
+          tone: "accent",
+          createdAt: period.createdAt,
+          href: `./tax.html?editMember=${period.member.id}#activeTaxTable`
         }))
       );
     }
