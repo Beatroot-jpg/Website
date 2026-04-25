@@ -5,7 +5,6 @@ import { asyncHandler, createError } from "../http.js";
 import { authenticateToken, requirePermission } from "../middleware/auth.js";
 import {
   normalizeOptionalString,
-  requireMoney,
   requirePositiveInt,
   requireString
 } from "../validators.js";
@@ -37,6 +36,10 @@ function resolveOrganizationName(employmentType, organizationName) {
 
 function addDays(date, days) {
   return new Date(date.getTime() + (days * DAY_IN_MS));
+}
+
+function requireTaxQuantity(value) {
+  return requirePositiveInt(value, "Quantity paid");
 }
 
 async function recalculateTaxTimeline(memberId) {
@@ -95,7 +98,7 @@ function serializeTaxMember(member, now = new Date()) {
     notes: member.notes,
     createdAt: member.createdAt,
     updatedAt: member.updatedAt,
-    currentAmount: latestPeriod ? Number(latestPeriod.amount || 0) : 0,
+    currentQuantityPaid: latestPeriod ? Number(latestPeriod.amount || 0) : 0,
     currentDurationDays: latestPeriod ? Number(latestPeriod.durationDays || 0) : 0,
     expiresAt: latestPeriod?.expiresAt || null,
     status: active ? "ACTIVE" : "INACTIVE",
@@ -103,7 +106,7 @@ function serializeTaxMember(member, now = new Date()) {
     daysRemaining,
     history: periods.map((period, index) => ({
       id: period.id,
-      amount: Number(period.amount || 0),
+      quantityPaid: Number(period.amount || 0),
       durationDays: Number(period.durationDays || 0),
       expiresAt: period.expiresAt,
       notes: period.notes,
@@ -187,7 +190,7 @@ router.post(
   "/",
   asyncHandler(async (req, res) => {
     const employmentType = normalizeEmploymentType(req.body.employmentType);
-    const amount = requireMoney(req.body.amount, "Amount paid");
+    const quantityPaid = requireTaxQuantity(req.body.quantityPaid ?? req.body.amount);
     const durationDays = requirePositiveInt(req.body.durationDays, "Duration");
     const member = await prisma.$transaction(async (transaction) => {
       const createdMember = await transaction.taxMember.create({
@@ -204,7 +207,7 @@ router.post(
       await transaction.taxPeriod.create({
         data: {
           memberId: createdMember.id,
-          amount,
+          amount: quantityPaid,
           durationDays,
           expiresAt: new Date(),
           notes: normalizeOptionalString(req.body.periodNotes),
@@ -269,7 +272,7 @@ router.post(
     await prisma.taxPeriod.create({
       data: {
         memberId: member.id,
-        amount: requireMoney(req.body.amount, "Amount paid"),
+        amount: requireTaxQuantity(req.body.quantityPaid ?? req.body.amount),
         durationDays: requirePositiveInt(req.body.durationDays, "Duration"),
         expiresAt: new Date(),
         notes: normalizeOptionalString(req.body.notes),
@@ -307,8 +310,8 @@ router.patch(
     await prisma.taxPeriod.update({
       where: { id: existingPeriod.id },
       data: {
-        amount: req.body.amount !== undefined
-          ? requireMoney(req.body.amount, "Amount paid")
+        amount: req.body.quantityPaid !== undefined || req.body.amount !== undefined
+          ? requireTaxQuantity(req.body.quantityPaid ?? req.body.amount)
           : existingPeriod.amount,
         durationDays: req.body.durationDays !== undefined
           ? requirePositiveInt(req.body.durationDays, "Duration")

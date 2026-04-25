@@ -246,7 +246,7 @@ router.get(
           id: `tax-period-${period.id}`,
           category: "Tax",
           title: period.member.fullName,
-          detail: `${period.durationDays} day renewal for $${Number(period.amount || 0).toFixed(2)}`,
+          detail: `${period.durationDays} day renewal for ${Number(period.amount || 0)} units`,
           badgeLabel: "Renewed",
           tone: "accent",
           createdAt: period.createdAt,

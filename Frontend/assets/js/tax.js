@@ -3,7 +3,6 @@ import { announceMutation, subscribeToMutations } from "./live.js";
 import {
   badge,
   closeFormModal,
-  formatCurrency,
   formatDate,
   initProtectedPage,
   mountFormError,
@@ -103,6 +102,10 @@ function normalizeEmploymentLabel(employmentType) {
   return `${employmentType || ""}`.charAt(0) + `${employmentType || ""}`.slice(1).toLowerCase();
 }
 
+function formatQuantity(value) {
+  return new Intl.NumberFormat().format(Number(value || 0));
+}
+
 function employmentBadge(employmentType) {
   return badge(
     normalizeEmploymentLabel(employmentType),
@@ -183,14 +186,14 @@ function renderHistory(member) {
   }
 
   if (!member?.history?.length) {
-    historyFeed.innerHTML = renderEmptyState("No renewal history yet", "This tracker has not had any payments recorded yet.");
+    historyFeed.innerHTML = renderEmptyState("No renewal history yet", "This tracker has not had any quantity entries recorded yet.");
     return;
   }
 
   historyFeed.innerHTML = member.history.map((entry) => `
     <article class="activity-card">
       <div>
-        <strong>${formatCurrency(entry.amount)} for ${entry.durationDays} day${entry.durationDays === 1 ? "" : "s"}</strong>
+        <strong>${formatQuantity(entry.quantityPaid)} units for ${entry.durationDays} day${entry.durationDays === 1 ? "" : "s"}</strong>
         <p>Expires ${formatDate(entry.expiresAt)}</p>
         <small class="subtle-row">Recorded ${formatDate(entry.createdAt)}${entry.createdByName ? ` by ${entry.createdByName}` : ""}${entry.notes ? ` - ${entry.notes}` : ""}</small>
       </div>
@@ -283,11 +286,11 @@ function fillRenewForm(member, renewal = null) {
   renewFormTitle.textContent = renewal ? `Edit renewal for ${member.fullName}` : `Renew ${member.fullName}`;
   renewFormSubtitle.textContent = renewal
     ? "Correct this renewal and the access timeline will recalculate automatically."
-    : "Add a new payment and the tracker will extend from the current expiry if they are still active.";
+    : "Add a new quantity entry and the tracker will extend from the current expiry if they are still active.";
   renewSubmitButton.textContent = renewal ? "Save changes" : "Add renewal";
   mountFormError(renewFormError, "");
 
-  renewForm.elements.amount.value = renewal ? `${renewal.amount}` : `${member.currentAmount || ""}`;
+  renewForm.elements.quantityPaid.value = renewal ? `${renewal.quantityPaid}` : `${member.currentQuantityPaid || ""}`;
   renewForm.elements.durationDays.value = renewal ? `${renewal.durationDays}` : `${member.currentDurationDays || 7}`;
   renewForm.elements.notes.value = renewal?.notes || "";
 }
@@ -311,7 +314,7 @@ function showRenewModal(opener = document.activeElement) {
   openFormModal({
     content: renewFormContent,
     host: renewFormHost,
-    focusSelector: '[name="amount"]',
+    focusSelector: '[name="quantityPaid"]',
     opener,
     onClose: () => {
       if (requestedRenewMemberId || requestedEditRenewalId) {
@@ -439,7 +442,7 @@ function renderMembersTable(container, members, { emptyTitle, emptyMessage, empt
             <th>Contact</th>
             <th>Type</th>
             <th>Access</th>
-            <th>Latest payment</th>
+            <th>Latest quantity</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -473,8 +476,8 @@ function renderMembersTable(container, members, { emptyTitle, emptyMessage, empt
                 </td>
                 <td>
                   ${latestRenewal
-                    ? `<strong>${formatCurrency(latestRenewal.amount)}</strong><span class="subtle-row">${latestRenewal.durationDays} day${latestRenewal.durationDays === 1 ? "" : "s"} / ${formatDate(latestRenewal.createdAt)}</span>`
-                    : `<strong>No payment yet</strong><span class="subtle-row">Create the first renewal to start tracking access.</span>`}
+                    ? `<strong>${formatQuantity(latestRenewal.quantityPaid)} units</strong><span class="subtle-row">${latestRenewal.durationDays} day${latestRenewal.durationDays === 1 ? "" : "s"} / ${formatDate(latestRenewal.createdAt)}</span>`
+                    : `<strong>No quantity recorded yet</strong><span class="subtle-row">Create the first renewal to start tracking access.</span>`}
                 </td>
                 <td>
                   <div class="inline-table-actions">
@@ -548,7 +551,7 @@ async function deleteRenewal(renewalId, memberId) {
     return;
   }
 
-  const confirmed = window.confirm(`Delete the ${formatCurrency(result.renewal.amount)} renewal for ${result.member.fullName}?`);
+  const confirmed = window.confirm(`Delete the ${formatQuantity(result.renewal.quantityPaid)} unit renewal for ${result.member.fullName}?`);
 
   if (!confirmed) {
     return;
@@ -611,7 +614,7 @@ memberForm?.addEventListener("submit", async (event) => {
   };
 
   if (!editingMemberId) {
-    payload.amount = Number(formData.get("amount") || 0);
+    payload.quantityPaid = Number(formData.get("quantityPaid") || 0);
     payload.durationDays = Number(formData.get("durationDays") || 0);
     payload.periodNotes = formData.get("periodNotes");
   }
@@ -649,7 +652,7 @@ renewForm?.addEventListener("submit", async (event) => {
   const renewalId = renewalIdField.value;
   const formData = new FormData(renewForm);
   const payload = {
-    amount: Number(formData.get("amount") || 0),
+    quantityPaid: Number(formData.get("quantityPaid") || 0),
     durationDays: Number(formData.get("durationDays") || 0),
     notes: formData.get("notes")
   };
