@@ -347,6 +347,43 @@ router.patch(
   })
 );
 
+router.delete(
+  "/distributors/:id",
+  asyncHandler(async (req, res) => {
+    const existingDistributor = await prisma.distributor.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        active: true
+      }
+    });
+
+    if (!existingDistributor) {
+      throw createError(404, "Runner not found.");
+    }
+
+    if (existingDistributor.active) {
+      throw createError(400, "Only inactive runners can be deleted.");
+    }
+
+    const distributionCount = await prisma.runnerDistribution.count({
+      where: {
+        distributorId: existingDistributor.id
+      }
+    });
+
+    if (distributionCount > 0) {
+      throw createError(400, "This runner has distribution history. Leave them inactive instead of deleting them.");
+    }
+
+    await prisma.distributor.delete({
+      where: { id: existingDistributor.id }
+    });
+
+    res.json({ message: "Runner deleted." });
+  })
+);
+
 router.post(
   "/",
   asyncHandler(async (req, res) => {

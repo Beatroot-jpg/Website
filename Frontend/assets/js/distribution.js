@@ -662,6 +662,7 @@ function renderDistributors() {
                   <div class="inline-table-actions">
                     <button class="mini-action" type="button" data-edit-distributor="${distributor.id}">Edit</button>
                     <button class="mini-action" type="button" data-toggle-distributor="${distributor.id}">${distributor.active ? "Pause" : "Activate"}</button>
+                    ${!distributor.active ? `<button class="mini-action danger-action" type="button" data-delete-distributor="${distributor.id}">Delete</button>` : ""}
                   </div>
                 </td>
                 <td>${formatDate(distributor.updatedAt)}</td>
@@ -704,6 +705,40 @@ function renderDistributors() {
         await loadPage();
         announceMutation(["distribution"]);
         showToast("Runner status updated.", "success");
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    });
+  });
+
+  distributorTable.querySelectorAll("[data-delete-distributor]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        const distributor = distributorsCache.find((entry) => entry.id === button.dataset.deleteDistributor);
+
+        if (!distributor) {
+          return;
+        }
+
+        const confirmed = window.confirm(`Delete ${distributor.name}? This only works if they have no saved distribution history.`);
+
+        if (!confirmed) {
+          return;
+        }
+
+        await api(`/distribution/distributors/${distributor.id}`, {
+          method: "DELETE"
+        });
+
+        if (requestedDistributorEditId === distributor.id) {
+          requestedDistributorEditId = "";
+          closeFormModal();
+          updateUrlParams({ editDistributor: "" }, ["editDistributor"]);
+        }
+
+        await loadPage();
+        announceMutation(["distribution"]);
+        showToast("Runner deleted.", "success");
       } catch (error) {
         showToast(error.message, "error");
       }
