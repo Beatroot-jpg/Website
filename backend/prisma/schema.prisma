@@ -196,11 +196,13 @@ model Distributor {
   name          String
   number        String
   active        Boolean              @default(true)
+  archived      Boolean              @default(false)
   distributions RunnerDistribution[]
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
   @@index([name])
+  @@index([archived])
 }
 
 model RunnerDistribution {

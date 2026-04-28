@@ -261,6 +261,9 @@ router.get(
         }
       }),
       prisma.distributor.findMany({
+        where: {
+          archived: false
+        },
         orderBy: [{ active: "desc" }, { name: "asc" }],
         select: {
           id: true,
@@ -280,6 +283,9 @@ router.get(
   asyncHandler(async (_req, res) => {
     const [distributors, distributions, ledgerEntries] = await Promise.all([
       prisma.distributor.findMany({
+        where: {
+          archived: false
+        },
         orderBy: [{ active: "desc" }, { name: "asc" }]
       }),
       prisma.runnerDistribution.findMany({
@@ -354,7 +360,8 @@ router.delete(
       where: { id: req.params.id },
       select: {
         id: true,
-        active: true
+        active: true,
+        archived: true
       }
     });
 
@@ -366,18 +373,28 @@ router.delete(
       throw createError(400, "Only inactive runners can be deleted.");
     }
 
-    const distributionCount = await prisma.runnerDistribution.count({
+    if (existingDistributor.archived) {
+      return res.json({ message: "Runner already deleted." });
+    }
+
+    const openDistributionCount = await prisma.runnerDistribution.count({
       where: {
-        distributorId: existingDistributor.id
+        distributorId: existingDistributor.id,
+        status: {
+          in: [...OPEN_STATUSES]
+        }
       }
     });
 
-    if (distributionCount > 0) {
-      throw createError(400, "This runner has distribution history. Leave them inactive instead of deleting them.");
+    if (openDistributionCount > 0) {
+      throw createError(400, "This runner still has active distributions. Clear those runs first.");
     }
 
-    await prisma.distributor.delete({
-      where: { id: existingDistributor.id }
+    await prisma.distributor.update({
+      where: { id: existingDistributor.id },
+      data: {
+        archived: true
+      }
     });
 
     res.json({ message: "Runner deleted." });
@@ -811,23 +828,23 @@ router.post(
       throw createError(400, "Only pending ledger entries can be deposited.");
     }
 
-    if (collections.some((collection) => toMoneyNumber(collection.amount) <= 0)) {
-      throw createError(400, "Only money-return ledger entries with value can be deposited.");
-    }
-
     const totalAmount = collections.reduce((sum, collection) => sum + toMoneyNumber(collection.amount), 0);
 
     const bankTransaction = await prisma.$transaction(async (transaction) => {
-      const createdTransaction = await transaction.bankTransaction.create({
-        data: {
-          amount: toMoneyString(totalAmount),
-          type: "CREDIT",
-          moneyType: "DIRTY",
-          sourceSystem: "distribution_deposit",
-          description: normalizeOptionalString(req.body.description) || `Distribution ledger deposit (${collections.length} entries)`,
-          createdById: req.user.id
-        }
-      });
+      let createdTransaction = null;
+
+      if (totalAmount > 0) {
+        createdTransaction = await transaction.bankTransaction.create({
+          data: {
+            amount: toMoneyString(totalAmount),
+            type: "CREDIT",
+            moneyType: "DIRTY",
+            sourceSystem: "distribution_deposit",
+            description: normalizeOptionalString(req.body.description) || `Distribution ledger deposit (${collections.length} entries)`,
+            createdById: req.user.id
+          }
+        });
+      }
 
       await transaction.distributionCollection.updateMany({
         where: {
@@ -837,7 +854,7 @@ router.post(
         },
         data: {
           status: "DEPOSITED",
-          bankTransactionId: createdTransaction.id,
+          bankTransactionId: createdTransaction?.id || null,
           depositedAt: new Date()
         }
       });

@@ -489,7 +489,7 @@ function visibleLedgerEntries() {
 function selectedLedgerEntries() {
   const knownIds = new Set(
     ledgerCache
-      .filter((entry) => entry.status === "PENDING" && Number(entry.amount) > 0)
+      .filter((entry) => entry.status === "PENDING")
       .map((entry) => entry.id)
   );
   selectedLedgerIds = new Set([...selectedLedgerIds].filter((id) => knownIds.has(id)));
@@ -795,7 +795,7 @@ function renderLedgerToolbar() {
 
 function renderLedgerEntries() {
   const entries = visibleLedgerEntries();
-  const allSelectable = entries.filter((entry) => Number(entry.amount) > 0);
+  const allSelectable = entries.filter((entry) => entry.status === "PENDING");
   const allSelected = allSelectable.length && allSelectable.every((entry) => selectedLedgerIds.has(entry.id));
 
   if (!entries.length) {
@@ -822,7 +822,7 @@ function renderLedgerEntries() {
         </thead>
         <tbody>
           ${entries.map((entry) => {
-            const selectable = entry.status === "PENDING" && Number(entry.amount) > 0;
+            const selectable = entry.status === "PENDING";
 
             return `
               <tr class="${requestedCollectionEditId === entry.id ? "editing-row" : ""}">
