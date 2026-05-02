@@ -26,11 +26,11 @@ const DEFAULT_AUDIENCES = [
   }
 ];
 
-const BRAND_NAME = "YUGO MAFIA";
-const WEBHOOK_NAME = "YUGO MAFIA Secretary";
+const BRAND_NAME = "The Shites";
+const WEBHOOK_NAME = "The Shites Secretary";
 const IMAGE_URL_PATTERN = /https?:\/\/\S+\.(?:png|jpe?g|gif|webp)(?:\?\S*)?/i;
 const DISCORD_COLORS = {
-  meeting: 0x1d4ed8,
+  meeting: 0x16a34a,
   minutes: 0x15803d,
   journal: 0x64748b,
   notice: 0xf59e0b
@@ -209,11 +209,11 @@ function buildMeetingPayload(meeting, audience) {
         title: "Meeting details",
         description: cleanedDetails
           ? truncate(cleanedDetails, 1800)
-          : "Meeting scheduled through the YUGO MAFIA secretary workspace.",
+          : "Meeting scheduled through The Shites secretary workspace.",
         color: DISCORD_COLORS.meeting,
         ...(embedFields.length ? { fields: embedFields } : {}),
         footer: {
-          text: "YUGO MAFIA Secretary"
+          text: "The Shites Secretary"
         },
         timestamp: new Date(meeting.startsAt).toISOString(),
         ...(imageUrl ? { image: { url: imageUrl } } : {})
@@ -299,11 +299,11 @@ function buildRecordPayload(record, audience) {
           ? truncate(cleanedContent, 1800)
           : cleanedSummary
             ? truncate(cleanedSummary, 1800)
-            : "Organization record posted from the YUGO MAFIA secretary workspace.",
+            : "Organization record posted from The Shites secretary workspace.",
         color: style.color,
         ...(embedFields.length ? { fields: embedFields } : {}),
         footer: {
-          text: "YUGO MAFIA Secretary"
+          text: "The Shites Secretary"
         },
         timestamp: new Date(record.updatedAt || record.createdAt || Date.now()).toISOString(),
         ...(imageUrl ? { image: { url: imageUrl } } : {})
@@ -360,3 +360,4 @@ export async function postRecordToDiscord(record) {
   const audience = getSecretaryAudienceByKey(record.audience);
   return executeWebhook(buildRecordPayload(record, audience));
 }
+

@@ -1,6 +1,6 @@
-const BRAND_NAME = "YUGO MAFIA";
-const WEBHOOK_NAME = "YUGO MAFIA Inventory";
-const EMBED_COLOR = 0x1d4ed8;
+const BRAND_NAME = "The Shites";
+const WEBHOOK_NAME = "The Shites Inventory";
+const EMBED_COLOR = 0x16a34a;
 
 function buildDiscordTimestamp(value, style = "F") {
   const date = new Date(value);
@@ -90,7 +90,7 @@ export async function postInventoryUpdateToDiscord(snapshot = {}) {
         description: "The website inventory has been refreshed and is now up to date.",
         color: EMBED_COLOR,
         footer: {
-          text: "YUGO MAFIA Inventory"
+          text: "The Shites Inventory"
         },
         timestamp: new Date(sentAt).toISOString()
       }
@@ -102,3 +102,4 @@ export async function postInventoryUpdateToDiscord(snapshot = {}) {
 
   return executeWebhook(payload);
 }
+

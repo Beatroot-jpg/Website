@@ -88,7 +88,7 @@ function validateMeetingForExternalEvent(meeting) {
 function buildExternalEventPayload(meeting) {
   return {
     name: truncate(meeting.title, 100),
-    description: truncate(meeting.details || "Scheduled from the YUGO MAFIA secretary workspace.", 1000),
+    description: truncate(meeting.details || "Scheduled from The Shites secretary workspace.", 1000),
     privacy_level: GUILD_ONLY_PRIVACY_LEVEL,
     scheduled_start_time: new Date(meeting.startsAt).toISOString(),
     scheduled_end_time: new Date(meeting.endsAt).toISOString(),
@@ -213,3 +213,4 @@ export async function deleteDiscordScheduledEvent(meeting) {
     deleted: true
   };
 }
+

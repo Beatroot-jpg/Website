@@ -1,4 +1,4 @@
-# YUGO MAFIA Control
+# The Shites Control
 
 Inventory management starter with:
 
@@ -128,3 +128,4 @@ Available page permissions:
 
 - Live server boot against a real PostgreSQL instance
 - End-to-end login and CRUD flows in a browser
+
