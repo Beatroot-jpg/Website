@@ -331,6 +331,7 @@ router.get(
       canViewUsers
         ? prisma.user.findMany({
           where: {
+            archived: false,
             OR: [
               { name: containsFilter },
               { email: containsFilter }
@@ -371,7 +372,10 @@ router.get(
   authenticateToken,
   asyncHandler(async (_req, res) => {
     const users = await prisma.user.findMany({
-      where: { active: true },
+      where: {
+        active: true,
+        archived: false
+      },
       orderBy: { name: "asc" },
       select: {
         id: true,

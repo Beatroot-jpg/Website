@@ -24,7 +24,7 @@ import {
   saveSavedView
 } from "./workflow.js";
 
-initProtectedPage({
+const currentUser = initProtectedPage({
   pageKey: "USERS",
   title: "Users and permissions",
   subtitle: "Create staff accounts and assign page-by-page access."
@@ -43,6 +43,7 @@ const generatePasswordButton = document.querySelector("#generatePassword");
 const openUserFormButton = document.querySelector("#openUserFormButton");
 const userFormHost = document.querySelector("#userFormHost");
 const userFormContent = document.querySelector("#userFormContent");
+const deleteUserButton = document.querySelector("#deleteUserButton");
 const toolbarHost = document.createElement("div");
 const pageParams = new URLSearchParams(window.location.search);
 const searchQuery = (pageParams.get("search") || "").trim().toLowerCase();
@@ -169,6 +170,7 @@ function resetForm() {
   requestedUserEditId = "";
   updateUrlParams({ editUser: "" }, ["editUser"]);
   syncPermissionState();
+  deleteUserButton?.classList.add("hidden");
 }
 
 function fillForm(user) {
@@ -189,6 +191,10 @@ function fillForm(user) {
   }
 
   syncPermissionState();
+
+  if (deleteUserButton) {
+    deleteUserButton.classList.toggle("hidden", user.id === currentUser.id);
+  }
 }
 
 function showUserFormModal(opener = document.activeElement) {
@@ -392,6 +398,54 @@ async function updateUsersBulkStatus(userIds, active) {
   });
 }
 
+async function deleteUser(user, opener = document.activeElement) {
+  if (!user) {
+    throw new Error("That user could not be found.");
+  }
+
+  if (user.id === currentUser.id) {
+    throw new Error("You cannot delete the account you are currently using.");
+  }
+
+  const confirmed = window.confirm(
+    `Delete ${user.name}? Their account will disappear from the live system, but old history will stay attached to them.`
+  );
+
+  if (!confirmed) {
+    return false;
+  }
+
+  await api(`/users/${user.id}`, {
+    method: "DELETE"
+  });
+
+  selectedUserIds.delete(user.id);
+
+  if (requestedUserEditId === user.id || userIdField.value === user.id) {
+    resetForm();
+    closeFormModal({ restoreFocus: false });
+  }
+
+  await loadUsers();
+  announceMutation(["users"]);
+  showToast("User deleted.", "success");
+
+  const fallbackFocusTarget = (
+    opener
+    && typeof opener.focus === "function"
+    && document.contains(opener)
+    && !opener.classList?.contains("hidden")
+  )
+    ? opener
+    : openUserFormButton;
+
+  if (fallbackFocusTarget && typeof fallbackFocusTarget.focus === "function") {
+    fallbackFocusTarget.focus({ preventScroll: true });
+  }
+
+  return true;
+}
+
 function renderUsers(users) {
   const visibleUsers = getVisibleUsers(users);
   const allVisibleSelected = visibleUsers.length && visibleUsers.every((user) => selectedUserIds.has(user.id));
@@ -453,6 +507,7 @@ function renderUsers(users) {
                 <div class="inline-table-actions">
                   <button class="mini-action" type="button" data-toggle-user="${user.id}">${user.active ? "Suspend" : "Activate"}</button>
                   <button class="mini-action" type="button" data-edit-user="${user.id}">Edit</button>
+                  ${user.id !== currentUser.id ? `<button class="mini-action danger-action" type="button" data-delete-user="${user.id}">Delete</button>` : ""}
                 </div>
               </td>
             </tr>
@@ -487,6 +542,18 @@ function renderUsers(users) {
         await loadUsers();
         announceMutation(["users"]);
         showToast("User updated inline.", "success");
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    });
+  });
+
+  tableContainer.querySelectorAll("[data-delete-user]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const user = usersCache.find((entry) => entry.id === button.dataset.deleteUser);
+
+      try {
+        await deleteUser(user, button);
       } catch (error) {
         showToast(error.message, "error");
       }
@@ -564,6 +631,21 @@ openUserFormButton?.addEventListener("click", () => {
 });
 
 resetButton?.addEventListener("click", resetForm);
+
+deleteUserButton?.addEventListener("click", async () => {
+  const user = usersCache.find((entry) => entry.id === userIdField.value);
+
+  try {
+    const deleted = await deleteUser(user, deleteUserButton);
+
+    if (deleted) {
+      closeFormModal();
+    }
+  } catch (error) {
+    mountFormError(userError, error.message);
+    showToast(error.message, "error");
+  }
+});
 
 userForm?.addEventListener("submit", async (event) => {
   event.preventDefault();

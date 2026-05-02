@@ -103,6 +103,7 @@ model User {
   name                   String
   role                   Role              @default(USER)
   active                 Boolean           @default(true)
+  archived               Boolean           @default(false)
   permissions            UserPermission[]
   createdDistributions   Distribution[]    @relation("DistributionCreatedBy")
   assignedDistributions  Distribution[]    @relation("DistributionAssignedTo")
@@ -120,6 +121,8 @@ model User {
   createdTaxPeriods      TaxPeriod[]       @relation("TaxPeriodCreatedBy")
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
+
+  @@index([archived])
 }
 
 model UserPermission {

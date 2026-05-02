@@ -21,6 +21,7 @@ export async function ensureInitialAdmin() {
       passwordHash,
       role: "ADMIN",
       active: true,
+      archived: false,
       permissions: {
         deleteMany: {},
         create: APP_PERMISSIONS.map((key) => ({ key }))
@@ -32,6 +33,7 @@ export async function ensureInitialAdmin() {
       passwordHash,
       role: "ADMIN",
       active: true,
+      archived: false,
       permissions: {
         create: APP_PERMISSIONS.map((key) => ({ key }))
       }

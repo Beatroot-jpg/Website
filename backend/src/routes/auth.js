@@ -19,7 +19,7 @@ router.post(
       include: { permissions: true }
     });
 
-    if (!user || !user.active) {
+    if (!user || !user.active || user.archived) {
       throw createError(401, "Invalid username or password.");
     }
 

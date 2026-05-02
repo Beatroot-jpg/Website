@@ -19,6 +19,9 @@ router.get(
   "/",
   asyncHandler(async (_req, res) => {
     const users = await prisma.user.findMany({
+      where: {
+        archived: false
+      },
       orderBy: [{ role: "asc" }, { name: "asc" }],
       include: { permissions: true }
     });
@@ -71,6 +74,7 @@ router.patch(
 
     const count = await prisma.user.count({
       where: {
+        archived: false,
         id: {
           in: userIds
         }
@@ -83,6 +87,7 @@ router.patch(
 
     const result = await prisma.user.updateMany({
       where: {
+        archived: false,
         id: {
           in: userIds
         }
@@ -105,6 +110,10 @@ router.patch(
     });
 
     if (!existingUser) {
+      throw createError(404, "User not found.");
+    }
+
+    if (existingUser.archived) {
       throw createError(404, "User not found.");
     }
 
@@ -157,6 +166,34 @@ router.patch(
     });
 
     res.json({ user: serializeUser(user) });
+  })
+);
+
+router.delete(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    if (req.user.id === req.params.id) {
+      throw createError(400, "You cannot delete the account you are currently using.");
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { id: req.params.id }
+    });
+
+    if (!existingUser || existingUser.archived) {
+      throw createError(404, "User not found.");
+    }
+
+    await prisma.user.update({
+      where: { id: existingUser.id },
+      data: {
+        active: false,
+        archived: true,
+        email: `deleted.${existingUser.id}`
+      }
+    });
+
+    res.json({ message: "User deleted." });
   })
 );
 

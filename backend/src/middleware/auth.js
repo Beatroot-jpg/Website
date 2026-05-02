@@ -20,7 +20,7 @@ export async function authenticateToken(req, res, next) {
       include: { permissions: true }
     });
 
-    if (!user || !user.active) {
+    if (!user || !user.active || user.archived) {
       return res.status(401).json({ message: "Your account is unavailable." });
     }
 
