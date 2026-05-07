@@ -39,7 +39,6 @@ router.get(
     const allowed = new Set(req.user.permissions);
     const canViewInventory = allowed.has("INVENTORY") || req.user.role === "ADMIN";
     const canViewAnalytics = allowed.has("ANALYTICS") || req.user.role === "ADMIN";
-    const canViewDailyTasks = allowed.has("DAILY_TASKS") || req.user.role === "ADMIN";
     const canEditSecretary = allowed.has("SECRETARY") || req.user.role === "ADMIN";
     const canViewSecretary = true;
     const canViewBank = allowed.has("BANK") || req.user.role === "ADMIN";
@@ -132,69 +131,6 @@ router.get(
           tone: item.status === "CLEARED" ? "good" : item.status === "FAULTY" ? "danger" : item.status === "PARTIAL" ? "warn" : "accent",
           sortAt: item.updatedAt
         })))
-        : [],
-      canViewDailyTasks
-        ? Promise.all([
-          prisma.dailyTask.findMany({
-            where: {
-              active: true,
-              OR: [
-                { title: containsFilter },
-                { description: containsFilter }
-              ]
-            },
-            orderBy: [{ importance: "desc" }, { updatedAt: "desc" }],
-            take: 4,
-            select: {
-              id: true,
-              title: true,
-              description: true,
-              importance: true,
-              updatedAt: true
-            }
-          }),
-          prisma.weeklyTask.findMany({
-            where: {
-              active: true,
-              OR: [
-                { title: containsFilter },
-                { description: containsFilter }
-              ]
-            },
-            orderBy: [{ importance: "desc" }, { updatedAt: "desc" }],
-            take: 4,
-            select: {
-              id: true,
-              title: true,
-              description: true,
-              importance: true,
-              updatedAt: true
-            }
-          })
-        ]).then(([dailyItems, weeklyItems]) => [
-          ...dailyItems.map((item) => ({
-            id: `daily-task-${item.id}`,
-            group: "Tasks",
-            title: item.title,
-            subtitle: `Daily - ${item.importance.toLowerCase()} priority${item.description ? ` - ${item.description}` : ""}`,
-            href: req.user.role === "ADMIN"
-              ? `./daily-tasks.html?editTask=${item.id}#adminTaskPanel`
-              : "./daily-tasks.html#taskChecklist",
-            tone: item.importance === "HIGH" ? "warn" : item.importance === "MEDIUM" ? "accent" : "neutral",
-            sortAt: item.updatedAt
-          })),
-          ...weeklyItems.map((item) => ({
-            id: `weekly-task-${item.id}`,
-            group: "Tasks",
-            title: item.title,
-            subtitle: `Weekly - ${item.importance.toLowerCase()} priority${item.description ? ` - ${item.description}` : ""}`,
-            href: req.user.role === "ADMIN"
-              ? `./daily-tasks.html?editWeeklyTask=${item.id}#adminTaskPanel`
-              : "./daily-tasks.html#weeklyTaskPanel",
-            tone: item.importance === "HIGH" ? "warn" : item.importance === "MEDIUM" ? "accent" : "neutral",
-            sortAt: item.updatedAt
-          }))
-        ])
         : [],
       canViewSecretary
         ? Promise.all([

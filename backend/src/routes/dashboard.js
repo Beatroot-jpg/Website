@@ -4,7 +4,7 @@ import { prisma } from "../db.js";
 import { asyncHandler } from "../http.js";
 import { authenticateToken, requirePermission } from "../middleware/auth.js";
 import { getBankBalances, getEntryTypeFromTransaction } from "../services/bank.js";
-import { getOperationalDayKey, getSydneyDateKey, getWeekStartKey, shiftDateKey } from "../services/time.js";
+import { getSydneyDateKey, getWeekStartKey, shiftDateKey } from "../services/time.js";
 
 const router = Router();
 
@@ -44,7 +44,6 @@ router.get(
     const allowed = new Set(req.user.permissions);
     const canViewInventory = allowed.has("INVENTORY") || req.user.role === "ADMIN";
     const canViewAnalytics = allowed.has("ANALYTICS") || req.user.role === "ADMIN";
-    const canViewDailyTasks = allowed.has("DAILY_TASKS") || req.user.role === "ADMIN";
     const canEditSecretary = allowed.has("SECRETARY") || req.user.role === "ADMIN";
     const canViewSecretary = true;
     const canViewBank = allowed.has("BANK") || req.user.role === "ADMIN";
@@ -361,47 +360,6 @@ router.get(
         note: "Open analytics",
         href: "./analytics.html"
       });
-    }
-
-    if (canViewDailyTasks) {
-      const taskDay = getOperationalDayKey();
-      const [activeTaskCount, completedCount, pointsToday] = await Promise.all([
-        prisma.dailyTask.count({
-          where: { active: true }
-        }),
-        prisma.dailyTaskCompletion.count({
-          where: {
-            userId: req.user.id,
-            taskDay
-          }
-        }),
-        prisma.dailyTaskCompletion.aggregate({
-          where: {
-            userId: req.user.id,
-            taskDay
-          },
-          _sum: {
-            pointsAwarded: true
-          }
-        })
-      ]);
-
-      metrics.push(
-        {
-          label: "Tasks today",
-          value: `${completedCount}/${activeTaskCount}`,
-          tone: completedCount === activeTaskCount && activeTaskCount > 0 ? "good" : "neutral",
-          note: "Open tasks",
-          href: "./daily-tasks.html#taskChecklist"
-        },
-        {
-          label: "Task points today",
-          value: Number(pointsToday._sum.pointsAwarded || 0),
-          tone: "good",
-          note: "See task board",
-          href: "./daily-tasks.html#leaderboardPanel"
-        }
-      );
     }
 
     if (canViewSecretary) {

@@ -28,7 +28,9 @@ export function getEffectivePermissions(user) {
     return [...APP_PERMISSIONS];
   }
 
-  return (user.permissions ?? []).map((permission) => permission.key ?? permission);
+  return (user.permissions ?? [])
+    .map((permission) => permission.key ?? permission)
+    .filter((permission) => APP_PERMISSIONS.includes(permission));
 }
 
 export function serializeUser(user) {

@@ -12,12 +12,6 @@ export const NAV_ITEMS = [
     description: "Trends and output"
   },
   {
-    key: "DAILY_TASKS",
-    label: "Tasks",
-    href: "./daily-tasks.html",
-    description: "Daily and weekly"
-  },
-  {
     key: "SECRETARY",
     label: "Secretary",
     href: "./secretary.html",
@@ -62,12 +56,6 @@ export const QUICK_ACTIONS = [
     label: "View analytics",
     href: "./analytics.html",
     description: "See weekly trends"
-  },
-  {
-    permission: "DAILY_TASKS",
-    label: "Open tasks",
-    href: "./daily-tasks.html#taskChecklist",
-    description: "Daily and team view"
   },
   {
     permission: "SECRETARY",
@@ -116,7 +104,6 @@ export const QUICK_ACTIONS = [
 export const PERMISSION_LABELS = {
   DASHBOARD: "Dashboard",
   ANALYTICS: "Analytics",
-  DAILY_TASKS: "Tasks",
   SECRETARY: "Secretary",
   INVENTORY: "Inventory",
   BANK: "Bank",
@@ -129,31 +116,31 @@ export const PERMISSION_PRESETS = [
   {
     key: "SECRETARY",
     label: "Secretary",
-    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "SECRETARY"]
+    permissions: ["DASHBOARD", "ANALYTICS", "SECRETARY"]
   },
   {
     key: "INVENTORY_STAFF",
     label: "Inventory Staff",
-    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "INVENTORY"]
+    permissions: ["DASHBOARD", "ANALYTICS", "INVENTORY"]
   },
   {
     key: "FINANCE",
     label: "Finance",
-    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "BANK", "TAX"]
+    permissions: ["DASHBOARD", "ANALYTICS", "BANK", "TAX"]
   },
   {
     key: "TAX_DESK",
     label: "Tax Desk",
-    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "TAX"]
+    permissions: ["DASHBOARD", "ANALYTICS", "TAX"]
   },
   {
     key: "DISTRIBUTOR",
     label: "Distributor",
-    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "INVENTORY", "DISTRIBUTION"]
+    permissions: ["DASHBOARD", "ANALYTICS", "INVENTORY", "DISTRIBUTION"]
   },
   {
     key: "OPERATIONS",
     label: "Operations",
-    permissions: ["DASHBOARD", "ANALYTICS", "DAILY_TASKS", "INVENTORY", "BANK", "TAX", "DISTRIBUTION"]
+    permissions: ["DASHBOARD", "ANALYTICS", "INVENTORY", "BANK", "TAX", "DISTRIBUTION"]
   }
 ];
