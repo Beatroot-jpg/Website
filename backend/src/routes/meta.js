@@ -39,6 +39,7 @@ router.get(
     const allowed = new Set(req.user.permissions);
     const canViewInventory = allowed.has("INVENTORY") || req.user.role === "ADMIN";
     const canViewAnalytics = allowed.has("ANALYTICS") || req.user.role === "ADMIN";
+    const canViewPriceList = true;
     const canEditSecretary = allowed.has("SECRETARY") || req.user.role === "ADMIN";
     const canViewSecretary = true;
     const canViewBank = allowed.has("BANK") || req.user.role === "ADMIN";
@@ -96,6 +97,42 @@ router.get(
           }
         ])
         : Promise.resolve([]),
+      canViewPriceList && /(price|pricing|quote|calculator|sale|sales)/i.test(query)
+        ? Promise.resolve([
+          {
+            id: "price-list-page",
+            group: "Price List",
+            title: "Price list page",
+            subtitle: "Shared pricing plus the live sale calculator.",
+            href: "./price-list.html",
+            tone: "accent",
+            sortAt: new Date().toISOString()
+          }
+        ])
+        : Promise.resolve([]),
+      canViewPriceList
+        ? prisma.priceListItem.findMany({
+          where: {
+            name: containsFilter
+          },
+          orderBy: { updatedAt: "desc" },
+          take: 4,
+          select: {
+            id: true,
+            name: true,
+            unitPrice: true,
+            updatedAt: true
+          }
+        }).then((items) => items.map((item) => ({
+          id: `price-list-${item.id}`,
+          group: "Price List",
+          title: item.name,
+          subtitle: `$${Number(item.unitPrice || 0).toFixed(2)} per item`,
+          href: `./price-list.html?editPriceItem=${item.id}#priceTable`,
+          tone: "accent",
+          sortAt: item.updatedAt
+        })))
+        : [],
       canViewDistribution
         ? prisma.runnerDistribution.findMany({
           where: {

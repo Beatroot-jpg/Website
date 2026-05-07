@@ -161,6 +161,16 @@ model InventoryMovement {
   createdAt     DateTime                @default(now())
 }
 
+model PriceListItem {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  unitPrice Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
 model BankTransaction {
   id             String              @id @default(cuid())
   amount         Decimal             @db.Decimal(12, 2)

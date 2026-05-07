@@ -12,6 +12,13 @@ export const NAV_ITEMS = [
     description: "Trends and output"
   },
   {
+    key: "PRICE_LIST",
+    label: "Price List",
+    href: "./price-list.html",
+    description: "Shared pricing",
+    visibleToAllAuthenticated: true
+  },
+  {
     key: "SECRETARY",
     label: "Secretary",
     href: "./secretary.html",
@@ -56,6 +63,12 @@ export const QUICK_ACTIONS = [
     label: "View analytics",
     href: "./analytics.html",
     description: "See weekly trends"
+  },
+  {
+    permission: "DASHBOARD",
+    label: "Open price list",
+    href: "./price-list.html",
+    description: "Shared pricing and calculator"
   },
   {
     permission: "SECRETARY",

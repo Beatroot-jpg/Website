@@ -1154,6 +1154,51 @@ label span,
   margin: 0.2rem 0 0;
 }
 
+.price-quote-row {
+  display: grid;
+  gap: 1rem;
+}
+
+.price-quote-row-copy {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.price-quote-row-copy p {
+  margin: 0;
+}
+
+.price-line-total {
+  display: grid;
+  gap: 0.22rem;
+  padding: 0.92rem 1rem;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--line);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.05), transparent 0 9rem),
+    rgba(255, 255, 255, 0.03);
+}
+
+.price-line-total span {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 800;
+  color: var(--muted-strong);
+}
+
+.price-line-total strong {
+  font-family: "Sora", "Segoe UI", sans-serif;
+  font-size: 1.55rem;
+  letter-spacing: -0.04em;
+  color: var(--accent-strong);
+  text-shadow: 0 0 18px rgba(46, 203, 114, 0.14);
+}
+
+.price-line-total small {
+  color: var(--muted);
+}
+
 .activity-meta small {
   color: var(--muted);
 }
