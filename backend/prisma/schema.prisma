@@ -96,6 +96,17 @@ enum SecretaryRecordType {
   NOTICE
 }
 
+enum FactoryRoundStatus {
+  ACTIVE
+  FINALIZED
+}
+
+enum FactoryCategorySection {
+  MINING
+  SMELTING
+  MISCELLANEOUS
+}
+
 model User {
   id                     String            @id @default(cuid())
   email                  String            @unique
@@ -119,6 +130,11 @@ model User {
   createdSecretaryRecords SecretaryRecord[] @relation("SecretaryRecordCreatedBy")
   createdTaxMembers      TaxMember[]       @relation("TaxMemberCreatedBy")
   createdTaxPeriods      TaxPeriod[]       @relation("TaxPeriodCreatedBy")
+  createdFactoryRounds   FactoryRound[]    @relation("FactoryRoundCreatedBy")
+  factorySessions        FactorySession[]  @relation("FactorySessionUser")
+  correctedFactorySessions FactorySession[] @relation("FactorySessionCorrectedBy")
+  createdFactorySaleEntries FactorySaleEntry[] @relation("FactorySaleEntryCreatedBy")
+  factoryRoundPayouts    FactoryRoundPayout[]
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 
@@ -169,6 +185,90 @@ model PriceListItem {
   updatedAt DateTime @updatedAt
 
   @@index([name])
+}
+
+model FactoryRound {
+  id                 String             @id @default(cuid())
+  roundNumber        Int                @unique
+  status             FactoryRoundStatus @default(ACTIVE)
+  createdById        String?
+  finalizedAt        DateTime?
+  finalizedSalesTotal Decimal?          @db.Decimal(14, 2)
+  createdBy          User?              @relation("FactoryRoundCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  sessions           FactorySession[]
+  salesEntries       FactorySaleEntry[]
+  payouts            FactoryRoundPayout[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model FactoryCategory {
+  id         String                 @id @default(cuid())
+  slug       String                 @unique
+  name       String
+  section    FactoryCategorySection
+  helperText String?
+  sortOrder  Int
+  locked     Boolean                @default(false)
+  sessions   FactorySession[]
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  @@index([section, sortOrder])
+}
+
+model FactorySession {
+  id            String          @id @default(cuid())
+  roundId       String
+  userId        String
+  categoryId    String
+  startedAt     DateTime
+  endedAt       DateTime?
+  note          String?
+  correctedById String?
+  round         FactoryRound    @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  user          User            @relation("FactorySessionUser", fields: [userId], references: [id], onDelete: Restrict)
+  category      FactoryCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  correctedBy   User?           @relation("FactorySessionCorrectedBy", fields: [correctedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([roundId, startedAt])
+  @@index([userId, roundId])
+  @@index([categoryId, roundId])
+  @@index([endedAt])
+}
+
+model FactorySaleEntry {
+  id          String       @id @default(cuid())
+  roundId     String
+  amount      Decimal      @db.Decimal(14, 2)
+  note        String?
+  createdById String?
+  round       FactoryRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  createdBy   User?        @relation("FactorySaleEntryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([roundId, createdAt])
+}
+
+model FactoryRoundPayout {
+  id           String       @id @default(cuid())
+  roundId      String
+  userId       String
+  totalMinutes Int
+  sharePercent Decimal      @db.Decimal(9, 4)
+  payoutAmount Decimal      @db.Decimal(14, 2)
+  round        FactoryRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  createdAt    DateTime     @default(now())
+
+  @@unique([roundId, userId])
+  @@index([roundId, payoutAmount])
 }
 
 model BankTransaction {

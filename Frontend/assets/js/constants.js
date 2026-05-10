@@ -19,6 +19,13 @@ export const NAV_ITEMS = [
     visibleToAllAuthenticated: true
   },
   {
+    key: "FACTORY",
+    label: "Factory",
+    href: "./factory.html",
+    description: "Time and payouts",
+    visibleToAllAuthenticated: true
+  },
+  {
     key: "SECRETARY",
     label: "Secretary",
     href: "./secretary.html",
@@ -69,6 +76,12 @@ export const QUICK_ACTIONS = [
     label: "Open price list",
     href: "./price-list.html",
     description: "Shared pricing and calculator"
+  },
+  {
+    permission: "DASHBOARD",
+    label: "Open factory",
+    href: "./factory.html",
+    description: "Clock time and track payout rounds"
   },
   {
     permission: "SECRETARY",

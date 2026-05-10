@@ -40,6 +40,7 @@ router.get(
     const canViewInventory = allowed.has("INVENTORY") || req.user.role === "ADMIN";
     const canViewAnalytics = allowed.has("ANALYTICS") || req.user.role === "ADMIN";
     const canViewPriceList = true;
+    const canViewFactory = true;
     const canEditSecretary = allowed.has("SECRETARY") || req.user.role === "ADMIN";
     const canViewSecretary = true;
     const canViewBank = allowed.has("BANK") || req.user.role === "ADMIN";
@@ -130,6 +131,50 @@ router.get(
           subtitle: `$${Number(item.unitPrice || 0).toFixed(2)} per item`,
           href: `./price-list.html?editPriceItem=${item.id}#priceTable`,
           tone: "accent",
+          sortAt: item.updatedAt
+        })))
+        : [],
+      canViewFactory && /(factory|clock|clocking|payout|payouts|mining|smelting|crafting|bullet|logistics|transit|copper|coal|zinc|brass)/i.test(query)
+        ? Promise.resolve([
+          {
+            id: "factory-page",
+            group: "Factory",
+            title: "Factory page",
+            subtitle: "Clock time, log round sales, and project worker payouts.",
+            href: "./factory.html",
+            tone: "accent",
+            sortAt: new Date().toISOString()
+          }
+        ])
+        : Promise.resolve([]),
+      canViewFactory
+        ? prisma.factoryCategory.findMany({
+          where: {
+            OR: [
+              { name: containsFilter },
+              { helperText: containsFilter },
+              { slug: containsFilter }
+            ]
+          },
+          orderBy: [
+            { section: "asc" },
+            { sortOrder: "asc" }
+          ],
+          take: 6,
+          select: {
+            id: true,
+            name: true,
+            section: true,
+            locked: true,
+            updatedAt: true
+          }
+        }).then((items) => items.map((item) => ({
+          id: `factory-category-${item.id}`,
+          group: "Factory",
+          title: item.name,
+          subtitle: `${item.section.toLowerCase()}${item.locked ? " - locked" : " - open"}`,
+          href: "./factory.html#factoryCategories",
+          tone: item.locked ? "warn" : "accent",
           sortAt: item.updatedAt
         })))
         : [],
