@@ -17,8 +17,8 @@ import {
 const currentUser = initProtectedPage({
   pageKey: "FACTORY",
   requiredPermission: null,
-  title: "Factory round tracker",
-  subtitle: "Clock work into the factory, log round sales as they happen, and let the payout share update live from time spent in the round."
+  title: "Factory payout tracker",
+  subtitle: "Clock factory work into the live week, keep the worker split visible, and let admin manage frozen sales without dragging workers through the bloat."
 });
 
 const categorySectionsContainer = document.querySelector("#factoryCategorySections");
@@ -26,15 +26,18 @@ const currentStatus = document.querySelector("#factoryCurrentStatus");
 const projectionNote = document.querySelector("#factoryProjectionNote");
 const pieChartHost = document.querySelector("#factoryPieChart");
 const shareTableContainer = document.querySelector("#factoryShareTable");
-const salesCreateCard = document.querySelector("#factorySalesCreateCard");
+
+const adminSurface = document.querySelector("#factoryAdminSurface");
 const salesSummaryContainer = document.querySelector("#factorySalesSummary");
 const salesTableContainer = document.querySelector("#factorySalesTable");
 const salesPaginationContainer = document.querySelector("#factorySalesPagination");
 const openSaleFormButton = document.querySelector("#openFactorySaleFormButton");
-const adminPanel = document.querySelector("#factoryAdminPanel");
 const openSessionsButton = document.querySelector("#openFactorySessionsButton");
-const finalizeRoundButton = document.querySelector("#finalizeFactoryRoundButton");
+const openCategoriesButton = document.querySelector("#openFactoryCategoriesButton");
+const freezeRoundButton = document.querySelector("#freezeFactoryRoundButton");
 const startRoundButton = document.querySelector("#startFactoryRoundButton");
+const frozenTableContainer = document.querySelector("#factoryFrozenTable");
+const frozenPaginationContainer = document.querySelector("#factoryFrozenPagination");
 const archiveTableContainer = document.querySelector("#factoryArchiveTable");
 const archivePaginationContainer = document.querySelector("#factoryArchivePagination");
 
@@ -47,6 +50,16 @@ const saleSubmitButton = document.querySelector("#factorySaleSubmitButton");
 const saleResetButton = document.querySelector("#resetFactorySaleForm");
 const saleError = document.querySelector("#factorySaleError");
 const saleIdField = document.querySelector("#factorySaleId");
+const saleRoundIdField = document.querySelector("#factorySaleRoundId");
+
+const workEntryForm = document.querySelector("#factoryWorkEntryForm");
+const workEntryHost = document.querySelector("#factoryWorkEntryHost");
+const workEntryContent = document.querySelector("#factoryWorkEntryContent");
+const workEntryTitle = document.querySelector("#factoryWorkEntryTitle");
+const workEntrySubtitle = document.querySelector("#factoryWorkEntrySubtitle");
+const workEntryResetButton = document.querySelector("#resetFactoryWorkEntryForm");
+const workEntryError = document.querySelector("#factoryWorkEntryError");
+const workEntryCategoryIdField = document.querySelector("#factoryWorkEntryCategoryId");
 
 const sessionsHost = document.querySelector("#factorySessionsHost");
 const sessionsContent = document.querySelector("#factorySessionsContent");
@@ -64,13 +77,28 @@ const sessionError = document.querySelector("#factorySessionError");
 const sessionIdField = document.querySelector("#factorySessionId");
 const deleteSessionButton = document.querySelector("#deleteFactorySessionButton");
 
-const archiveDetailHost = document.querySelector("#factoryArchiveDetailHost");
-const archiveDetailContent = document.querySelector("#factoryArchiveDetailContent");
+const categoriesManagerHost = document.querySelector("#factoryCategoriesManagerHost");
+const categoriesManagerContent = document.querySelector("#factoryCategoriesManagerContent");
+const categoriesManagerTable = document.querySelector("#factoryCategoriesManagerTable");
+const openCategoryFormButton = document.querySelector("#openFactoryCategoryFormButton");
+
+const categoryForm = document.querySelector("#factoryCategoryForm");
+const categoryFormHost = document.querySelector("#factoryCategoryFormHost");
+const categoryFormContent = document.querySelector("#factoryCategoryFormContent");
+const categoryFormTitle = document.querySelector("#factoryCategoryFormTitle");
+const categoryFormSubtitle = document.querySelector("#factoryCategoryFormSubtitle");
+const categorySubmitButton = document.querySelector("#factoryCategorySubmitButton");
+const categoryResetButton = document.querySelector("#resetFactoryCategoryForm");
+const categoryError = document.querySelector("#factoryCategoryError");
+const categoryIdField = document.querySelector("#factoryCategoryId");
+
+const roundDetailHost = document.querySelector("#factoryRoundDetailHost");
+const roundDetailContent = document.querySelector("#factoryRoundDetailContent");
 
 const params = new URLSearchParams(window.location.search);
 let currentSalesPage = Number.parseInt(params.get("salesPage") || "1", 10);
+let currentFrozenPage = Number.parseInt(params.get("frozenPage") || "1", 10);
 let currentArchivePage = Number.parseInt(params.get("archivePage") || "1", 10);
-let requestedArchiveRoundId = params.get("viewFactoryRound") || "";
 
 let viewerState = {
   canAdmin: false,
@@ -78,8 +106,8 @@ let viewerState = {
   activeSessionId: ""
 };
 let categoriesCache = [];
-let currentRoundCache = null;
-let archiveRoundsCache = [];
+let activeRoundCache = null;
+let adminCache = null;
 let currentSessionsPage = 1;
 let currentSessionsCache = [];
 let currentSessionsPagination = {
@@ -89,6 +117,13 @@ let currentSessionsPagination = {
   totalPages: 1
 };
 let reopenSessionsListAfterClose = false;
+let roundDetailState = {
+  roundId: "",
+  salesPage: 1,
+  sessionsPage: 1
+};
+let roundDetailCache = null;
+let categoriesManagerCache = [];
 
 const PIE_COLORS = [
   "#2ecb72",
@@ -109,6 +144,10 @@ if (!Number.isFinite(currentSalesPage) || currentSalesPage < 1) {
   currentSalesPage = 1;
 }
 
+if (!Number.isFinite(currentFrozenPage) || currentFrozenPage < 1) {
+  currentFrozenPage = 1;
+}
+
 if (!Number.isFinite(currentArchivePage) || currentArchivePage < 1) {
   currentArchivePage = 1;
 }
@@ -122,7 +161,7 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function updateUrlParams(updates = {}, removeKeys = []) {
+function updateUrlParams(updates = {}) {
   const nextParams = new URLSearchParams(window.location.search);
 
   Object.entries(updates).forEach(([key, value]) => {
@@ -133,7 +172,6 @@ function updateUrlParams(updates = {}, removeKeys = []) {
     }
   });
 
-  removeKeys.forEach((key) => nextParams.delete(key));
   const query = nextParams.toString();
   window.history.replaceState({}, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
 }
@@ -187,40 +225,69 @@ function sectionBadge(section) {
   return badge(sectionLabel(section), tone);
 }
 
+function workModeBadge(workMode) {
+  return badge(workMode === "LOGGED_ENTRY" ? "Logged entry" : "Clocked", workMode === "LOGGED_ENTRY" ? "warn" : "good");
+}
+
 function lockBadge(locked) {
   return badge(locked ? "Locked" : "Open", locked ? "warn" : "good");
+}
+
+function roundStatusBadge(status) {
+  const normalized = `${status || ""}`.toUpperCase();
+  const tone = normalized === "FROZEN"
+    ? "warn"
+    : normalized === "PAID" || normalized === "FINALIZED"
+      ? "good"
+      : "accent";
+  const label = normalized === "FINALIZED" ? "Paid (legacy)" : normalized.charAt(0) + normalized.slice(1).toLowerCase();
+  return badge(label, tone);
 }
 
 function activeCategory() {
   return categoriesCache.find((category) => category.id === viewerState.activeCategoryId) || null;
 }
 
+function isRoundDetailOpen() {
+  return Boolean(roundDetailState.roundId);
+}
+
 function resetSaleForm() {
   saleForm.reset();
   saleIdField.value = "";
+  saleRoundIdField.value = activeRoundCache?.id || "";
   saleFormTitle.textContent = "Add sale entry";
-  saleFormSubtitle.textContent = "Log the deal value here and it will add onto the current round total immediately.";
+  saleFormSubtitle.textContent = "Log the deal value here and it will add onto the selected week total immediately.";
   saleSubmitButton.textContent = "Save sale entry";
   mountFormError(saleError, "");
 }
 
-function fillSaleForm(entry) {
+function fillSaleForm(entry, roundId, roundLabel = "selected week") {
   saleIdField.value = entry.id;
+  saleRoundIdField.value = roundId;
   saleFormTitle.textContent = "Edit sale entry";
-  saleFormSubtitle.textContent = "Correct the deal amount or note here. The round projection will recalculate immediately.";
+  saleFormSubtitle.textContent = `Correct the deal amount or note for ${roundLabel}. The payout projection will recalculate immediately.`;
   saleSubmitButton.textContent = "Save changes";
   saleForm.elements.amount.value = Number(entry.amount || 0).toFixed(2);
   saleForm.elements.note.value = entry.note || "";
   mountFormError(saleError, "");
 }
 
-function showSaleModal(opener = document.activeElement) {
-  openFormModal({
-    content: saleFormContent,
-    host: saleFormHost,
-    focusSelector: '[name="amount"]',
-    opener
-  });
+function resetWorkEntryForm() {
+  workEntryForm.reset();
+  workEntryCategoryIdField.value = "";
+  workEntryTitle.textContent = "Log timed work";
+  workEntrySubtitle.textContent = "Use this for load and leave categories. The block is saved straight away and counted into the active week.";
+  mountFormError(workEntryError, "");
+}
+
+function fillWorkEntryForm(category) {
+  workEntryCategoryIdField.value = category.id;
+  workEntryTitle.textContent = `Log ${category.name}`;
+  workEntrySubtitle.textContent = "Enter the time spent and any quantity/details. If you are currently clocked somewhere else, that live block will close at the start of this logged entry.";
+  workEntryForm.elements.minutes.value = "";
+  workEntryForm.elements.note.value = "";
+  mountFormError(workEntryError, "");
 }
 
 function resetSessionForm() {
@@ -236,13 +303,58 @@ function resetSessionForm() {
 function fillSessionForm(session) {
   sessionIdField.value = session.id;
   sessionFormTitle.textContent = `Correct ${session.userName}`;
-  sessionFormSubtitle.textContent = `Update the ${session.categoryName} session here if the worker forgot to clock cleanly.`;
+  sessionFormSubtitle.textContent = `Update the ${session.categoryName} block here if the worker forgot to clock cleanly.`;
   sessionSubmitButton.textContent = "Save correction";
   sessionForm.elements.startedAt.value = toInputDateTimeValue(session.startedAt);
   sessionForm.elements.endedAt.value = toInputDateTimeValue(session.endedAt);
   sessionForm.elements.note.value = session.note || "";
   deleteSessionButton?.classList.remove("hidden");
   mountFormError(sessionError, "");
+}
+
+function resetCategoryForm() {
+  categoryForm.reset();
+  categoryIdField.value = "";
+  categoryFormTitle.textContent = "Add category";
+  categoryFormSubtitle.textContent = "Create a category and decide whether it uses a live clock or a timed entry button.";
+  categorySubmitButton.textContent = "Save category";
+  categoryForm.elements.section.value = "MINING";
+  categoryForm.elements.workMode.value = "CLOCKED";
+  categoryForm.elements.locked.checked = false;
+  categoryForm.elements.archived.checked = false;
+  mountFormError(categoryError, "");
+}
+
+function fillCategoryForm(category) {
+  categoryIdField.value = category.id;
+  categoryFormTitle.textContent = `Edit ${category.name}`;
+  categoryFormSubtitle.textContent = "Change how this category works or archive it without needing a code update.";
+  categorySubmitButton.textContent = "Save changes";
+  categoryForm.elements.name.value = category.name || "";
+  categoryForm.elements.section.value = category.section || "MINING";
+  categoryForm.elements.workMode.value = category.workMode || "CLOCKED";
+  categoryForm.elements.helperText.value = category.helperText || "";
+  categoryForm.elements.locked.checked = Boolean(category.locked);
+  categoryForm.elements.archived.checked = Boolean(category.archived);
+  mountFormError(categoryError, "");
+}
+
+function showSaleModal(opener = document.activeElement) {
+  openFormModal({
+    content: saleFormContent,
+    host: saleFormHost,
+    focusSelector: '[name="amount"]',
+    opener
+  });
+}
+
+function showWorkEntryModal(opener = document.activeElement) {
+  openFormModal({
+    content: workEntryContent,
+    host: workEntryHost,
+    focusSelector: '[name="minutes"]',
+    opener
+  });
 }
 
 function showSessionsModal(opener = document.activeElement) {
@@ -269,17 +381,40 @@ function showSessionFormModal(opener = document.activeElement) {
   });
 }
 
-function showArchiveDetailModal(opener = document.activeElement) {
+function showCategoriesManagerModal(opener = document.activeElement) {
   openFormModal({
-    content: archiveDetailContent,
-    host: archiveDetailHost,
+    content: categoriesManagerContent,
+    host: categoriesManagerHost,
+    focusSelector: ".form-modal-close",
+    opener
+  });
+}
+
+function showCategoryFormModal(opener = document.activeElement) {
+  openFormModal({
+    content: categoryFormContent,
+    host: categoryFormHost,
+    focusSelector: '[name="name"]',
+    opener,
+    onClose: () => {
+      window.setTimeout(() => showCategoriesManagerModal(opener), 0);
+    }
+  });
+}
+
+function showRoundDetailModal(opener = document.activeElement) {
+  openFormModal({
+    content: roundDetailContent,
+    host: roundDetailHost,
     focusSelector: ".form-modal-close",
     opener,
     onClose: () => {
-      if (requestedArchiveRoundId) {
-        requestedArchiveRoundId = "";
-        updateUrlParams({ viewFactoryRound: "" }, ["viewFactoryRound"]);
-      }
+      roundDetailState = {
+        roundId: "",
+        salesPage: 1,
+        sessionsPage: 1
+      };
+      roundDetailCache = null;
     }
   });
 }
@@ -289,21 +424,21 @@ function renderCurrentStatus() {
     return;
   }
 
-  if (!currentRoundCache) {
+  if (!activeRoundCache) {
     currentStatus.textContent = viewerState.canAdmin
-      ? "There is no active factory round right now. Start the next round below when the team is ready to clock in again."
-      : "There is no active factory round right now. Clocking will reopen once an admin starts the next round.";
+      ? "There is no active week right now. You can open a fresh week from the admin section below."
+      : "There is no active week right now. Clocking will reopen once an admin starts the next one.";
     return;
   }
 
   const active = activeCategory();
 
   if (active) {
-    currentStatus.textContent = `You are currently clocked into ${active.name} for round ${currentRoundCache.roundNumber}.`;
+    currentStatus.textContent = `You are currently clocked into ${active.name} for week ${activeRoundCache.roundNumber}.`;
     return;
   }
 
-  currentStatus.textContent = `You are not clocked into a factory category right now. Round ${currentRoundCache.roundNumber} is currently open.`;
+  currentStatus.textContent = `You are not clocked into a live category right now. Week ${activeRoundCache.roundNumber} is open.`;
 }
 
 function renderCategorySections() {
@@ -329,40 +464,53 @@ function renderCategorySections() {
       <section class="stack-list">
         <div class="panel-header compact-panel-header">
           <h3>${sectionLabel(section)}</h3>
-          <p>${section === "MINING" ? "Raw collection work" : section === "SMELTING" ? "Ore conversion work" : "Support and finish work"}</p>
+          <p>${section === "MINING" ? "Raw collection work" : section === "SMELTING" ? "Load and leave or processing work" : "Support and finish work"}</p>
         </div>
         <div class="stack-list">
           ${categories.map((category) => {
-            const helperText = category.helperText && !/section$/i.test(category.helperText) ? category.helperText : "";
             const workerNames = category.activeWorkers.map((worker) => worker.userName).join(", ");
-            const actionLabel = category.viewerActive
-              ? "Clock out"
-              : userHasActiveCategory
-                ? "Switch here"
-                : "Clock in";
-            const actionDisabled = !currentRoundCache || (category.locked && !viewerState.canAdmin && !category.viewerActive);
+            const helperText = category.helperText || (category.workMode === "LOGGED_ENTRY"
+              ? "Use the timed entry button when you finish a load or quick factory block."
+              : "Clock into this category while you are actively working it.");
+            const isClocked = category.workMode === "CLOCKED";
+            const actionLabel = isClocked
+              ? category.viewerActive
+                ? "Clock out"
+                : userHasActiveCategory
+                  ? "Switch here"
+                  : "Clock in"
+              : "Log entry";
+            const actionDisabled = !activeRoundCache || (category.locked && !viewerState.canAdmin && !category.viewerActive);
 
             return `
               <article class="activity-card factory-category-card">
                 <div>
                   <strong>${escapeHtml(category.name)}</strong>
-                  <p>${helperText || "Clock time here if this is the part of the factory you are working on."}</p>
-                  <small class="subtle-row">${category.activeWorkerCount ? `${category.activeWorkerCount} active worker${category.activeWorkerCount === 1 ? "" : "s"}${workerNames ? ` - ${escapeHtml(workerNames)}` : ""}` : "Nobody clocked in here right now"}</small>
+                  <p>${escapeHtml(helperText)}</p>
+                  <small class="subtle-row">
+                    ${isClocked
+                      ? category.activeWorkerCount
+                        ? `${category.activeWorkerCount} active worker${category.activeWorkerCount === 1 ? "" : "s"}${workerNames ? ` - ${escapeHtml(workerNames)}` : ""}`
+                        : "Nobody clocked in here right now"
+                      : "Timed entry category"}
+                  </small>
                 </div>
                 <div class="activity-meta">
                   <div class="badge-group">
                     ${sectionBadge(category.section)}
+                    ${workModeBadge(category.workMode)}
                     ${lockBadge(category.locked)}
                   </div>
                   <div class="inline-table-actions">
-                    <button class="mini-action" type="button" data-category-action="${category.viewerActive ? "clock-out" : "clock-in"}" data-category-id="${category.id}" ${actionDisabled ? "disabled" : ""}>
+                    <button
+                      class="mini-action"
+                      type="button"
+                      data-category-action="${isClocked ? (category.viewerActive ? "clock-out" : "clock-in") : "log-entry"}"
+                      data-category-id="${category.id}"
+                      ${actionDisabled ? "disabled" : ""}
+                    >
                       ${actionDisabled && category.locked && !category.viewerActive ? "Locked" : actionLabel}
                     </button>
-                    ${viewerState.canAdmin ? `
-                      <button class="mini-action" type="button" data-lock-category="${category.id}" data-lock-next="${category.locked ? "false" : "true"}">
-                        ${category.locked ? "Unlock" : "Lock"}
-                      </button>
-                    ` : ""}
                   </div>
                 </div>
               </article>
@@ -384,7 +532,12 @@ function renderCategorySections() {
             method: "POST"
           });
           showToast("Factory clock-out saved.", "success");
-        } else {
+          await loadPage();
+          announceMutation(["factory"]);
+          return;
+        }
+
+        if (action === "clock-in") {
           const response = await api("/factory/clock-in", {
             method: "POST",
             body: {
@@ -397,28 +550,21 @@ function renderCategorySections() {
               : "Factory clock-in saved.",
             "success"
           );
+          await loadPage();
+          announceMutation(["factory"]);
+          return;
         }
 
-        await loadPage();
-        announceMutation(["factory"]);
-      } catch (error) {
-        showToast(error.message, "error");
-      }
-    });
-  });
+        const category = categoriesCache.find((entry) => entry.id === categoryId);
 
-  categorySectionsContainer.querySelectorAll("[data-lock-category]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      try {
-        await api(`/factory/categories/${button.dataset.lockCategory}`, {
-          method: "PATCH",
-          body: {
-            locked: button.dataset.lockNext === "true"
-          }
-        });
-        showToast(button.dataset.lockNext === "true" ? "Category locked." : "Category unlocked.", "success");
-        await loadPage();
-        announceMutation(["factory"]);
+        if (!category) {
+          showToast("That category could not be found.", "error");
+          return;
+        }
+
+        resetWorkEntryForm();
+        fillWorkEntryForm(category);
+        showWorkEntryModal(button);
       } catch (error) {
         showToast(error.message, "error");
       }
@@ -431,29 +577,34 @@ function renderProjectionNote() {
     return;
   }
 
-  if (!currentRoundCache) {
-    projectionNote.innerHTML = `<div class="empty-state"><h3>No active round</h3><p>Archived rounds are still viewable below, but a new round needs to be started before the factory can clock time or collect fresh sales.</p></div>`;
+  if (!activeRoundCache) {
+    projectionNote.innerHTML = `
+      <div class="empty-state">
+        <h3>No active week</h3>
+        <p>Once an admin opens the next week, the live share and projection will appear here again.</p>
+      </div>
+    `;
     return;
   }
 
-  if (currentRoundCache.estimateBasisSource === "CURRENT_ROUND") {
+  if (activeRoundCache.estimateBasisSource === "CURRENT_WEEK_SALES") {
     projectionNote.innerHTML = `
       <article class="activity-card">
         <div>
-          <strong>Projection basis: current round sales</strong>
-          <p>${formatCurrency(currentRoundCache.salesTotal)} is currently driving the live payout projection for round ${currentRoundCache.roundNumber}.</p>
+          <strong>Projection basis: live week sales</strong>
+          <p>${formatCurrency(activeRoundCache.salesTotal)} is currently driving the payout estimate for week ${activeRoundCache.roundNumber}.</p>
         </div>
       </article>
     `;
     return;
   }
 
-  if (currentRoundCache.estimateBasisSource === "LAST_FINALIZED_ROUND") {
+  if (activeRoundCache.estimateBasisSource === "LAST_CLOSED_WEEK") {
     projectionNote.innerHTML = `
       <article class="activity-card">
         <div>
-          <strong>Projection basis: last finalized round</strong>
-          <p>No sales have been logged into round ${currentRoundCache.roundNumber} yet, so the live estimate is temporarily using ${formatCurrency(currentRoundCache.lastFinalizedTotal)} from the last finalized round.</p>
+          <strong>Projection basis: last closed week</strong>
+          <p>No sales have been logged into week ${activeRoundCache.roundNumber} yet, so the estimate is temporarily using ${formatCurrency(activeRoundCache.referenceSalesTotal)} from the most recent closed week.</p>
         </div>
       </article>
     `;
@@ -464,7 +615,7 @@ function renderProjectionNote() {
     <article class="activity-card">
       <div>
         <strong>Projection basis: waiting for the first sale</strong>
-        <p>No current or prior round sales are available yet, so the projected payout will stay at zero until the first sale entry lands.</p>
+        <p>There are no current or prior week sales available yet, so projected payouts will stay at zero until the first sale lands.</p>
       </div>
     </article>
   `;
@@ -475,18 +626,18 @@ function renderPieChart() {
     return;
   }
 
-  if (!currentRoundCache) {
+  if (!activeRoundCache) {
     pieChartHost.innerHTML = "";
     return;
   }
 
-  if (!currentRoundCache.shareRows.length) {
-    pieChartHost.innerHTML = renderEmptyState("No clocked time yet", "Once workers start clocking time into the factory, their share of the round will appear here.");
+  if (!activeRoundCache.shareRows.length) {
+    pieChartHost.innerHTML = renderEmptyState("No worker time yet", "Once people start clocking or logging work blocks into this week, their share of the pie will appear here.");
     return;
   }
 
   let progress = 0;
-  const slices = currentRoundCache.shareRows.map((row, index) => {
+  const slices = activeRoundCache.shareRows.map((row, index) => {
     const start = progress;
     const end = Math.min(100, progress + Number(row.sharePercent || 0));
     progress = end;
@@ -497,7 +648,7 @@ function renderPieChart() {
     <div class="factory-pie-shell">
       <div class="factory-pie-chart" style="background: conic-gradient(${slices.join(", ")});">
         <div class="factory-pie-center">
-          <strong>${formatCurrency(currentRoundCache.estimateBasisTotal)}</strong>
+          <strong>${formatCurrency(activeRoundCache.estimateBasisTotal)}</strong>
           <span>Projection pool</span>
         </div>
       </div>
@@ -510,12 +661,7 @@ function renderShareTable() {
     return;
   }
 
-  if (!currentRoundCache) {
-    shareTableContainer.innerHTML = "";
-    return;
-  }
-
-  if (!currentRoundCache.shareRows.length) {
+  if (!activeRoundCache || !activeRoundCache.shareRows.length) {
     shareTableContainer.innerHTML = "";
     return;
   }
@@ -526,20 +672,20 @@ function renderShareTable() {
         <thead>
           <tr>
             <th>Worker</th>
-            <th>Live status</th>
+            <th>Status</th>
             <th>Hours</th>
             <th>Share</th>
             <th>Projected payout</th>
           </tr>
         </thead>
         <tbody>
-          ${currentRoundCache.shareRows.map((row) => `
+          ${activeRoundCache.shareRows.map((row) => `
             <tr class="${row.userId === currentUser.id ? "selected-row" : ""}">
               <td>
                 <strong>${escapeHtml(row.userName)}</strong>
-                <span class="subtle-row">${row.activeCategoryName ? `Currently in ${escapeHtml(row.activeCategoryName)}` : "Not actively clocked in right now"}</span>
+                <span class="subtle-row">${row.activeCategoryName ? `Currently in ${escapeHtml(row.activeCategoryName)}` : "No live clock running right now"}</span>
               </td>
-              <td>${row.activeCategoryName ? badge("Clocked in", "good") : badge("Offline", "neutral")}</td>
+              <td>${row.activeCategoryName ? badge("Clocked in", "good") : badge("Idle", "neutral")}</td>
               <td><strong>${formatHours(row.totalHours)} h</strong><span class="subtle-row">${row.totalMinutes} minutes</span></td>
               <td><strong>${formatPercent(row.sharePercent)}%</strong></td>
               <td><strong>${formatCurrency(row.projectedPayout)}</strong></td>
@@ -552,36 +698,32 @@ function renderShareTable() {
 }
 
 function renderSalesSummary() {
-  if (!salesSummaryContainer) {
+  if (!salesSummaryContainer || !viewerState.canAdmin) {
     return;
   }
 
-  if (!currentRoundCache) {
-    salesSummaryContainer.innerHTML = renderEmptyState(
-      "No active round sales yet",
-      viewerState.canAdmin
-        ? "Start a new round below when the factory is ready to begin clocking and logging deals again."
-        : "A fresh round needs to be opened by an admin before sales can start compounding here."
-    );
+  if (!activeRoundCache) {
+    salesSummaryContainer.innerHTML = renderEmptyState("No active week", "Open the next week before logging live sales.");
     return;
   }
 
+  const saleEntryCount = activeRoundCache.salesPagination?.total || 0;
   salesSummaryContainer.innerHTML = `
     <div class="metric-grid">
       <article class="metric-card accent">
-        <p>Current round sales</p>
-        <strong>${formatCurrency(currentRoundCache.salesTotal)}</strong>
-        <small>Total logged into the live round so far</small>
+        <p>Active week total</p>
+        <strong>${formatCurrency(activeRoundCache.salesTotal)}</strong>
+        <small>Compounded from every sale logged into this live week</small>
       </article>
       <article class="metric-card good">
-        <p>Projection basis</p>
-        <strong>${formatCurrency(currentRoundCache.estimateBasisTotal)}</strong>
-        <small>${currentRoundCache.estimateBasisSource === "CURRENT_ROUND" ? "Using live round sales" : currentRoundCache.estimateBasisSource === "LAST_FINALIZED_ROUND" ? "Using last finalized round" : "Waiting for the first sale"}</small>
+        <p>Sale entries</p>
+        <strong>${saleEntryCount}</strong>
+        <small>Every deal logged so far into week ${activeRoundCache.roundNumber}</small>
       </article>
       <article class="metric-card neutral">
-        <p>Last finalized round</p>
-        <strong>${formatCurrency(currentRoundCache.lastFinalizedTotal)}</strong>
-        <small>Fallback estimate when the new round has no sales yet</small>
+        <p>Worker time</p>
+        <strong>${formatHours((activeRoundCache.totalMinutes || 0) / 60)} h</strong>
+        <small>${activeRoundCache.totalMinutes || 0} minutes clocked or logged so far</small>
       </article>
     </div>
   `;
@@ -594,7 +736,7 @@ function renderSalesPagination(pagination) {
 
   if (!pagination || pagination.totalPages <= 1) {
     salesPaginationContainer.innerHTML = pagination?.total
-      ? `<span class="pager-label">${pagination.total} total sale entries</span>`
+      ? `<span class="pager-label">${pagination.total} sale entr${pagination.total === 1 ? "y" : "ies"}</span>`
       : "";
     return;
   }
@@ -621,26 +763,21 @@ function renderSalesPagination(pagination) {
 }
 
 function renderSalesTable() {
-  if (!salesTableContainer) {
+  if (!salesTableContainer || !viewerState.canAdmin) {
     return;
   }
 
-  if (!currentRoundCache) {
+  if (!activeRoundCache) {
     salesTableContainer.innerHTML = "";
     salesPaginationContainer.innerHTML = "";
     return;
   }
 
-  const pagination = currentRoundCache.salesPagination;
+  const entries = activeRoundCache.salesEntries || [];
 
-  if (!currentRoundCache.salesEntries.length) {
-    salesTableContainer.innerHTML = renderEmptyState(
-      "No sales logged into this round yet",
-      viewerState.canAdmin
-        ? "Add the first sale entry above and the payout projection will start updating straight away."
-        : "Waiting for an admin to log the first deal into this round."
-    );
-    renderSalesPagination(pagination);
+  if (!entries.length) {
+    salesTableContainer.innerHTML = renderEmptyState("No current week sales yet", "Add each deal into the live ledger as it happens so worker projections stay accurate through the week.");
+    renderSalesPagination(activeRoundCache.salesPagination || null);
     return;
   }
 
@@ -657,19 +794,17 @@ function renderSalesTable() {
           </tr>
         </thead>
         <tbody>
-          ${currentRoundCache.salesEntries.map((entry) => `
+          ${entries.map((entry) => `
             <tr>
               <td><strong>${formatCurrency(entry.amount)}</strong></td>
               <td>${escapeHtml(entry.note || "No note")}</td>
               <td>${escapeHtml(entry.createdByName || "Unknown user")}</td>
               <td>${formatDate(entry.updatedAt)}</td>
               <td>
-                ${viewerState.canAdmin ? `
-                  <div class="inline-table-actions">
-                    <button class="mini-action" type="button" data-edit-sale="${entry.id}">Edit</button>
-                    <button class="mini-action danger-action" type="button" data-delete-sale="${entry.id}">Delete</button>
-                  </div>
-                ` : "Read only"}
+                <div class="inline-table-actions">
+                  <button class="mini-action" type="button" data-edit-active-sale="${entry.id}">Edit</button>
+                  <button class="mini-action danger-action" type="button" data-delete-active-sale="${entry.id}">Delete</button>
+                </div>
               </td>
             </tr>
           `).join("")}
@@ -678,28 +813,28 @@ function renderSalesTable() {
     </div>
   `;
 
-  salesTableContainer.querySelectorAll("[data-edit-sale]").forEach((button) => {
+  salesTableContainer.querySelectorAll("[data-edit-active-sale]").forEach((button) => {
     button.addEventListener("click", () => {
-      const entry = currentRoundCache.salesEntries.find((item) => item.id === button.dataset.editSale);
+      const entry = entries.find((candidate) => candidate.id === button.dataset.editActiveSale);
 
       if (!entry) {
         return;
       }
 
-      fillSaleForm(entry);
+      fillSaleForm(entry, activeRoundCache.id, `active week ${activeRoundCache.roundNumber}`);
       showSaleModal(button);
     });
   });
 
-  salesTableContainer.querySelectorAll("[data-delete-sale]").forEach((button) => {
+  salesTableContainer.querySelectorAll("[data-delete-active-sale]").forEach((button) => {
     button.addEventListener("click", async () => {
-      const entry = currentRoundCache.salesEntries.find((item) => item.id === button.dataset.deleteSale);
+      const entry = entries.find((candidate) => candidate.id === button.dataset.deleteActiveSale);
 
       if (!entry) {
         return;
       }
 
-      const confirmed = window.confirm(`Delete the ${formatCurrency(entry.amount)} sale entry from this round?`);
+      const confirmed = window.confirm("Delete this live sale entry from the current week?");
 
       if (!confirmed) {
         return;
@@ -718,99 +853,108 @@ function renderSalesTable() {
     });
   });
 
-  renderSalesPagination(pagination);
+  renderSalesPagination(activeRoundCache.salesPagination || null);
 }
 
 function renderAdminState() {
-  salesCreateCard?.classList.toggle("hidden", !viewerState.canAdmin || !currentRoundCache);
-  adminPanel?.classList.toggle("hidden", !viewerState.canAdmin);
+  if (!adminSurface) {
+    return;
+  }
+
+  adminSurface.classList.toggle("hidden", !viewerState.canAdmin);
 
   if (!viewerState.canAdmin) {
     return;
   }
 
-  finalizeRoundButton.disabled = !currentRoundCache;
-  startRoundButton.disabled = Boolean(currentRoundCache);
-  openSessionsButton.disabled = !currentRoundCache;
+  freezeRoundButton.disabled = !activeRoundCache;
+  startRoundButton.disabled = Boolean(activeRoundCache);
+  openSessionsButton.disabled = !activeRoundCache;
 }
 
-function renderArchivePagination(pagination) {
-  if (!archivePaginationContainer) {
+function renderRoundListPagination(container, pagination, dataAttribute, onChange) {
+  if (!container) {
     return;
   }
 
   if (!pagination || pagination.totalPages <= 1) {
-    archivePaginationContainer.innerHTML = pagination?.total
-      ? `<span class="pager-label">${pagination.total} archived rounds</span>`
+    container.innerHTML = pagination?.total
+      ? `<span class="pager-label">${pagination.total} week${pagination.total === 1 ? "" : "s"}</span>`
       : "";
     return;
   }
 
-  archivePaginationContainer.innerHTML = `
+  container.innerHTML = `
     <span class="pager-label">Page ${pagination.page} of ${pagination.totalPages}</span>
-    <button class="ghost-button pager-button" type="button" data-archive-page="${pagination.page - 1}" ${pagination.page <= 1 ? "disabled" : ""}>Prev</button>
-    <button class="ghost-button pager-button" type="button" data-archive-page="${pagination.page + 1}" ${pagination.page >= pagination.totalPages ? "disabled" : ""}>Next</button>
+    <button class="ghost-button pager-button" type="button" data-${dataAttribute}="${pagination.page - 1}" ${pagination.page <= 1 ? "disabled" : ""}>Prev</button>
+    <button class="ghost-button pager-button" type="button" data-${dataAttribute}="${pagination.page + 1}" ${pagination.page >= pagination.totalPages ? "disabled" : ""}>Next</button>
   `;
 
-  archivePaginationContainer.querySelectorAll("[data-archive-page]").forEach((button) => {
+  container.querySelectorAll(`[data-${dataAttribute}]`).forEach((button) => {
     button.addEventListener("click", () => {
-      const nextPage = Number(button.dataset.archivePage);
+      const nextPage = Number(button.dataset[dataAttribute]);
 
       if (!Number.isFinite(nextPage) || nextPage < 1 || nextPage > pagination.totalPages) {
         return;
       }
 
-      currentArchivePage = nextPage;
-      updateUrlParams({ archivePage: `${currentArchivePage}` });
-      loadPage();
+      onChange(nextPage);
     });
   });
 }
 
-function renderArchiveTable(pagination = null) {
-  if (!archiveTableContainer) {
+function renderFrozenTable() {
+  if (!frozenTableContainer || !viewerState.canAdmin) {
     return;
   }
 
-  if (!archiveRoundsCache.length) {
-    archiveTableContainer.innerHTML = renderEmptyState("No archived rounds yet", "Once a factory round is finalized, it will appear here with its frozen payout history.");
-    renderArchivePagination(pagination);
+  const frozenRounds = adminCache?.frozenRounds?.rounds || [];
+  const pagination = adminCache?.frozenRounds?.pagination || null;
+
+  if (!frozenRounds.length) {
+    frozenTableContainer.innerHTML = renderEmptyState("No frozen unpaid weeks", "Once you freeze a week, it will land here so sales can keep being added while the workers move onto the next one.");
+    renderRoundListPagination(frozenPaginationContainer, pagination, "frozenPage", (nextPage) => {
+      currentFrozenPage = nextPage;
+      updateUrlParams({ frozenPage: `${currentFrozenPage}` });
+      loadPage();
+    });
     return;
   }
 
-  archiveTableContainer.innerHTML = `
+  frozenTableContainer.innerHTML = `
     <div class="table-shell">
       <table class="data-table">
         <thead>
           <tr>
-            <th>Round</th>
-            <th>Final sales</th>
+            <th>Week</th>
+            <th>Sales</th>
             <th>Worker time</th>
             <th>Participants</th>
-            <th>Finalized</th>
+            <th>Frozen</th>
             <th>Action</th>
           </tr>
         </thead>
         <tbody>
-          ${archiveRoundsCache.map((round) => `
-            <tr class="${requestedArchiveRoundId === round.id ? "editing-row" : ""}">
+          ${frozenRounds.map((round) => `
+            <tr>
               <td>
-                <strong>Round ${round.roundNumber}</strong>
-                <span class="subtle-row">${round.saleEntryCount} sale entr${round.saleEntryCount === 1 ? "y" : "ies"}</span>
+                <strong>Week ${round.roundNumber}</strong>
+                <span class="subtle-row">${roundStatusBadge(round.status)}</span>
               </td>
               <td>
-                <strong>${formatCurrency(round.finalizedSalesTotal)}</strong>
-                <span class="subtle-row">Highest payout ${formatCurrency(round.highestPayout)}</span>
+                <strong>${formatCurrency(round.salesTotal)}</strong>
+                <span class="subtle-row">${round.saleEntryCount} sale entr${round.saleEntryCount === 1 ? "y" : "ies"}</span>
               </td>
               <td>
                 <strong>${formatHours(round.totalMinutes / 60)} h</strong>
                 <span class="subtle-row">${round.totalMinutes} minutes</span>
               </td>
               <td>${round.participantCount}</td>
-              <td>${formatDate(round.finalizedAt)}</td>
+              <td>${formatDate(round.frozenAt || round.createdAt)}</td>
               <td>
                 <div class="inline-table-actions">
-                  <button class="mini-action" type="button" data-view-round="${round.id}">View</button>
+                  <button class="mini-action" type="button" data-manage-frozen-round="${round.id}">Manage</button>
+                  <button class="mini-action danger-action" type="button" data-pay-round="${round.id}">Mark paid</button>
                 </div>
               </td>
             </tr>
@@ -820,50 +964,284 @@ function renderArchiveTable(pagination = null) {
     </div>
   `;
 
-  archiveTableContainer.querySelectorAll("[data-view-round]").forEach((button) => {
+  frozenTableContainer.querySelectorAll("[data-manage-frozen-round]").forEach((button) => {
     button.addEventListener("click", () => {
-      requestedArchiveRoundId = button.dataset.viewRound;
-      updateUrlParams({ viewFactoryRound: requestedArchiveRoundId });
-      loadArchiveRoundDetail(button.dataset.viewRound, button);
+      loadRoundDetail(button.dataset.manageFrozenRound, button);
     });
   });
 
-  renderArchivePagination(pagination);
+  frozenTableContainer.querySelectorAll("[data-pay-round]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const confirmed = window.confirm("Mark this frozen week as paid? Sales will lock and the week will move into the archive.");
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        await api(`/factory/rounds/${button.dataset.payRound}/pay`, {
+          method: "POST"
+        });
+        showToast("Factory week marked as paid.", "success");
+        if (roundDetailState.roundId === button.dataset.payRound) {
+          closeFormModal();
+        }
+        await loadPage();
+        announceMutation(["factory"]);
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    });
+  });
+
+  renderRoundListPagination(frozenPaginationContainer, pagination, "frozenPage", (nextPage) => {
+    currentFrozenPage = nextPage;
+    updateUrlParams({ frozenPage: `${currentFrozenPage}` });
+    loadPage();
+  });
 }
 
-function renderArchiveDetail(detail) {
+function renderArchiveTable() {
+  if (!archiveTableContainer || !viewerState.canAdmin) {
+    return;
+  }
+
+  const rounds = adminCache?.archives?.rounds || [];
+  const pagination = adminCache?.archives?.pagination || null;
+
+  if (!rounds.length) {
+    archiveTableContainer.innerHTML = renderEmptyState("No paid archive yet", "Once frozen weeks are marked paid, they will land here with the payout history locked in.");
+    renderRoundListPagination(archivePaginationContainer, pagination, "archivePage", (nextPage) => {
+      currentArchivePage = nextPage;
+      updateUrlParams({ archivePage: `${currentArchivePage}` });
+      loadPage();
+    });
+    return;
+  }
+
+  archiveTableContainer.innerHTML = `
+    <div class="table-shell">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Week</th>
+            <th>Sales</th>
+            <th>Worker time</th>
+            <th>Participants</th>
+            <th>Paid</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rounds.map((round) => `
+            <tr>
+              <td>
+                <strong>Week ${round.roundNumber}</strong>
+                <span class="subtle-row">${roundStatusBadge(round.status)}</span>
+              </td>
+              <td>
+                <strong>${formatCurrency(round.salesTotal)}</strong>
+                <span class="subtle-row">Highest payout ${formatCurrency(round.highestPayout)}</span>
+              </td>
+              <td>
+                <strong>${formatHours(round.totalMinutes / 60)} h</strong>
+                <span class="subtle-row">${round.totalMinutes} minutes</span>
+              </td>
+              <td>${round.participantCount}</td>
+              <td>${formatDate(round.paidAt || round.finalizedAt || round.createdAt)}</td>
+              <td>
+                <div class="inline-table-actions">
+                  <button class="mini-action" type="button" data-view-archive-round="${round.id}">View</button>
+                </div>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  archiveTableContainer.querySelectorAll("[data-view-archive-round]").forEach((button) => {
+    button.addEventListener("click", () => {
+      loadRoundDetail(button.dataset.viewArchiveRound, button);
+    });
+  });
+
+  renderRoundListPagination(archivePaginationContainer, pagination, "archivePage", (nextPage) => {
+    currentArchivePage = nextPage;
+    updateUrlParams({ archivePage: `${currentArchivePage}` });
+    loadPage();
+  });
+}
+
+function renderCategoriesManager() {
+  if (!categoriesManagerTable) {
+    return;
+  }
+
+  if (!categoriesManagerCache.length) {
+    categoriesManagerTable.innerHTML = renderEmptyState("No categories found", "Create the first category so workers have somewhere to clock or log time.");
+    return;
+  }
+
+  categoriesManagerTable.innerHTML = `
+    <div class="table-shell">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Section</th>
+            <th>Mode</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${categoriesManagerCache.map((category) => `
+            <tr class="${category.archived ? "editing-row" : ""}">
+              <td>
+                <strong>${escapeHtml(category.name)}</strong>
+                <span class="subtle-row">${escapeHtml(category.helperText || "No helper text")}</span>
+              </td>
+              <td>${sectionBadge(category.section)}</td>
+              <td>${workModeBadge(category.workMode)}</td>
+              <td>
+                <div class="badge-group">
+                  ${lockBadge(category.locked)}
+                  ${category.archived ? badge("Archived", "neutral") : badge("Live", "good")}
+                </div>
+              </td>
+              <td>
+                <div class="inline-table-actions">
+                  <button class="mini-action" type="button" data-edit-category="${category.id}">Edit</button>
+                  <button class="mini-action" type="button" data-toggle-lock-category="${category.id}" data-next-lock="${category.locked ? "false" : "true"}">
+                    ${category.locked ? "Unlock" : "Lock"}
+                  </button>
+                  <button class="mini-action ${category.archived ? "" : "danger-action"}" type="button" data-toggle-archive-category="${category.id}" data-next-archive="${category.archived ? "false" : "true"}">
+                    ${category.archived ? "Restore" : "Archive"}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  categoriesManagerTable.querySelectorAll("[data-edit-category]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const category = categoriesManagerCache.find((entry) => entry.id === button.dataset.editCategory);
+
+      if (!category) {
+        return;
+      }
+
+      fillCategoryForm(category);
+      showCategoryFormModal(button);
+    });
+  });
+
+  categoriesManagerTable.querySelectorAll("[data-toggle-lock-category]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        await api(`/factory/categories/${button.dataset.toggleLockCategory}`, {
+          method: "PATCH",
+          body: {
+            locked: button.dataset.nextLock === "true"
+          }
+        });
+        showToast(button.dataset.nextLock === "true" ? "Category locked." : "Category unlocked.", "success");
+        await loadPage();
+        renderCategoriesManager();
+        announceMutation(["factory"]);
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    });
+  });
+
+  categoriesManagerTable.querySelectorAll("[data-toggle-archive-category]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const archiveNext = button.dataset.nextArchive === "true";
+      const confirmed = window.confirm(archiveNext
+        ? "Archive this category? Workers will no longer see it in the live week."
+        : "Restore this category back into the live worker list?");
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        await api(`/factory/categories/${button.dataset.toggleArchiveCategory}`, {
+          method: "PATCH",
+          body: {
+            archived: archiveNext
+          }
+        });
+        showToast(archiveNext ? "Category archived." : "Category restored.", "success");
+        await loadPage();
+        renderCategoriesManager();
+        announceMutation(["factory"]);
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    });
+  });
+}
+
+function renderRoundDetail(detail) {
+  roundDetailCache = detail;
+
   const payoutRows = detail.payouts || [];
   const salesEntries = detail.salesEntries || [];
+  const sessions = detail.sessions || [];
   const categoryBreakdown = detail.categoryBreakdown || [];
 
-  archiveDetailContent.innerHTML = `
+  roundDetailContent.innerHTML = `
     <div class="panel-header">
-      <h2>Round ${detail.round.roundNumber} archive</h2>
-      <p>This round is frozen. The payout table and sales history below are the stored record used when the round was finalized.</p>
+      <h2>Week ${detail.round.roundNumber}</h2>
+      <p>${detail.round.status === "FROZEN"
+        ? "Worker percentages are locked here while sales can still be added until payout is marked complete."
+        : "This week is archived and read-only. Use it to review how worker time and sales were recorded."}</p>
     </div>
 
     <div class="metric-grid">
       <article class="metric-card accent">
-        <p>Final sales</p>
-        <strong>${formatCurrency(detail.round.finalizedSalesTotal)}</strong>
-        <small>Total locked into this round when it was finalized</small>
+        <p>Week total</p>
+        <strong>${formatCurrency(detail.round.salesTotal)}</strong>
+        <small>${detail.round.status === "FROZEN" ? "Still live for sales" : "Final locked sales total"}</small>
       </article>
       <article class="metric-card good">
-        <p>Total worker time</p>
+        <p>Worker time</p>
         <strong>${formatHours(detail.round.totalMinutes / 60)} h</strong>
-        <small>${detail.round.totalMinutes} minutes across the whole round</small>
+        <small>${detail.round.totalMinutes} minutes across the whole week</small>
       </article>
       <article class="metric-card neutral">
         <p>Participants</p>
         <strong>${detail.round.participantCount}</strong>
-        <small>Workers who earned a payout in this round</small>
+        <small>${detail.round.status === "FROZEN" ? "Workers locked into this split" : "Workers paid from this split"}</small>
       </article>
     </div>
 
+    ${detail.round.canEditSales || detail.round.canMarkPaid ? `
+      <div class="panel-divider"></div>
+      <div class="action-launch-card">
+        <div class="action-launch-copy">
+          <strong>Frozen week controls</strong>
+          <p class="muted">Add late sales while the worker split stays frozen, then mark the week paid once management is done.</p>
+        </div>
+        <div class="inline-actions">
+          ${detail.round.canEditSales ? `<button class="primary-button" type="button" data-add-detail-sale="${detail.round.id}">Add sale entry</button>` : ""}
+          ${detail.round.canMarkPaid ? `<button class="ghost-button" type="button" data-mark-detail-paid="${detail.round.id}">Mark paid</button>` : ""}
+        </div>
+      </div>
+    ` : ""}
+
     <div class="panel-divider"></div>
     <div class="panel-header compact-panel-header">
-      <h3>Final payout table</h3>
-      <p>Frozen payouts by worker for this round.</p>
+      <h3>Locked payout split</h3>
+      <p>The worker percentages below are the frozen split that sales continue to flow through for this week.</p>
     </div>
     ${payoutRows.length ? `
       <div class="table-shell">
@@ -888,12 +1266,12 @@ function renderArchiveDetail(detail) {
           </tbody>
         </table>
       </div>
-    ` : renderEmptyState("No payout rows stored", "This round does not have stored payout rows yet.")}
+    ` : renderEmptyState("No payout rows stored", "This week does not have a frozen payout split yet.")}
 
     <div class="panel-divider"></div>
     <div class="panel-header compact-panel-header">
-      <h3>Sales logged in this round</h3>
-      <p>Every deal amount that compounded into the final round total.</p>
+      <h3>Sales history</h3>
+      <p>Every sale entry that has compounded into this week total.</p>
     </div>
     ${salesEntries.length ? `
       <div class="table-shell">
@@ -904,6 +1282,7 @@ function renderArchiveDetail(detail) {
               <th>Note</th>
               <th>Logged by</th>
               <th>Updated</th>
+              <th>${detail.round.canEditSales ? "Action" : "State"}</th>
             </tr>
           </thead>
           <tbody>
@@ -913,17 +1292,62 @@ function renderArchiveDetail(detail) {
                 <td>${escapeHtml(entry.note || "No note")}</td>
                 <td>${escapeHtml(entry.createdByName || "Unknown user")}</td>
                 <td>${formatDate(entry.updatedAt)}</td>
+                <td>
+                  ${detail.round.canEditSales ? `
+                    <div class="inline-table-actions">
+                      <button class="mini-action" type="button" data-edit-detail-sale="${entry.id}">Edit</button>
+                      <button class="mini-action danger-action" type="button" data-delete-detail-sale="${entry.id}">Delete</button>
+                    </div>
+                  ` : badge("Locked", "neutral")}
+                </td>
               </tr>
             `).join("")}
           </tbody>
         </table>
       </div>
-    ` : renderEmptyState("No sales entries stored", "This round has no saved sales entries.")}
+    ` : renderEmptyState("No sales stored", "No sale entries have been logged into this week yet.")}
+    <div class="pager" id="factoryRoundDetailSalesPagination"></div>
 
     <div class="panel-divider"></div>
     <div class="panel-header compact-panel-header">
-      <h3>Category time breakdown</h3>
-      <p>How the round’s work hours were spread across the factory categories.</p>
+      <h3>Work history</h3>
+      <p>Paginated worker blocks so you can backtrack the week without the page turning into a wall of sessions.</p>
+    </div>
+    ${sessions.length ? `
+      <div class="table-shell">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Worker</th>
+              <th>Category</th>
+              <th>Mode</th>
+              <th>Duration</th>
+              <th>Started</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sessions.map((session) => `
+              <tr>
+                <td>
+                  <strong>${escapeHtml(session.userName)}</strong>
+                  <span class="subtle-row">${session.note ? escapeHtml(session.note) : "No note"}</span>
+                </td>
+                <td>${escapeHtml(session.categoryName)}</td>
+                <td>${workModeBadge(session.workMode)}</td>
+                <td>${formatHours(session.durationHours)} h<span class="subtle-row">${session.durationMinutes} minutes</span></td>
+                <td>${formatDate(session.startedAt)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    ` : renderEmptyState("No work blocks stored", "No work sessions were found for this week.")}
+    <div class="pager" id="factoryRoundDetailSessionsPagination"></div>
+
+    <div class="panel-divider"></div>
+    <div class="panel-header compact-panel-header">
+      <h3>Category breakdown</h3>
+      <p>How the week’s worker time was spread across the factory categories.</p>
     </div>
     ${categoryBreakdown.length ? `
       <div class="table-shell">
@@ -946,27 +1370,110 @@ function renderArchiveDetail(detail) {
           </tbody>
         </table>
       </div>
-    ` : renderEmptyState("No category breakdown available", "No stored time blocks were found for this round.")}
+    ` : renderEmptyState("No category breakdown available", "No stored work blocks were found for this week.")}
   `;
+
+  const detailSalesPager = roundDetailContent.querySelector("#factoryRoundDetailSalesPagination");
+  renderRoundListPagination(detailSalesPager, detail.salesPagination, "detailSalesPage", (nextPage) => {
+    roundDetailState.salesPage = nextPage;
+    loadRoundDetail(roundDetailState.roundId);
+  });
+
+  const detailSessionsPager = roundDetailContent.querySelector("#factoryRoundDetailSessionsPagination");
+  renderRoundListPagination(detailSessionsPager, detail.sessionsPagination, "detailSessionsPage", (nextPage) => {
+    roundDetailState.sessionsPage = nextPage;
+    loadRoundDetail(roundDetailState.roundId);
+  });
+
+  roundDetailContent.querySelectorAll("[data-add-detail-sale]").forEach((button) => {
+    button.addEventListener("click", () => {
+      resetSaleForm();
+      saleRoundIdField.value = detail.round.id;
+      saleFormTitle.textContent = "Add frozen week sale";
+      saleFormSubtitle.textContent = `Log another sale into week ${detail.round.roundNumber}. The worker split stays frozen while the payout amount updates.`;
+      showSaleModal(button);
+    });
+  });
+
+  roundDetailContent.querySelectorAll("[data-mark-detail-paid]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const confirmed = window.confirm("Mark this frozen week as paid? This will move it into the read-only archive.");
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        await api(`/factory/rounds/${button.dataset.markDetailPaid}/pay`, {
+          method: "POST"
+        });
+        showToast("Factory week marked as paid.", "success");
+        closeFormModal();
+        await loadPage();
+        announceMutation(["factory"]);
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    });
+  });
+
+  roundDetailContent.querySelectorAll("[data-edit-detail-sale]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const entry = salesEntries.find((candidate) => candidate.id === button.dataset.editDetailSale);
+
+      if (!entry) {
+        return;
+      }
+
+      fillSaleForm(entry, detail.round.id, `week ${detail.round.roundNumber}`);
+      showSaleModal(button);
+    });
+  });
+
+  roundDetailContent.querySelectorAll("[data-delete-detail-sale]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const entry = salesEntries.find((candidate) => candidate.id === button.dataset.deleteDetailSale);
+
+      if (!entry) {
+        return;
+      }
+
+      const confirmed = window.confirm("Delete this sale entry from the frozen week?");
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        await api(`/factory/sales/${entry.id}`, {
+          method: "DELETE"
+        });
+        showToast("Sale entry deleted.", "success");
+        await loadPage();
+        await loadRoundDetail(detail.round.id);
+        announceMutation(["factory"]);
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    });
+  });
 }
 
-async function loadArchiveRoundDetail(roundId, opener = document.activeElement) {
-  try {
-    archiveDetailContent.innerHTML = renderMetricSkeleton(3);
-    const detail = await api(`/factory/rounds/${roundId}`);
-    renderArchiveDetail(detail);
-    showArchiveDetailModal(opener);
-  } catch (error) {
-    showToast(error.message, "error");
-  }
-}
-
-async function maybeOpenRequestedArchiveRound() {
-  if (!requestedArchiveRoundId) {
+async function loadRoundDetail(roundId, opener = document.activeElement) {
+  if (!roundId) {
     return;
   }
 
-  await loadArchiveRoundDetail(requestedArchiveRoundId);
+  roundDetailState.roundId = roundId;
+  roundDetailContent.innerHTML = renderMetricSkeleton(3);
+
+  try {
+    const detail = await api(`/factory/rounds/${roundId}?salesPage=${roundDetailState.salesPage}&sessionsPage=${roundDetailState.sessionsPage}`);
+    renderRoundDetail(detail);
+    showRoundDetailModal(opener);
+  } catch (error) {
+    showToast(error.message, "error");
+  }
 }
 
 async function loadSessionCorrections(page = 1) {
@@ -981,10 +1488,10 @@ async function loadSessionCorrections(page = 1) {
 
     if (!currentSessionsCache.length) {
       sessionsTableContainer.innerHTML = renderEmptyState(
-        "No current round sessions yet",
+        "No active week sessions yet",
         data.round
-          ? "Once the team starts clocking work into this round, the correction list will appear here."
-          : "There is no active round to correct right now."
+          ? "Once the team starts clocking or logging work into this week, the correction list will appear here."
+          : "There is no active week to correct right now."
       );
       sessionsPaginationContainer.innerHTML = "";
       return;
@@ -997,9 +1504,9 @@ async function loadSessionCorrections(page = 1) {
             <tr>
               <th>Worker</th>
               <th>Category</th>
+              <th>Mode</th>
               <th>Start</th>
               <th>End</th>
-              <th>Hours</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -1011,9 +1518,9 @@ async function loadSessionCorrections(page = 1) {
                   <span class="subtle-row">${session.correctedByName ? `Last corrected by ${escapeHtml(session.correctedByName)}` : "No admin correction yet"}</span>
                 </td>
                 <td>${escapeHtml(session.categoryName)}</td>
+                <td>${workModeBadge(session.workMode)}</td>
                 <td>${formatDate(session.startedAt)}</td>
                 <td>${session.endedAt ? formatDate(session.endedAt) : "Still active"}</td>
-                <td>${formatHours(session.durationHours)} h</td>
                 <td>
                   <div class="inline-table-actions">
                     <button class="mini-action" type="button" data-edit-session="${session.id}">Edit</button>
@@ -1049,7 +1556,7 @@ async function loadSessionCorrections(page = 1) {
           return;
         }
 
-        const confirmed = window.confirm(`Delete ${session.userName}'s ${session.categoryName} session from the current round?`);
+        const confirmed = window.confirm(`Delete ${session.userName}'s ${session.categoryName} work block from the active week?`);
 
         if (!confirmed) {
           return;
@@ -1069,78 +1576,71 @@ async function loadSessionCorrections(page = 1) {
       });
     });
 
-    renderSessionPagination(currentSessionsPagination);
+    renderRoundListPagination(sessionsPaginationContainer, currentSessionsPagination, "sessionPage", (nextPage) => {
+      loadSessionCorrections(nextPage);
+    });
   } catch (error) {
     sessionsTableContainer.innerHTML = renderEmptyState("Unable to load session corrections", error.message);
     showToast(error.message, "error");
   }
 }
 
-function renderSessionPagination(pagination) {
-  if (!sessionsPaginationContainer) {
-    return;
-  }
-
-  if (!pagination || pagination.totalPages <= 1) {
-    sessionsPaginationContainer.innerHTML = pagination?.total
-      ? `<span class="pager-label">${pagination.total} current sessions</span>`
-      : "";
-    return;
-  }
-
-  sessionsPaginationContainer.innerHTML = `
-    <span class="pager-label">Page ${pagination.page} of ${pagination.totalPages}</span>
-    <button class="ghost-button pager-button" type="button" data-session-page="${pagination.page - 1}" ${pagination.page <= 1 ? "disabled" : ""}>Prev</button>
-    <button class="ghost-button pager-button" type="button" data-session-page="${pagination.page + 1}" ${pagination.page >= pagination.totalPages ? "disabled" : ""}>Next</button>
-  `;
-
-  sessionsPaginationContainer.querySelectorAll("[data-session-page]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const nextPage = Number(button.dataset.sessionPage);
-
-      if (!Number.isFinite(nextPage) || nextPage < 1 || nextPage > pagination.totalPages) {
-        return;
-      }
-
-      loadSessionCorrections(nextPage);
-    });
-  });
-}
-
-async function loadPage() {
+function renderLoadingState() {
   categorySectionsContainer.innerHTML = renderMetricSkeleton(3);
   projectionNote.innerHTML = renderMetricSkeleton(1);
   pieChartHost.innerHTML = "";
   shareTableContainer.innerHTML = renderTableSkeleton(5, 5);
-  salesSummaryContainer.innerHTML = renderMetricSkeleton(3);
-  salesTableContainer.innerHTML = renderTableSkeleton(5, 5);
-  salesPaginationContainer.innerHTML = "";
-  archiveTableContainer.innerHTML = renderTableSkeleton(6, 4);
-  archivePaginationContainer.innerHTML = "";
+
+  if (viewerState.canAdmin || adminSurface) {
+    salesSummaryContainer.innerHTML = renderMetricSkeleton(3);
+    salesTableContainer.innerHTML = renderTableSkeleton(5, 4);
+    salesPaginationContainer.innerHTML = "";
+    frozenTableContainer.innerHTML = renderTableSkeleton(6, 4);
+    frozenPaginationContainer.innerHTML = "";
+    archiveTableContainer.innerHTML = renderTableSkeleton(6, 4);
+    archivePaginationContainer.innerHTML = "";
+  }
+}
+
+async function loadPage() {
+  renderLoadingState();
 
   try {
-    const data = await api(`/factory?salesPage=${currentSalesPage}&archivePage=${currentArchivePage}`);
+    const data = await api(`/factory?salesPage=${currentSalesPage}&frozenPage=${currentFrozenPage}&archivePage=${currentArchivePage}`);
     viewerState = {
       canAdmin: Boolean(data.viewer?.canAdmin),
       activeCategoryId: data.viewer?.activeCategoryId || "",
       activeSessionId: data.viewer?.activeSessionId || ""
     };
     categoriesCache = data.categories || [];
-    currentRoundCache = data.currentRound || null;
-    archiveRoundsCache = data.archives?.rounds || [];
-    currentSalesPage = data.currentRound?.salesPagination?.page || currentSalesPage;
-    currentArchivePage = data.archives?.pagination?.page || currentArchivePage;
+    activeRoundCache = data.activeRound || null;
+    adminCache = data.admin || null;
+    categoriesManagerCache = data.admin?.categories || [];
+    currentSalesPage = data.activeRound?.salesPagination?.page || currentSalesPage;
+    currentFrozenPage = data.admin?.frozenRounds?.pagination?.page || currentFrozenPage;
+    currentArchivePage = data.admin?.archives?.pagination?.page || currentArchivePage;
 
     renderCurrentStatus();
     renderCategorySections();
     renderProjectionNote();
     renderPieChart();
     renderShareTable();
-    renderSalesSummary();
-    renderSalesTable();
     renderAdminState();
-    renderArchiveTable(data.archives?.pagination || null);
-    await maybeOpenRequestedArchiveRound();
+
+    if (viewerState.canAdmin) {
+      renderSalesSummary();
+      renderSalesTable();
+      renderFrozenTable();
+      renderArchiveTable();
+    } else {
+      salesSummaryContainer.innerHTML = "";
+      salesTableContainer.innerHTML = "";
+      salesPaginationContainer.innerHTML = "";
+      frozenTableContainer.innerHTML = "";
+      frozenPaginationContainer.innerHTML = "";
+      archiveTableContainer.innerHTML = "";
+      archivePaginationContainer.innerHTML = "";
+    }
   } catch (error) {
     const fallback = renderEmptyState("Unable to load factory page", error.message);
     categorySectionsContainer.innerHTML = fallback;
@@ -1148,6 +1648,7 @@ async function loadPage() {
     shareTableContainer.innerHTML = "";
     salesSummaryContainer.innerHTML = "";
     salesTableContainer.innerHTML = "";
+    frozenTableContainer.innerHTML = "";
     archiveTableContainer.innerHTML = "";
     showToast(error.message, "error");
   }
@@ -1158,6 +1659,7 @@ saleForm?.addEventListener("submit", async (event) => {
   mountFormError(saleError, "");
 
   const payload = {
+    roundId: saleRoundIdField.value || activeRoundCache?.id || "",
     amount: Number(saleForm.elements.amount.value || 0),
     note: saleForm.elements.note.value
   };
@@ -1174,15 +1676,52 @@ saleForm?.addEventListener("submit", async (event) => {
         method: "POST",
         body: payload
       });
-      showToast("Sale entry added to the round.", "success");
+      showToast("Sale entry added.", "success");
     }
 
+    const detailRoundId = roundDetailState.roundId;
     resetSaleForm();
+    closeFormModal();
+    await loadPage();
+
+    if (detailRoundId && payload.roundId === detailRoundId) {
+      await loadRoundDetail(detailRoundId);
+    }
+
+    announceMutation(["factory"]);
+  } catch (error) {
+    mountFormError(saleError, error.message);
+    showToast(error.message, "error");
+  }
+});
+
+workEntryForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  mountFormError(workEntryError, "");
+
+  const payload = {
+    categoryId: workEntryCategoryIdField.value,
+    minutes: Number(workEntryForm.elements.minutes.value || 0),
+    note: workEntryForm.elements.note.value
+  };
+
+  try {
+    const response = await api("/factory/entries", {
+      method: "POST",
+      body: payload
+    });
+    showToast(
+      response.closedCurrentCategoryName
+        ? `Logged work block and closed ${response.closedCurrentCategoryName} at the start of it.`
+        : "Factory work block saved.",
+      "success"
+    );
+    resetWorkEntryForm();
     closeFormModal();
     await loadPage();
     announceMutation(["factory"]);
   } catch (error) {
-    mountFormError(saleError, error.message);
+    mountFormError(workEntryError, error.message);
     showToast(error.message, "error");
   }
 });
@@ -1214,13 +1753,57 @@ sessionForm?.addEventListener("submit", async (event) => {
   }
 });
 
+categoryForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  mountFormError(categoryError, "");
+
+  const payload = {
+    name: categoryForm.elements.name.value,
+    section: categoryForm.elements.section.value,
+    workMode: categoryForm.elements.workMode.value,
+    helperText: categoryForm.elements.helperText.value,
+    locked: categoryForm.elements.locked.checked,
+    archived: categoryForm.elements.archived.checked
+  };
+
+  try {
+    if (categoryIdField.value) {
+      await api(`/factory/categories/${categoryIdField.value}`, {
+        method: "PATCH",
+        body: payload
+      });
+      showToast("Factory category updated.", "success");
+    } else {
+      await api("/factory/categories", {
+        method: "POST",
+        body: payload
+      });
+      showToast("Factory category created.", "success");
+    }
+
+    resetCategoryForm();
+    closeFormModal();
+    await loadPage();
+    renderCategoriesManager();
+    announceMutation(["factory"]);
+  } catch (error) {
+    mountFormError(categoryError, error.message);
+    showToast(error.message, "error");
+  }
+});
+
 openSaleFormButton?.addEventListener("click", () => {
   resetSaleForm();
+  saleRoundIdField.value = activeRoundCache?.id || "";
   showSaleModal(openSaleFormButton);
 });
 
 saleResetButton?.addEventListener("click", () => {
   resetSaleForm();
+});
+
+workEntryResetButton?.addEventListener("click", () => {
+  resetWorkEntryForm();
 });
 
 openSessionsButton?.addEventListener("click", async () => {
@@ -1240,7 +1823,7 @@ deleteSessionButton?.addEventListener("click", async () => {
     return;
   }
 
-  const confirmed = window.confirm(`Delete ${session.userName}'s ${session.categoryName} session from the current round?`);
+  const confirmed = window.confirm(`Delete ${session.userName}'s ${session.categoryName} work block from the active week?`);
 
   if (!confirmed) {
     return;
@@ -1262,18 +1845,32 @@ deleteSessionButton?.addEventListener("click", async () => {
   }
 });
 
-finalizeRoundButton?.addEventListener("click", async () => {
-  const confirmed = window.confirm("Finalize the current factory round? This will close any live sessions, freeze the payout snapshot, and archive the round.");
+openCategoriesButton?.addEventListener("click", () => {
+  renderCategoriesManager();
+  showCategoriesManagerModal(openCategoriesButton);
+});
+
+openCategoryFormButton?.addEventListener("click", () => {
+  resetCategoryForm();
+  showCategoryFormModal(openCategoryFormButton);
+});
+
+categoryResetButton?.addEventListener("click", () => {
+  resetCategoryForm();
+});
+
+freezeRoundButton?.addEventListener("click", async () => {
+  const confirmed = window.confirm("Freeze the current factory week? Worker percentages will lock, the next week will open immediately, and sales can keep being added to the frozen week.");
 
   if (!confirmed) {
     return;
   }
 
   try {
-    const response = await api("/factory/rounds/finalize", {
+    const response = await api("/factory/rounds/freeze", {
       method: "POST"
     });
-    showToast(`Round ${response.round.roundNumber} finalized and archived.`, "success");
+    showToast(`Week ${response.frozenRound.roundNumber} frozen. Week ${response.nextRound.roundNumber} is now open.`, "success");
     await loadPage();
     announceMutation(["factory"]);
   } catch (error) {
@@ -1286,7 +1883,7 @@ startRoundButton?.addEventListener("click", async () => {
     const response = await api("/factory/rounds/start", {
       method: "POST"
     });
-    showToast(`Round ${response.round.roundNumber} is now open.`, "success");
+    showToast(`Week ${response.round.roundNumber} is now open.`, "success");
     await loadPage();
     announceMutation(["factory"]);
   } catch (error) {
@@ -1295,10 +1892,11 @@ startRoundButton?.addEventListener("click", async () => {
 });
 
 subscribeToMutations(["factory"], () => {
-  showToast("Factory page refreshed with live changes.", "info");
   loadPage();
 });
 
 resetSaleForm();
+resetWorkEntryForm();
 resetSessionForm();
+resetCategoryForm();
 loadPage();

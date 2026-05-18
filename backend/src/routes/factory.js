@@ -9,15 +9,28 @@ import {
   computeSessionMilliseconds,
   ensureFactoryBootstrap,
   factorySectionLabel,
-  getNextFactoryRoundNumber
+  factoryWorkModeLabel,
+  getNextFactoryRoundNumber,
+  getUniqueFactoryCategorySlug,
+  summarizeFactoryCategoryBreakdown
 } from "../services/factory.js";
-import { normalizeOptionalString, requireMoney, requireString } from "../validators.js";
+import {
+  normalizeOptionalString,
+  requireMoney,
+  requirePositiveInt,
+  requireString
+} from "../validators.js";
 
 const router = Router();
 
 const SALES_PAGE_SIZE = 8;
-const ARCHIVE_PAGE_SIZE = 8;
+const ROUND_LIST_PAGE_SIZE = 8;
 const SESSION_PAGE_SIZE = 10;
+const DETAIL_SALES_PAGE_SIZE = 8;
+const DETAIL_SESSIONS_PAGE_SIZE = 10;
+
+const FACTORY_SECTIONS = new Set(["MINING", "SMELTING", "MISCELLANEOUS"]);
+const FACTORY_WORK_MODES = new Set(["CLOCKED", "LOGGED_ENTRY"]);
 
 router.use(authenticateToken);
 
@@ -58,6 +71,26 @@ function parseSessionEnd(value, fieldName) {
   return requireDateTime(value, fieldName);
 }
 
+function requireFactorySection(value) {
+  const normalized = requireString(value, "Section").toUpperCase();
+
+  if (!FACTORY_SECTIONS.has(normalized)) {
+    throw createError(400, "Section must be Mining, Smelting, or Miscellaneous.");
+  }
+
+  return normalized;
+}
+
+function requireFactoryWorkMode(value) {
+  const normalized = requireString(value, "Work mode").toUpperCase();
+
+  if (!FACTORY_WORK_MODES.has(normalized)) {
+    throw createError(400, "Work mode must be Clocked or Logged entry.");
+  }
+
+  return normalized;
+}
+
 function rangesOverlap(startA, endA, startB, endB) {
   const leftStart = new Date(startA).getTime();
   const leftEnd = endA ? new Date(endA).getTime() : Number.POSITIVE_INFINITY;
@@ -67,8 +100,8 @@ function rangesOverlap(startA, endA, startB, endB) {
   return leftStart < rightEnd && rightStart < leftEnd;
 }
 
-async function assertNoSessionOverlap({ sessionId = "", userId, roundId, startedAt, endedAt }) {
-  const existingSessions = await prisma.factorySession.findMany({
+async function assertNoSessionOverlap(client, { sessionId = "", userId, roundId, startedAt, endedAt }) {
+  const existingSessions = await client.factorySession.findMany({
     where: {
       userId,
       roundId,
@@ -95,7 +128,7 @@ async function assertNoSessionOverlap({ sessionId = "", userId, roundId, started
   ));
 
   if (hasOverlap) {
-    throw createError(400, "This session overlaps with another clocked block for that worker.");
+    throw createError(400, "This session overlaps with another work block for that worker.");
   }
 }
 
@@ -123,6 +156,9 @@ function serializeSession(session, now = new Date()) {
     categoryId: session.categoryId,
     categoryName: session.category?.name || "Unknown category",
     categorySection: session.category?.section || "MISCELLANEOUS",
+    categorySectionLabel: factorySectionLabel(session.category?.section || "MISCELLANEOUS"),
+    workMode: session.workMode || session.category?.workMode || "CLOCKED",
+    workModeLabel: factoryWorkModeLabel(session.workMode || session.category?.workMode || "CLOCKED"),
     startedAt: session.startedAt,
     endedAt: session.endedAt,
     durationMinutes: Math.round(durationMilliseconds / 60000),
@@ -135,7 +171,7 @@ function serializeSession(session, now = new Date()) {
   };
 }
 
-function serializeRoundArchive(round) {
+function summarizeRoundForList(round) {
   const totalMinutes = (round.payouts || []).reduce((sum, payout) => sum + Number(payout.totalMinutes || 0), 0);
   const highestPayout = (round.payouts || []).reduce((max, payout) => {
     const value = Number(payout.payoutAmount || 0);
@@ -145,12 +181,16 @@ function serializeRoundArchive(round) {
   return {
     id: round.id,
     roundNumber: round.roundNumber,
-    finalizedAt: round.finalizedAt,
-    finalizedSalesTotal: Number(round.finalizedSalesTotal || 0),
+    status: round.status,
+    salesTotal: Number(round.finalizedSalesTotal || 0),
     totalMinutes,
     participantCount: round._count?.payouts || round.payouts?.length || 0,
     saleEntryCount: round._count?.salesEntries || 0,
-    highestPayout
+    highestPayout,
+    frozenAt: round.frozenAt,
+    paidAt: round.paidAt,
+    finalizedAt: round.finalizedAt,
+    createdAt: round.createdAt
   };
 }
 
@@ -165,13 +205,14 @@ async function getActiveRound() {
   });
 }
 
-async function getLastFinalizedRound() {
+async function getLatestReferenceRound() {
   return prisma.factoryRound.findFirst({
     where: {
-      status: "FINALIZED"
+      status: {
+        in: ["FROZEN", "PAID", "FINALIZED"]
+      }
     },
     orderBy: [
-      { finalizedAt: "desc" },
       { roundNumber: "desc" }
     ]
   });
@@ -181,13 +222,64 @@ async function requireActiveRound() {
   const activeRound = await getActiveRound();
 
   if (!activeRound) {
-    throw createError(400, "No active factory round exists yet. Ask an admin to start the next round.");
+    throw createError(400, "No active factory week exists yet. Ask an admin to open the next week.");
   }
 
   return activeRound;
 }
 
-function roundDetailInclude() {
+async function getRoundSalesTotal(client, roundId) {
+  const aggregate = await client.factorySaleEntry.aggregate({
+    where: {
+      roundId
+    },
+    _sum: {
+      amount: true
+    }
+  });
+
+  return Number(aggregate._sum.amount || 0);
+}
+
+async function syncLockedRoundPayouts(client, roundId) {
+  const salesTotal = await getRoundSalesTotal(client, roundId);
+  const payouts = await client.factoryRoundPayout.findMany({
+    where: {
+      roundId
+    },
+    select: {
+      id: true,
+      sharePercent: true
+    }
+  });
+
+  for (const payout of payouts) {
+    const shareRatio = Number(payout.sharePercent || 0) / 100;
+    const payoutAmount = salesTotal * shareRatio;
+
+    await client.factoryRoundPayout.update({
+      where: {
+        id: payout.id
+      },
+      data: {
+        payoutAmount: payoutAmount.toFixed(2)
+      }
+    });
+  }
+
+  await client.factoryRound.update({
+    where: {
+      id: roundId
+    },
+    data: {
+      finalizedSalesTotal: salesTotal.toFixed(2)
+    }
+  });
+
+  return salesTotal;
+}
+
+function roundBaseDetailInclude() {
   return {
     payouts: {
       include: {
@@ -202,41 +294,6 @@ function roundDetailInclude() {
         { payoutAmount: "desc" },
         { totalMinutes: "desc" }
       ]
-    },
-    salesEntries: {
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
-      },
-      orderBy: [
-        { createdAt: "desc" },
-        { id: "desc" }
-      ]
-    },
-    sessions: {
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-            section: true
-          }
-        }
-      },
-      orderBy: [
-        { startedAt: "asc" },
-        { id: "asc" }
-      ]
     }
   };
 }
@@ -248,53 +305,51 @@ router.get(
 
     const now = new Date();
     const salesPage = parsePage(req.query.salesPage, 1);
+    const frozenPage = parsePage(req.query.frozenPage, 1);
     const archivePage = parsePage(req.query.archivePage, 1);
 
-    const [categories, activeRound, lastFinalizedRound, archiveCount] = await Promise.all([
+    const [allCategories, activeRound, latestReferenceRound, frozenCount, archiveCount] = await Promise.all([
       prisma.factoryCategory.findMany({
         orderBy: [
+          { archived: "asc" },
           { section: "asc" },
-          { sortOrder: "asc" }
+          { sortOrder: "asc" },
+          { name: "asc" }
         ]
       }),
       getActiveRound(),
-      getLastFinalizedRound(),
-      prisma.factoryRound.count({
-        where: {
-          status: "FINALIZED"
-        }
-      })
+      getLatestReferenceRound(),
+      req.user.role === "ADMIN"
+        ? prisma.factoryRound.count({
+          where: {
+            status: "FROZEN"
+          }
+        })
+        : Promise.resolve(0),
+      req.user.role === "ADMIN"
+        ? prisma.factoryRound.count({
+          where: {
+            status: {
+              in: ["PAID", "FINALIZED"]
+            }
+          }
+        })
+        : Promise.resolve(0)
     ]);
 
-    let viewerActiveCategoryId = "";
-    let viewerActiveSessionId = "";
-    let categoryView = categories.map((category) => ({
-      id: category.id,
-      slug: category.slug,
-      name: category.name,
-      section: category.section,
-      sectionLabel: factorySectionLabel(category.section),
-      helperText: category.helperText,
-      locked: category.locked,
-      activeWorkers: [],
-      activeWorkerCount: 0,
-      viewerActive: false
-    }));
-
-    let currentRound = null;
+    let categoryView = buildFactoryCategoryView(allCategories, [], req.user.id);
+    let activeRoundPayload = null;
 
     if (activeRound) {
-      const salesPagination = buildPagination(
-        await prisma.factorySaleEntry.count({
+      const activeSalesCountPromise = req.user.role === "ADMIN"
+        ? prisma.factorySaleEntry.count({
           where: {
             roundId: activeRound.id
           }
-        }),
-        salesPage,
-        SALES_PAGE_SIZE
-      );
+        })
+        : Promise.resolve(0);
 
-      const [allSessions, currentSalesAggregate, salesEntries] = await Promise.all([
+      const [sessions, currentSalesTotal, activeSalesCount] = await Promise.all([
         prisma.factorySession.findMany({
           where: {
             roundId: activeRound.id
@@ -310,7 +365,8 @@ router.get(
               select: {
                 id: true,
                 name: true,
-                section: true
+                section: true,
+                workMode: true
               }
             }
           },
@@ -319,15 +375,26 @@ router.get(
             { id: "asc" }
           ]
         }),
-        prisma.factorySaleEntry.aggregate({
-          where: {
-            roundId: activeRound.id
-          },
-          _sum: {
-            amount: true
-          }
-        }),
-        prisma.factorySaleEntry.findMany({
+        getRoundSalesTotal(prisma, activeRound.id),
+        activeSalesCountPromise
+      ]);
+
+      categoryView = buildFactoryCategoryView(allCategories, sessions, req.user.id);
+
+      const referenceSalesTotal = Number(latestReferenceRound?.finalizedSalesTotal || 0);
+      const estimateBasisTotal = currentSalesTotal > 0 ? currentSalesTotal : referenceSalesTotal;
+      const estimateBasisSource = currentSalesTotal > 0
+        ? "CURRENT_WEEK_SALES"
+        : referenceSalesTotal > 0
+          ? "LAST_CLOSED_WEEK"
+          : "NONE";
+      const shareSnapshot = buildFactoryShareRows(sessions, estimateBasisTotal, now);
+      let salesEntries = [];
+      let salesPagination = null;
+
+      if (req.user.role === "ADMIN") {
+        const pagination = buildPagination(activeSalesCount, salesPage, SALES_PAGE_SIZE);
+        salesEntries = await prisma.factorySaleEntry.findMany({
           where: {
             roundId: activeRound.id
           },
@@ -343,35 +410,26 @@ router.get(
             { createdAt: "desc" },
             { id: "desc" }
           ],
-          skip: salesPagination.skip,
-          take: salesPagination.pageSize
-        })
-      ]);
+          skip: pagination.skip,
+          take: pagination.pageSize
+        });
+        salesPagination = {
+          page: pagination.page,
+          pageSize: pagination.pageSize,
+          total: pagination.total,
+          totalPages: pagination.totalPages
+        };
+      }
 
-      const currentSalesTotal = Number(currentSalesAggregate._sum.amount || 0);
-      const lastFinalizedTotal = Number(lastFinalizedRound?.finalizedSalesTotal || 0);
-      const estimateBasisTotal = currentSalesTotal > 0 ? currentSalesTotal : lastFinalizedTotal;
-      const estimateBasisSource = currentSalesTotal > 0
-        ? "CURRENT_ROUND"
-        : lastFinalizedTotal > 0
-          ? "LAST_FINALIZED_ROUND"
-          : "NONE";
-      const shareSnapshot = buildFactoryShareRows(allSessions, estimateBasisTotal, now);
-      const categorySnapshot = buildFactoryCategoryView(categories, allSessions, req.user.id);
-
-      viewerActiveCategoryId = categorySnapshot.viewerActiveCategoryId;
-      viewerActiveSessionId = categorySnapshot.viewerActiveSessionId;
-      categoryView = categorySnapshot.categories;
-
-      currentRound = {
+      activeRoundPayload = {
         id: activeRound.id,
         roundNumber: activeRound.roundNumber,
         startedAt: activeRound.createdAt,
         status: activeRound.status,
         salesTotal: currentSalesTotal,
-        lastFinalizedTotal,
         estimateBasisTotal,
         estimateBasisSource,
+        referenceSalesTotal,
         totalMinutes: Math.round(shareSnapshot.totalMilliseconds / 60000),
         shareRows: shareSnapshot.shareRows.map((row) => ({
           userId: row.userId,
@@ -382,60 +440,120 @@ router.get(
           projectedPayout: row.projectedPayout,
           activeCategoryName: row.activeCategoryName
         })),
-        salesEntries: salesEntries.map(serializeSaleEntry),
-        salesPagination: {
-          page: salesPagination.page,
-          pageSize: salesPagination.pageSize,
-          total: salesPagination.total,
-          totalPages: salesPagination.totalPages
+        ...(req.user.role === "ADMIN"
+          ? {
+            salesEntries: salesEntries.map(serializeSaleEntry),
+            salesPagination
+          }
+          : {})
+      };
+    }
+
+    let adminPayload = null;
+
+    if (req.user.role === "ADMIN") {
+      const frozenPagination = buildPagination(frozenCount, frozenPage, ROUND_LIST_PAGE_SIZE);
+      const archivePagination = buildPagination(archiveCount, archivePage, ROUND_LIST_PAGE_SIZE);
+      const [frozenRounds, archivedRounds] = await Promise.all([
+        prisma.factoryRound.findMany({
+          where: {
+            status: "FROZEN"
+          },
+          orderBy: [
+            { frozenAt: "desc" },
+            { roundNumber: "desc" }
+          ],
+          skip: frozenPagination.skip,
+          take: frozenPagination.pageSize,
+          include: {
+            payouts: {
+              select: {
+                totalMinutes: true,
+                payoutAmount: true
+              }
+            },
+            _count: {
+              select: {
+                payouts: true,
+                salesEntries: true
+              }
+            }
+          }
+        }),
+        prisma.factoryRound.findMany({
+          where: {
+            status: {
+              in: ["PAID", "FINALIZED"]
+            }
+          },
+          orderBy: [
+            { paidAt: "desc" },
+            { finalizedAt: "desc" },
+            { roundNumber: "desc" }
+          ],
+          skip: archivePagination.skip,
+          take: archivePagination.pageSize,
+          include: {
+            payouts: {
+              select: {
+                totalMinutes: true,
+                payoutAmount: true
+              }
+            },
+            _count: {
+              select: {
+                payouts: true,
+                salesEntries: true
+              }
+            }
+          }
+        })
+      ]);
+
+      adminPayload = {
+        categories: allCategories.map((category) => ({
+          id: category.id,
+          slug: category.slug,
+          name: category.name,
+          section: category.section,
+          sectionLabel: factorySectionLabel(category.section),
+          workMode: category.workMode,
+          workModeLabel: factoryWorkModeLabel(category.workMode),
+          helperText: category.helperText,
+          sortOrder: category.sortOrder,
+          locked: category.locked,
+          archived: category.archived
+        })),
+        frozenRounds: {
+          rounds: frozenRounds.map(summarizeRoundForList),
+          pagination: {
+            page: frozenPagination.page,
+            pageSize: frozenPagination.pageSize,
+            total: frozenPagination.total,
+            totalPages: frozenPagination.totalPages
+          }
+        },
+        archives: {
+          rounds: archivedRounds.map(summarizeRoundForList),
+          pagination: {
+            page: archivePagination.page,
+            pageSize: archivePagination.pageSize,
+            total: archivePagination.total,
+            totalPages: archivePagination.totalPages
+          }
         }
       };
     }
 
-    const archivePagination = buildPagination(archiveCount, archivePage, ARCHIVE_PAGE_SIZE);
-    const archiveRounds = await prisma.factoryRound.findMany({
-      where: {
-        status: "FINALIZED"
-      },
-      orderBy: [
-        { finalizedAt: "desc" },
-        { roundNumber: "desc" }
-      ],
-      skip: archivePagination.skip,
-      take: archivePagination.pageSize,
-      include: {
-        payouts: {
-          select: {
-            totalMinutes: true,
-            payoutAmount: true
-          }
-        },
-        _count: {
-          select: {
-            payouts: true,
-            salesEntries: true
-          }
-        }
-      }
-    });
-
     res.json({
       viewer: {
         canAdmin: req.user.role === "ADMIN",
-        activeCategoryId: viewerActiveCategoryId,
-        activeSessionId: viewerActiveSessionId
+        activeCategoryId: categoryView.viewerActiveCategoryId,
+        activeSessionId: categoryView.viewerActiveSessionId
       },
-      categories: categoryView,
-      currentRound,
-      archives: {
-        rounds: archiveRounds.map(serializeRoundArchive),
-        pagination: {
-          page: archivePagination.page,
-          pageSize: archivePagination.pageSize,
-          total: archivePagination.total,
-          totalPages: archivePagination.totalPages
-        }
-      }
+      categories: categoryView.categories,
+      activeRound: activeRoundPayload,
+      admin: adminPayload
     });
   })
 );
@@ -453,8 +571,12 @@ router.post(
       }
     });
 
-    if (!category) {
+    if (!category || category.archived) {
       throw createError(404, "Factory category not found.");
+    }
+
+    if (category.workMode !== "CLOCKED") {
+      throw createError(400, "That category uses a logged work entry, not a live clock.");
     }
 
     if (category.locked && req.user.role !== "ADMIN") {
@@ -500,6 +622,7 @@ router.post(
           roundId: activeRound.id,
           userId: req.user.id,
           categoryId: category.id,
+          workMode: "CLOCKED",
           startedAt: now
         },
         include: {
@@ -513,7 +636,8 @@ router.post(
             select: {
               id: true,
               name: true,
-              section: true
+              section: true,
+              workMode: true
             }
           }
         }
@@ -548,7 +672,8 @@ router.post(
           select: {
             id: true,
             name: true,
-            section: true
+            section: true,
+            workMode: true
           }
         }
       }
@@ -556,6 +681,10 @@ router.post(
 
     if (!currentSession) {
       throw createError(400, "You are not clocked into any factory category right now.");
+    }
+
+    if (currentSession.workMode !== "CLOCKED") {
+      throw createError(400, "Logged work entries close automatically once they are saved.");
     }
 
     const now = new Date();
@@ -577,7 +706,8 @@ router.post(
           select: {
             id: true,
             name: true,
-            section: true
+            section: true,
+            workMode: true
           }
         }
       }
@@ -589,160 +719,114 @@ router.post(
   })
 );
 
-router.patch(
-  "/categories/:id",
-  requireAdmin,
+router.post(
+  "/entries",
   asyncHandler(async (req, res) => {
+    await ensureFactoryBootstrap();
+
+    const activeRound = await requireActiveRound();
+    const categoryId = requireString(req.body.categoryId, "Category");
+    const minutes = requirePositiveInt(req.body.minutes, "Minutes spent");
+    const note = normalizeOptionalString(req.body.note);
     const category = await prisma.factoryCategory.findUnique({
       where: {
-        id: req.params.id
+        id: categoryId
       }
     });
 
-    if (!category) {
+    if (!category || category.archived) {
       throw createError(404, "Factory category not found.");
     }
 
-    if (typeof req.body.locked !== "boolean") {
-      throw createError(400, "A locked value is required.");
+    if (category.workMode !== "LOGGED_ENTRY") {
+      throw createError(400, "That category uses a live clock. Use Clock in instead.");
     }
 
-    const updatedCategory = await prisma.factoryCategory.update({
-      where: {
-        id: category.id
-      },
-      data: {
-        locked: req.body.locked
-      }
-    });
-
-    res.json({
-      category: {
-        id: updatedCategory.id,
-        locked: updatedCategory.locked
-      }
-    });
-  })
-);
-
-router.post(
-  "/sales",
-  requireAdmin,
-  asyncHandler(async (req, res) => {
-    const activeRound = await requireActiveRound();
-    const amount = Number(requireMoney(req.body.amount, "Sale amount"));
-
-    if (amount <= 0) {
-      throw createError(400, "Sale amount must be greater than zero.");
+    if (category.locked && req.user.role !== "ADMIN") {
+      throw createError(403, "That category is locked right now. An admin can reopen it when needed.");
     }
 
-    const entry = await prisma.factorySaleEntry.create({
-      data: {
-        roundId: activeRound.id,
-        amount: amount.toFixed(2),
-        note: normalizeOptionalString(req.body.note),
-        createdById: req.user.id
-      },
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            name: true
+    const endedAt = new Date();
+    const startedAt = new Date(endedAt.getTime() - (minutes * 60000));
+
+    let session = null;
+    let closedCurrentCategoryName = null;
+
+    await prisma.$transaction(async (tx) => {
+      const currentSession = await tx.factorySession.findFirst({
+        where: {
+          roundId: activeRound.id,
+          userId: req.user.id,
+          endedAt: null
+        },
+        include: {
+          category: {
+            select: {
+              name: true
+            }
           }
         }
+      });
+
+      if (currentSession) {
+        if (new Date(currentSession.startedAt).getTime() > startedAt.getTime()) {
+          throw createError(
+            400,
+            "This logged block overlaps your current clocked time. Clock out first or enter a shorter duration."
+          );
+        }
+
+        await tx.factorySession.update({
+          where: {
+            id: currentSession.id
+          },
+          data: {
+            endedAt: startedAt
+          }
+        });
+
+        closedCurrentCategoryName = currentSession.category?.name || null;
       }
+
+      await assertNoSessionOverlap(tx, {
+        userId: req.user.id,
+        roundId: activeRound.id,
+        startedAt,
+        endedAt
+      });
+
+      session = await tx.factorySession.create({
+        data: {
+          roundId: activeRound.id,
+          userId: req.user.id,
+          categoryId: category.id,
+          workMode: "LOGGED_ENTRY",
+          startedAt,
+          endedAt,
+          note
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          category: {
+            select: {
+              id: true,
+              name: true,
+              section: true,
+              workMode: true
+            }
+          }
+        }
+      });
     });
 
     res.status(201).json({
-      entry: serializeSaleEntry(entry)
-    });
-  })
-);
-
-router.patch(
-  "/sales/:id",
-  requireAdmin,
-  asyncHandler(async (req, res) => {
-    const entry = await prisma.factorySaleEntry.findUnique({
-      where: {
-        id: req.params.id
-      },
-      include: {
-        round: true
-      }
-    });
-
-    if (!entry) {
-      throw createError(404, "Sale entry not found.");
-    }
-
-    if (entry.round.status !== "ACTIVE") {
-      throw createError(400, "Only the live round sale ledger can be edited.");
-    }
-
-    const amount = req.body.amount !== undefined
-      ? Number(requireMoney(req.body.amount, "Sale amount"))
-      : Number(entry.amount || 0);
-
-    if (amount <= 0) {
-      throw createError(400, "Sale amount must be greater than zero.");
-    }
-
-    const updatedEntry = await prisma.factorySaleEntry.update({
-      where: {
-        id: entry.id
-      },
-      data: {
-        amount: amount.toFixed(2),
-        note: req.body.note !== undefined
-          ? normalizeOptionalString(req.body.note)
-          : entry.note
-      },
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
-      }
-    });
-
-    res.json({
-      entry: serializeSaleEntry(updatedEntry)
-    });
-  })
-);
-
-router.delete(
-  "/sales/:id",
-  requireAdmin,
-  asyncHandler(async (req, res) => {
-    const entry = await prisma.factorySaleEntry.findUnique({
-      where: {
-        id: req.params.id
-      },
-      include: {
-        round: true
-      }
-    });
-
-    if (!entry) {
-      throw createError(404, "Sale entry not found.");
-    }
-
-    if (entry.round.status !== "ACTIVE") {
-      throw createError(400, "Only the live round sale ledger can be edited.");
-    }
-
-    await prisma.factorySaleEntry.delete({
-      where: {
-        id: entry.id
-      }
-    });
-
-    res.json({
-      deleted: true
+      session: serializeSession(session, endedAt),
+      closedCurrentCategoryName
     });
   })
 );
@@ -788,7 +872,8 @@ router.get(
           select: {
             id: true,
             name: true,
-            section: true
+            section: true,
+            workMode: true
           }
         },
         correctedBy: {
@@ -840,7 +925,7 @@ router.patch(
     }
 
     if (existingSession.round.status !== "ACTIVE") {
-      throw createError(400, "Only current round sessions can be corrected.");
+      throw createError(400, "Only the current active week can have its sessions corrected.");
     }
 
     const startedAt = req.body.startedAt !== undefined
@@ -854,7 +939,7 @@ router.patch(
       throw createError(400, "Session end time must be after the start time.");
     }
 
-    await assertNoSessionOverlap({
+    await assertNoSessionOverlap(prisma, {
       sessionId: existingSession.id,
       userId: existingSession.userId,
       roundId: existingSession.roundId,
@@ -885,7 +970,8 @@ router.patch(
           select: {
             id: true,
             name: true,
-            section: true
+            section: true,
+            workMode: true
           }
         },
         correctedBy: {
@@ -921,7 +1007,7 @@ router.delete(
     }
 
     if (existingSession.round.status !== "ACTIVE") {
-      throw createError(400, "Only current round sessions can be removed.");
+      throw createError(400, "Only the current active week can remove work blocks.");
     }
 
     await prisma.factorySession.delete({
@@ -937,9 +1023,289 @@ router.delete(
 );
 
 router.post(
-  "/rounds/finalize",
+  "/categories",
   requireAdmin,
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    await ensureFactoryBootstrap();
+
+    const name = requireString(req.body.name, "Category name");
+    const section = requireFactorySection(req.body.section);
+    const workMode = requireFactoryWorkMode(req.body.workMode);
+    const helperText = normalizeOptionalString(req.body.helperText);
+    const slug = await getUniqueFactoryCategorySlug(name);
+    const latestCategory = await prisma.factoryCategory.findFirst({
+      orderBy: {
+        sortOrder: "desc"
+      },
+      select: {
+        sortOrder: true
+      }
+    });
+
+    const category = await prisma.factoryCategory.create({
+      data: {
+        slug,
+        name,
+        section,
+        workMode,
+        helperText,
+        sortOrder: Number(latestCategory?.sortOrder || 0) + 10,
+        locked: false,
+        archived: false
+      }
+    });
+
+    res.status(201).json({
+      category: {
+        id: category.id,
+        slug: category.slug,
+        name: category.name,
+        section: category.section,
+        workMode: category.workMode,
+        helperText: category.helperText,
+        sortOrder: category.sortOrder,
+        locked: category.locked,
+        archived: category.archived
+      }
+    });
+  })
+);
+
+router.patch(
+  "/categories/:id",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const category = await prisma.factoryCategory.findUnique({
+      where: {
+        id: req.params.id
+      }
+    });
+
+    if (!category) {
+      throw createError(404, "Factory category not found.");
+    }
+
+    const nextSection = req.body.section !== undefined
+      ? requireFactorySection(req.body.section)
+      : category.section;
+    const nextWorkMode = req.body.workMode !== undefined
+      ? requireFactoryWorkMode(req.body.workMode)
+      : category.workMode;
+    const nextArchived = typeof req.body.archived === "boolean"
+      ? req.body.archived
+      : category.archived;
+
+    const hasLiveSession = await prisma.factorySession.count({
+      where: {
+        categoryId: category.id,
+        endedAt: null
+      }
+    });
+
+    if (hasLiveSession && (nextArchived || nextWorkMode !== category.workMode)) {
+      throw createError(400, "Close the live clock session on this category before archiving it or changing how it works.");
+    }
+
+    const updatedCategory = await prisma.factoryCategory.update({
+      where: {
+        id: category.id
+      },
+      data: {
+        name: req.body.name !== undefined ? requireString(req.body.name, "Category name") : category.name,
+        section: nextSection,
+        workMode: nextWorkMode,
+        helperText: req.body.helperText !== undefined
+          ? normalizeOptionalString(req.body.helperText)
+          : category.helperText,
+        locked: typeof req.body.locked === "boolean"
+          ? req.body.locked
+          : nextArchived
+            ? true
+            : category.locked,
+        archived: nextArchived
+      }
+    });
+
+    res.json({
+      category: {
+        id: updatedCategory.id,
+        slug: updatedCategory.slug,
+        name: updatedCategory.name,
+        section: updatedCategory.section,
+        workMode: updatedCategory.workMode,
+        helperText: updatedCategory.helperText,
+        sortOrder: updatedCategory.sortOrder,
+        locked: updatedCategory.locked,
+        archived: updatedCategory.archived
+      }
+    });
+  })
+);
+
+router.post(
+  "/sales",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const amount = Number(requireMoney(req.body.amount, "Sale amount"));
+
+    if (amount <= 0) {
+      throw createError(400, "Sale amount must be greater than zero.");
+    }
+
+    const targetRoundId = normalizeOptionalString(req.body.roundId);
+    const round = targetRoundId
+      ? await prisma.factoryRound.findUnique({
+        where: {
+          id: targetRoundId
+        }
+      })
+      : await requireActiveRound();
+
+    if (!round) {
+      throw createError(404, "Factory round not found.");
+    }
+
+    if (!["ACTIVE", "FROZEN"].includes(round.status)) {
+      throw createError(400, "Sales can only be logged against the current active week or a frozen unpaid week.");
+    }
+
+    let entry = null;
+
+    await prisma.$transaction(async (tx) => {
+      entry = await tx.factorySaleEntry.create({
+        data: {
+          roundId: round.id,
+          amount: amount.toFixed(2),
+          note: normalizeOptionalString(req.body.note),
+          createdById: req.user.id
+        },
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+
+      if (round.status === "FROZEN") {
+        await syncLockedRoundPayouts(tx, round.id);
+      }
+    });
+
+    res.status(201).json({
+      entry: serializeSaleEntry(entry)
+    });
+  })
+);
+
+router.patch(
+  "/sales/:id",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const entry = await prisma.factorySaleEntry.findUnique({
+      where: {
+        id: req.params.id
+      },
+      include: {
+        round: true
+      }
+    });
+
+    if (!entry) {
+      throw createError(404, "Sale entry not found.");
+    }
+
+    if (!["ACTIVE", "FROZEN"].includes(entry.round.status)) {
+      throw createError(400, "Only active weeks and frozen unpaid weeks can edit sale entries.");
+    }
+
+    const amount = req.body.amount !== undefined
+      ? Number(requireMoney(req.body.amount, "Sale amount"))
+      : Number(entry.amount || 0);
+
+    if (amount <= 0) {
+      throw createError(400, "Sale amount must be greater than zero.");
+    }
+
+    let updatedEntry = null;
+
+    await prisma.$transaction(async (tx) => {
+      updatedEntry = await tx.factorySaleEntry.update({
+        where: {
+          id: entry.id
+        },
+        data: {
+          amount: amount.toFixed(2),
+          note: req.body.note !== undefined
+            ? normalizeOptionalString(req.body.note)
+            : entry.note
+        },
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+
+      if (entry.round.status === "FROZEN") {
+        await syncLockedRoundPayouts(tx, entry.roundId);
+      }
+    });
+
+    res.json({
+      entry: serializeSaleEntry(updatedEntry)
+    });
+  })
+);
+
+router.delete(
+  "/sales/:id",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const entry = await prisma.factorySaleEntry.findUnique({
+      where: {
+        id: req.params.id
+      },
+      include: {
+        round: true
+      }
+    });
+
+    if (!entry) {
+      throw createError(404, "Sale entry not found.");
+    }
+
+    if (!["ACTIVE", "FROZEN"].includes(entry.round.status)) {
+      throw createError(400, "Only active weeks and frozen unpaid weeks can edit sale entries.");
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.factorySaleEntry.delete({
+        where: {
+          id: entry.id
+        }
+      });
+
+      if (entry.round.status === "FROZEN") {
+        await syncLockedRoundPayouts(tx, entry.roundId);
+      }
+    });
+
+    res.json({
+      deleted: true
+    });
+  })
+);
+
+router.post(
+  "/rounds/freeze",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
     const activeRound = await requireActiveRound();
     const now = new Date();
 
@@ -954,7 +1320,7 @@ router.post(
         }
       });
 
-      const [sessions, salesAggregate] = await Promise.all([
+      const [sessions, salesTotal] = await Promise.all([
         tx.factorySession.findMany({
           where: {
             roundId: activeRound.id
@@ -970,7 +1336,8 @@ router.post(
               select: {
                 id: true,
                 name: true,
-                section: true
+                section: true,
+                workMode: true
               }
             }
           },
@@ -979,17 +1346,9 @@ router.post(
             { id: "asc" }
           ]
         }),
-        tx.factorySaleEntry.aggregate({
-          where: {
-            roundId: activeRound.id
-          },
-          _sum: {
-            amount: true
-          }
-        })
+        getRoundSalesTotal(tx, activeRound.id)
       ]);
 
-      const salesTotal = Number(salesAggregate._sum.amount || 0);
       const shareSnapshot = buildFactoryShareRows(sessions, salesTotal, now);
 
       await tx.factoryRoundPayout.deleteMany({
@@ -1010,32 +1369,41 @@ router.post(
         });
       }
 
-      const round = await tx.factoryRound.update({
+      const frozenRound = await tx.factoryRound.update({
         where: {
           id: activeRound.id
         },
         data: {
-          status: "FINALIZED",
-          finalizedAt: now,
+          status: "FROZEN",
+          frozenAt: now,
           finalizedSalesTotal: salesTotal.toFixed(2)
         }
       });
 
+      const nextRound = await tx.factoryRound.create({
+        data: {
+          roundNumber: await getNextFactoryRoundNumber(tx),
+          createdById: req.user.id
+        }
+      });
+
       return {
-        round,
-        salesTotal,
-        payoutCount: shareSnapshot.shareRows.length
+        frozenRound,
+        nextRound
       };
     });
 
     res.json({
-      round: {
-        id: result.round.id,
-        roundNumber: result.round.roundNumber,
-        finalizedAt: result.round.finalizedAt,
-        finalizedSalesTotal: Number(result.salesTotal || 0)
+      frozenRound: {
+        id: result.frozenRound.id,
+        roundNumber: result.frozenRound.roundNumber,
+        frozenAt: result.frozenRound.frozenAt
       },
-      payoutCount: result.payoutCount
+      nextRound: {
+        id: result.nextRound.id,
+        roundNumber: result.nextRound.roundNumber,
+        createdAt: result.nextRound.createdAt
+      }
     });
   })
 );
@@ -1049,7 +1417,7 @@ router.post(
     const activeRound = await getActiveRound();
 
     if (activeRound) {
-      throw createError(400, "There is already an active factory round running.");
+      throw createError(400, "There is already an active factory week running.");
     }
 
     const round = await prisma.factoryRound.create({
@@ -1069,46 +1437,182 @@ router.post(
   })
 );
 
-router.get(
-  "/rounds/:id",
+router.post(
+  "/rounds/:id/pay",
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const round = await prisma.factoryRound.findUnique({
       where: {
         id: req.params.id
-      },
-      include: roundDetailInclude()
+      }
     });
 
     if (!round) {
       throw createError(404, "Factory round not found.");
     }
 
-    const categoryMap = new Map();
+    if (round.status !== "FROZEN") {
+      throw createError(400, "Only frozen unpaid weeks can be marked as paid.");
+    }
 
-    round.sessions.forEach((session) => {
-      const durationMilliseconds = computeSessionMilliseconds(session);
-      const existing = categoryMap.get(session.categoryId) || {
-        categoryId: session.categoryId,
-        categoryName: session.category?.name || "Unknown category",
-        section: session.category?.section || "MISCELLANEOUS",
-        sectionLabel: factorySectionLabel(session.category?.section || "MISCELLANEOUS"),
-        totalMilliseconds: 0
-      };
+    const now = new Date();
+    const updatedRound = await prisma.$transaction(async (tx) => {
+      const salesTotal = await syncLockedRoundPayouts(tx, round.id);
 
-      existing.totalMilliseconds += durationMilliseconds;
-      categoryMap.set(session.categoryId, existing);
+      return tx.factoryRound.update({
+        where: {
+          id: round.id
+        },
+        data: {
+          status: "PAID",
+          paidAt: now,
+          finalizedAt: now,
+          finalizedSalesTotal: salesTotal.toFixed(2)
+        }
+      });
     });
 
-    const categoryBreakdown = [...categoryMap.values()]
-      .map((entry) => ({
-        categoryId: entry.categoryId,
-        categoryName: entry.categoryName,
-        section: entry.section,
-        sectionLabel: entry.sectionLabel,
-        totalMinutes: Math.round(entry.totalMilliseconds / 60000),
-        totalHours: entry.totalMilliseconds / 3600000
-      }))
-      .sort((left, right) => right.totalMinutes - left.totalMinutes || left.categoryName.localeCompare(right.categoryName));
+    res.json({
+      round: {
+        id: updatedRound.id,
+        roundNumber: updatedRound.roundNumber,
+        status: updatedRound.status,
+        paidAt: updatedRound.paidAt
+      }
+    });
+  })
+);
+
+router.get(
+  "/rounds/:id",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const salesPage = parsePage(req.query.salesPage, 1);
+    const sessionsPage = parsePage(req.query.sessionsPage, 1);
+
+    const round = await prisma.factoryRound.findUnique({
+      where: {
+        id: req.params.id
+      },
+      include: roundBaseDetailInclude()
+    });
+
+    if (!round) {
+      throw createError(404, "Factory round not found.");
+    }
+
+    const [salesTotalCount, sessionTotalCount, salesEntries, pagedSessions, allSessions] = await Promise.all([
+      prisma.factorySaleEntry.count({
+        where: {
+          roundId: round.id
+        }
+      }),
+      prisma.factorySession.count({
+        where: {
+          roundId: round.id
+        }
+      }),
+      (async () => {
+        const pagination = buildPagination(
+          await prisma.factorySaleEntry.count({
+            where: {
+              roundId: round.id
+            }
+          }),
+          salesPage,
+          DETAIL_SALES_PAGE_SIZE
+        );
+
+        const entries = await prisma.factorySaleEntry.findMany({
+          where: {
+            roundId: round.id
+          },
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          },
+          orderBy: [
+            { createdAt: "desc" },
+            { id: "desc" }
+          ],
+          skip: pagination.skip,
+          take: pagination.pageSize
+        });
+
+        return {
+          pagination,
+          entries
+        };
+      })(),
+      (async () => {
+        const pagination = buildPagination(
+          await prisma.factorySession.count({
+            where: {
+              roundId: round.id
+            }
+          }),
+          sessionsPage,
+          DETAIL_SESSIONS_PAGE_SIZE
+        );
+
+        const sessions = await prisma.factorySession.findMany({
+          where: {
+            roundId: round.id
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            category: {
+              select: {
+                id: true,
+                name: true,
+                section: true,
+                workMode: true
+              }
+            },
+            correctedBy: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          },
+          orderBy: [
+            { startedAt: "desc" },
+            { id: "desc" }
+          ],
+          skip: pagination.skip,
+          take: pagination.pageSize
+        });
+
+        return {
+          pagination,
+          sessions
+        };
+      })(),
+      prisma.factorySession.findMany({
+        where: {
+          roundId: round.id
+        },
+        include: {
+          category: {
+            select: {
+              id: true,
+              name: true,
+              section: true
+            }
+          }
+        }
+      })
+    ]);
 
     const totalMinutes = round.payouts.reduce((sum, payout) => sum + Number(payout.totalMinutes || 0), 0);
 
@@ -1118,10 +1622,14 @@ router.get(
         roundNumber: round.roundNumber,
         status: round.status,
         createdAt: round.createdAt,
+        frozenAt: round.frozenAt,
+        paidAt: round.paidAt,
         finalizedAt: round.finalizedAt,
-        finalizedSalesTotal: Number(round.finalizedSalesTotal || 0),
+        salesTotal: Number(round.finalizedSalesTotal || 0),
         totalMinutes,
-        participantCount: round.payouts.length
+        participantCount: round.payouts.length,
+        canEditSales: round.status === "FROZEN",
+        canMarkPaid: round.status === "FROZEN"
       },
       payouts: round.payouts.map((payout) => ({
         id: payout.id,
@@ -1132,8 +1640,21 @@ router.get(
         sharePercent: Number(payout.sharePercent || 0),
         payoutAmount: Number(payout.payoutAmount || 0)
       })),
-      salesEntries: round.salesEntries.map(serializeSaleEntry),
-      categoryBreakdown
+      salesEntries: salesEntries.entries.map(serializeSaleEntry),
+      salesPagination: {
+        page: salesEntries.pagination.page,
+        pageSize: salesEntries.pagination.pageSize,
+        total: salesTotalCount,
+        totalPages: salesEntries.pagination.totalPages
+      },
+      sessions: pagedSessions.sessions.map((session) => serializeSession(session)),
+      sessionsPagination: {
+        page: pagedSessions.pagination.page,
+        pageSize: pagedSessions.pagination.pageSize,
+        total: sessionTotalCount,
+        totalPages: pagedSessions.pagination.totalPages
+      },
+      categoryBreakdown: summarizeFactoryCategoryBreakdown(allSessions)
     });
   })
 );

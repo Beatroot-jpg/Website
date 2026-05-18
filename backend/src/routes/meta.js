@@ -150,6 +150,7 @@ router.get(
       canViewFactory
         ? prisma.factoryCategory.findMany({
           where: {
+            archived: false,
             OR: [
               { name: containsFilter },
               { helperText: containsFilter },

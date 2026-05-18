@@ -98,6 +98,8 @@ enum SecretaryRecordType {
 
 enum FactoryRoundStatus {
   ACTIVE
+  FROZEN
+  PAID
   FINALIZED
 }
 
@@ -105,6 +107,11 @@ enum FactoryCategorySection {
   MINING
   SMELTING
   MISCELLANEOUS
+}
+
+enum FactoryCategoryWorkMode {
+  CLOCKED
+  LOGGED_ENTRY
 }
 
 model User {
@@ -192,6 +199,8 @@ model FactoryRound {
   roundNumber        Int                @unique
   status             FactoryRoundStatus @default(ACTIVE)
   createdById        String?
+  frozenAt           DateTime?
+  paidAt             DateTime?
   finalizedAt        DateTime?
   finalizedSalesTotal Decimal?          @db.Decimal(14, 2)
   createdBy          User?              @relation("FactoryRoundCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -210,14 +219,16 @@ model FactoryCategory {
   slug       String                 @unique
   name       String
   section    FactoryCategorySection
+  workMode   FactoryCategoryWorkMode @default(CLOCKED)
   helperText String?
   sortOrder  Int
   locked     Boolean                @default(false)
+  archived   Boolean                @default(false)
   sessions   FactorySession[]
   createdAt  DateTime               @default(now())
   updatedAt  DateTime               @updatedAt
 
-  @@index([section, sortOrder])
+  @@index([archived, section, sortOrder])
 }
 
 model FactorySession {
@@ -225,6 +236,7 @@ model FactorySession {
   roundId       String
   userId        String
   categoryId    String
+  workMode      FactoryCategoryWorkMode @default(CLOCKED)
   startedAt     DateTime
   endedAt       DateTime?
   note          String?

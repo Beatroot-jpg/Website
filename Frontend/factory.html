@@ -20,7 +20,7 @@
         </div>
         <p class="sidebar-section-title">Sections</p>
         <nav class="nav-list" id="sidebarNav"></nav>
-        <div class="sidebar-footer">Clock the factory work, log round sales as they happen, and let the payout share update live.</div>
+        <div class="sidebar-footer">Clock factory work, keep the week moving, and let the payout split stay visible without drowning workers in admin clutter.</div>
       </aside>
 
       <main class="workspace">
@@ -39,13 +39,13 @@
         <section class="workflow-stack">
           <article class="panel" id="factoryCategories">
             <div class="panel-header">
-              <h2>Clock in / out</h2>
-              <p>Clock into the factory category you are working on. If you switch categories, the old block closes and the new one starts straight away.</p>
+              <h2>Factory work</h2>
+              <p>Clock into live categories, or log a timed entry for smelting-style load and leave work. Your share updates off the time you actually put in this week.</p>
             </div>
             <div class="action-launch-card">
               <div class="action-launch-copy">
-                <strong>Live worker status</strong>
-                <p class="muted" id="factoryCurrentStatus">Checking whether you are already clocked in for this round.</p>
+                <strong>My current status</strong>
+                <p class="muted" id="factoryCurrentStatus">Checking whether you are already clocked into the active week.</p>
               </div>
             </div>
             <div class="stack-list" id="factoryCategorySections"></div>
@@ -54,23 +54,42 @@
           <article class="panel">
             <div class="panel-header">
               <h2>Current share</h2>
-              <p>Your percentage comes straight from time spent in this round. Projected payout uses the current round sales total, or the last finalized round total until new sales are logged.</p>
+              <p>The pie is driven by this week’s worker time. If there are no sales in the active week yet, the estimate falls back to the most recent closed week so people still have a live reference.</p>
             </div>
             <div class="factory-projection-note" id="factoryProjectionNote"></div>
             <div class="factory-pie-host" id="factoryPieChart"></div>
             <div id="factoryShareTable"></div>
           </article>
 
-          <article class="panel">
+          <article class="panel hidden" id="factoryAdminSurface">
             <div class="panel-header">
-              <h2>Round sales</h2>
-              <p>Log each deal into the current round as it happens. The projections recalculate live after every entry.</p>
+              <h2>Factory admin</h2>
+              <p>Workers keep operating on the active week while you handle sales, frozen weeks, category changes, and archive review here.</p>
             </div>
 
-            <div class="action-launch-card hidden" id="factorySalesCreateCard">
+            <div class="action-launch-card">
               <div class="action-launch-copy">
-                <strong>New sale entry</strong>
-                <p class="muted">Use one entry per batch or finalized deal amount so the live payout projection stays accurate through the round.</p>
+                <strong>Week controls</strong>
+                <p class="muted">Freeze the current week to lock worker percentages and open the next week straight away. Session corrections stay active-week only so the frozen split stays trustworthy.</p>
+              </div>
+              <div class="inline-actions">
+                <button class="secondary-button" id="openFactorySessionsButton" type="button">Session corrections</button>
+                <button class="secondary-button" id="openFactoryCategoriesButton" type="button">Manage categories</button>
+                <button class="primary-button" id="freezeFactoryRoundButton" type="button">Freeze current week</button>
+                <button class="ghost-button" id="startFactoryRoundButton" type="button">Open new week</button>
+              </div>
+            </div>
+
+            <div class="panel-divider"></div>
+            <div class="panel-header compact-panel-header">
+              <h3>Current week sales</h3>
+              <p>Use the live sales ledger while the active week is still open. Once you freeze it, that week moves below into the frozen queue.</p>
+            </div>
+
+            <div class="action-launch-card">
+              <div class="action-launch-copy">
+                <strong>Log live sales</strong>
+                <p class="muted">Each sale compounds the week total and immediately updates the projected payout split for the workers in the active week.</p>
               </div>
               <div class="inline-actions">
                 <button class="primary-button" id="openFactorySaleFormButton" type="button">Add sale entry</button>
@@ -81,110 +100,193 @@
             <div id="factorySalesTable"></div>
             <div class="pager" id="factorySalesPagination"></div>
 
-            <div class="modal-form-host" id="factorySaleFormHost">
-              <div class="modal-form-content" id="factorySaleFormContent">
-                <div class="panel-header">
-                  <h2 id="factorySaleFormTitle">Add sale entry</h2>
-                  <p id="factorySaleFormSubtitle">Log the deal value here and it will add onto the current round total immediately.</p>
-                </div>
-
-                <form class="stack-form" id="factorySaleForm">
-                  <input type="hidden" id="factorySaleId" name="factorySaleId">
-                  <label class="field-stack">
-                    <span>Sale amount</span>
-                    <input type="number" min="0" step="0.01" name="amount" placeholder="12000000" required>
-                  </label>
-                  <label class="field-stack">
-                    <span>Note</span>
-                    <input type="text" name="note" placeholder="Friday batch, Saturday top-up, bulk pencil run">
-                  </label>
-                  <div class="inline-actions">
-                    <button class="primary-button" id="factorySaleSubmitButton" type="submit">Save sale entry</button>
-                    <button class="ghost-button" id="resetFactorySaleForm" type="button">Reset form</button>
-                  </div>
-                  <p class="form-error hidden" id="factorySaleError"></p>
-                </form>
-              </div>
+            <div class="panel-divider"></div>
+            <div class="panel-header compact-panel-header">
+              <h3>Frozen unpaid weeks</h3>
+              <p>These weeks have locked worker percentages. Sales can keep getting added until the week is marked paid.</p>
             </div>
-          </article>
+            <div id="factoryFrozenTable"></div>
+            <div class="pager" id="factoryFrozenPagination"></div>
 
-          <article class="panel hidden" id="factoryAdminPanel">
-            <div class="panel-header">
-              <h2>Admin controls</h2>
-              <p>Correct clock blocks when needed, finalize the round once payouts are ready, or start the next round after the old one is archived.</p>
-            </div>
-
-            <div class="action-launch-card">
-              <div class="action-launch-copy">
-                <strong>Round controls</strong>
-                <p class="muted">Finalizing freezes the round and stores the payout snapshot. Starting a new round opens fresh clocking and sales again.</p>
-              </div>
-              <div class="inline-actions">
-                <button class="secondary-button" id="openFactorySessionsButton" type="button">Session corrections</button>
-                <button class="ghost-button" id="finalizeFactoryRoundButton" type="button">Finalize round</button>
-                <button class="primary-button" id="startFactoryRoundButton" type="button">Start new round</button>
-              </div>
-            </div>
-
-            <div class="modal-form-host" id="factorySessionsHost">
-              <div class="modal-form-content" id="factorySessionsContent">
-                <div class="panel-header">
-                  <h2>Session corrections</h2>
-                  <p>Use this list to correct bad start or end times before the round is finalized.</p>
-                </div>
-                <div id="factorySessionsTable"></div>
-                <div class="pager" id="factorySessionsPagination"></div>
-              </div>
-            </div>
-
-            <div class="modal-form-host" id="factorySessionFormHost">
-              <div class="modal-form-content" id="factorySessionFormContent">
-                <div class="panel-header">
-                  <h2 id="factorySessionFormTitle">Correct session</h2>
-                  <p id="factorySessionFormSubtitle">Adjust the worker’s session times here. Overlapping blocks are blocked automatically.</p>
-                </div>
-                <form class="stack-form" id="factorySessionForm">
-                  <input type="hidden" id="factorySessionId" name="factorySessionId">
-                  <label class="field-stack">
-                    <span>Start time</span>
-                    <input type="datetime-local" name="startedAt" required>
-                  </label>
-                  <label class="field-stack">
-                    <span>End time</span>
-                    <input type="datetime-local" name="endedAt">
-                  </label>
-                  <label class="field-stack">
-                    <span>Correction note</span>
-                    <input type="text" name="note" placeholder="Optional note about what was corrected">
-                  </label>
-                  <div class="inline-actions">
-                    <button class="secondary-button" id="factorySessionSubmitButton" type="submit">Save correction</button>
-                    <button class="ghost-button" id="resetFactorySessionForm" type="button">Reset form</button>
-                    <button class="mini-action danger-action hidden" id="deleteFactorySessionButton" type="button">Delete session</button>
-                  </div>
-                  <p class="form-error hidden" id="factorySessionError"></p>
-                </form>
-              </div>
-            </div>
-          </article>
-
-          <article class="panel">
-            <div class="panel-header">
-              <h2>Archived rounds</h2>
-              <p>Past rounds stay here with pagination so the main page stays clean while the payout history stays easy to inspect.</p>
+            <div class="panel-divider"></div>
+            <div class="panel-header compact-panel-header">
+              <h3>Paid archive</h3>
+              <p>Older paid weeks stay paginated here so you can backtrack work and sales history without bloating the main page.</p>
             </div>
             <div id="factoryArchiveTable"></div>
             <div class="pager" id="factoryArchivePagination"></div>
-
-            <div class="modal-form-host" id="factoryArchiveDetailHost">
-              <div class="modal-form-content" id="factoryArchiveDetailContent"></div>
-            </div>
           </article>
         </section>
       </main>
     </div>
 
     <div class="toast-stack" id="toastStack"></div>
+
+    <div class="modal-form-host" id="factorySaleFormHost">
+      <div class="modal-form-content" id="factorySaleFormContent">
+        <div class="panel-header">
+          <h2 id="factorySaleFormTitle">Add sale entry</h2>
+          <p id="factorySaleFormSubtitle">Log the deal value here and it will add onto the selected week total immediately.</p>
+        </div>
+
+        <form class="stack-form" id="factorySaleForm">
+          <input type="hidden" id="factorySaleId" name="factorySaleId">
+          <input type="hidden" id="factorySaleRoundId" name="factorySaleRoundId">
+          <label class="field-stack">
+            <span>Sale amount</span>
+            <input type="number" min="0" step="0.01" name="amount" placeholder="12000000" required>
+          </label>
+          <label class="field-stack">
+            <span>Note</span>
+            <input type="text" name="note" placeholder="Friday batch, Saturday top-up, bulk pencil run">
+          </label>
+          <div class="inline-actions">
+            <button class="primary-button" id="factorySaleSubmitButton" type="submit">Save sale entry</button>
+            <button class="ghost-button" id="resetFactorySaleForm" type="button">Reset form</button>
+          </div>
+          <p class="form-error hidden" id="factorySaleError"></p>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-form-host" id="factoryWorkEntryHost">
+      <div class="modal-form-content" id="factoryWorkEntryContent">
+        <div class="panel-header">
+          <h2 id="factoryWorkEntryTitle">Log timed work</h2>
+          <p id="factoryWorkEntrySubtitle">Use this for load and leave categories. The block is saved straight away and counted into the active week.</p>
+        </div>
+
+        <form class="stack-form" id="factoryWorkEntryForm">
+          <input type="hidden" id="factoryWorkEntryCategoryId" name="categoryId">
+          <label class="field-stack">
+            <span>Minutes spent</span>
+            <input type="number" min="1" step="1" name="minutes" placeholder="20" required>
+          </label>
+          <label class="field-stack">
+            <span>Details</span>
+            <input type="text" name="note" placeholder="Loaded 2 smelters with copper and zinc">
+          </label>
+          <div class="inline-actions">
+            <button class="primary-button" id="factoryWorkEntrySubmitButton" type="submit">Save work block</button>
+            <button class="ghost-button" id="resetFactoryWorkEntryForm" type="button">Reset form</button>
+          </div>
+          <p class="form-error hidden" id="factoryWorkEntryError"></p>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-form-host" id="factorySessionsHost">
+      <div class="modal-form-content" id="factorySessionsContent">
+        <div class="panel-header">
+          <h2>Session corrections</h2>
+          <p>Only the active week can be corrected. Once a week is frozen, its worker split is locked and sales carry on separately.</p>
+        </div>
+        <div id="factorySessionsTable"></div>
+        <div class="pager" id="factorySessionsPagination"></div>
+      </div>
+    </div>
+
+    <div class="modal-form-host" id="factorySessionFormHost">
+      <div class="modal-form-content" id="factorySessionFormContent">
+        <div class="panel-header">
+          <h2 id="factorySessionFormTitle">Correct session</h2>
+          <p id="factorySessionFormSubtitle">Adjust the worker’s session times here. Overlapping blocks are blocked automatically.</p>
+        </div>
+        <form class="stack-form" id="factorySessionForm">
+          <input type="hidden" id="factorySessionId" name="factorySessionId">
+          <label class="field-stack">
+            <span>Start time</span>
+            <input type="datetime-local" name="startedAt" required>
+          </label>
+          <label class="field-stack">
+            <span>End time</span>
+            <input type="datetime-local" name="endedAt">
+          </label>
+          <label class="field-stack">
+            <span>Correction note</span>
+            <input type="text" name="note" placeholder="Optional note about what was corrected">
+          </label>
+          <div class="inline-actions">
+            <button class="secondary-button" id="factorySessionSubmitButton" type="submit">Save correction</button>
+            <button class="ghost-button" id="resetFactorySessionForm" type="button">Reset form</button>
+            <button class="mini-action danger-action hidden" id="deleteFactorySessionButton" type="button">Delete session</button>
+          </div>
+          <p class="form-error hidden" id="factorySessionError"></p>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-form-host" id="factoryCategoriesManagerHost">
+      <div class="modal-form-content" id="factoryCategoriesManagerContent">
+        <div class="panel-header">
+          <h2>Manage categories</h2>
+          <p>Add new factory categories, switch them between clocked and logged-entry work, or archive old ones without needing code changes.</p>
+        </div>
+        <div class="action-launch-card">
+          <div class="action-launch-copy">
+            <strong>New category</strong>
+            <p class="muted">Use this when production expands and the team needs a new place to clock or log time.</p>
+          </div>
+          <div class="inline-actions">
+            <button class="primary-button" id="openFactoryCategoryFormButton" type="button">Add category</button>
+          </div>
+        </div>
+        <div id="factoryCategoriesManagerTable"></div>
+      </div>
+    </div>
+
+    <div class="modal-form-host" id="factoryCategoryFormHost">
+      <div class="modal-form-content" id="factoryCategoryFormContent">
+        <div class="panel-header">
+          <h2 id="factoryCategoryFormTitle">Add category</h2>
+          <p id="factoryCategoryFormSubtitle">Create a category and decide whether it uses a live clock or a timed entry button.</p>
+        </div>
+        <form class="stack-form" id="factoryCategoryForm">
+          <input type="hidden" id="factoryCategoryId" name="factoryCategoryId">
+          <label class="field-stack">
+            <span>Name</span>
+            <input type="text" name="name" placeholder="Mine Silver Ore" required>
+          </label>
+          <label class="field-stack">
+            <span>Section</span>
+            <select name="section" required>
+              <option value="MINING">Mining</option>
+              <option value="SMELTING">Smelting</option>
+              <option value="MISCELLANEOUS">Miscellaneous</option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>Work mode</span>
+            <select name="workMode" required>
+              <option value="CLOCKED">Clocked</option>
+              <option value="LOGGED_ENTRY">Logged entry</option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>Helper text</span>
+            <input type="text" name="helperText" placeholder="Optional note for the workers">
+          </label>
+          <label class="field-inline">
+            <input type="checkbox" name="locked">
+            <span>Lock this category straight away</span>
+          </label>
+          <label class="field-inline">
+            <input type="checkbox" name="archived">
+            <span>Archive this category</span>
+          </label>
+          <div class="inline-actions">
+            <button class="primary-button" id="factoryCategorySubmitButton" type="submit">Save category</button>
+            <button class="ghost-button" id="resetFactoryCategoryForm" type="button">Reset form</button>
+          </div>
+          <p class="form-error hidden" id="factoryCategoryError"></p>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-form-host" id="factoryRoundDetailHost">
+      <div class="modal-form-content" id="factoryRoundDetailContent"></div>
+    </div>
+
     <script type="module" src="./assets/js/factory.js"></script>
   </body>
 </html>
