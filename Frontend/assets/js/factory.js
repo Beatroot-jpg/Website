@@ -886,13 +886,13 @@ function renderRoundListPagination(container, pagination, dataAttribute, onChang
 
   container.innerHTML = `
     <span class="pager-label">Page ${pagination.page} of ${pagination.totalPages}</span>
-    <button class="ghost-button pager-button" type="button" data-${dataAttribute}="${pagination.page - 1}" ${pagination.page <= 1 ? "disabled" : ""}>Prev</button>
-    <button class="ghost-button pager-button" type="button" data-${dataAttribute}="${pagination.page + 1}" ${pagination.page >= pagination.totalPages ? "disabled" : ""}>Next</button>
+    <button class="ghost-button pager-button" type="button" data-page-key="${dataAttribute}" data-page-value="${pagination.page - 1}" ${pagination.page <= 1 ? "disabled" : ""}>Prev</button>
+    <button class="ghost-button pager-button" type="button" data-page-key="${dataAttribute}" data-page-value="${pagination.page + 1}" ${pagination.page >= pagination.totalPages ? "disabled" : ""}>Next</button>
   `;
 
-  container.querySelectorAll(`[data-${dataAttribute}]`).forEach((button) => {
+  container.querySelectorAll(`[data-page-key="${dataAttribute}"]`).forEach((button) => {
     button.addEventListener("click", () => {
-      const nextPage = Number(button.dataset[dataAttribute]);
+      const nextPage = Number(button.dataset.pageValue || button.getAttribute("data-page-value"));
 
       if (!Number.isFinite(nextPage) || nextPage < 1 || nextPage > pagination.totalPages) {
         return;
