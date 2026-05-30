@@ -70,10 +70,10 @@
             <div class="action-launch-card">
               <div class="action-launch-copy">
                 <strong>Week controls</strong>
-                <p class="muted">Freeze the current week to lock worker percentages and open the next week straight away. Session corrections stay active-week only so the frozen split stays trustworthy.</p>
+                <p class="muted">Freeze the current week to lock workers out of it and open the next week straight away. Admins can still correct unpaid frozen weeks without dragging the workers into the cleanup.</p>
               </div>
               <div class="inline-actions">
-                <button class="secondary-button" id="openFactorySessionsButton" type="button">Session corrections</button>
+                <button class="secondary-button" id="openFactorySessionsButton" type="button">Active week corrections</button>
                 <button class="secondary-button" id="openFactoryCategoriesButton" type="button">Manage categories</button>
                 <button class="primary-button" id="freezeFactoryRoundButton" type="button">Freeze current week</button>
                 <button class="ghost-button" id="startFactoryRoundButton" type="button">Open new week</button>
@@ -179,7 +179,7 @@
       <div class="modal-form-content" id="factorySessionsContent">
         <div class="panel-header">
           <h2>Session corrections</h2>
-          <p>Only the active week can be corrected. Once a week is frozen, its worker split is locked and sales carry on separately.</p>
+          <p>Use this to correct the live active week. Frozen unpaid weeks can be corrected from inside their own week detail without reopening them to workers.</p>
         </div>
         <div id="factorySessionsTable"></div>
         <div class="pager" id="factorySessionsPagination"></div>
@@ -194,6 +194,15 @@
         </div>
         <form class="stack-form" id="factorySessionForm">
           <input type="hidden" id="factorySessionId" name="factorySessionId">
+          <input type="hidden" id="factorySessionRoundId" name="factorySessionRoundId">
+          <label class="field-stack">
+            <span>Worker</span>
+            <select name="userId" required></select>
+          </label>
+          <label class="field-stack">
+            <span>Category</span>
+            <select name="categoryId" required></select>
+          </label>
           <label class="field-stack">
             <span>Start time</span>
             <input type="datetime-local" name="startedAt" required>

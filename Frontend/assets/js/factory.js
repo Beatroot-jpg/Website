@@ -75,6 +75,7 @@ const sessionSubmitButton = document.querySelector("#factorySessionSubmitButton"
 const sessionResetButton = document.querySelector("#resetFactorySessionForm");
 const sessionError = document.querySelector("#factorySessionError");
 const sessionIdField = document.querySelector("#factorySessionId");
+const sessionRoundIdField = document.querySelector("#factorySessionRoundId");
 const deleteSessionButton = document.querySelector("#deleteFactorySessionButton");
 
 const categoriesManagerHost = document.querySelector("#factoryCategoriesManagerHost");
@@ -116,7 +117,14 @@ let currentSessionsPagination = {
   total: 0,
   totalPages: 1
 };
-let reopenSessionsListAfterClose = false;
+let factoryWorkersCache = [];
+let sessionFormContext = {
+  source: "",
+  roundId: "",
+  roundLabel: "",
+  opener: null,
+  restoreParentOnClose: false
+};
 let roundDetailState = {
   roundId: "",
   salesPage: 1,
@@ -124,6 +132,7 @@ let roundDetailState = {
 };
 let roundDetailCache = null;
 let categoriesManagerCache = [];
+let preserveRoundDetailStateOnClose = false;
 
 const PIE_COLORS = [
   "#2ecb72",
@@ -202,6 +211,59 @@ function formatPercent(value) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2
   }).format(Number(value || 0));
+}
+
+function sortFactoryCategoriesForForms(left, right) {
+  const sectionIndexLeft = SECTION_ORDER.indexOf(left.section);
+  const sectionIndexRight = SECTION_ORDER.indexOf(right.section);
+
+  if (sectionIndexLeft !== sectionIndexRight) {
+    return sectionIndexLeft - sectionIndexRight;
+  }
+
+  return (Number(left.sortOrder || 0) - Number(right.sortOrder || 0))
+    || `${left.name || ""}`.localeCompare(`${right.name || ""}`);
+}
+
+function setSessionFormContext(context = {}) {
+  sessionFormContext = {
+    source: context.source || "",
+    roundId: context.roundId || "",
+    roundLabel: context.roundLabel || "selected week",
+    opener: context.opener || null,
+    restoreParentOnClose: Boolean(context.restoreParentOnClose)
+  };
+}
+
+function populateSessionFormOptions(selectedUserId = "", selectedCategoryId = "") {
+  if (!sessionForm) {
+    return;
+  }
+
+  const workerOptions = [
+    '<option value="">Select worker</option>',
+    ...factoryWorkersCache.map((worker) => `
+      <option value="${worker.id}" ${worker.id === selectedUserId ? "selected" : ""}>${escapeHtml(worker.name)}</option>
+    `)
+  ].join("");
+
+  const categoryOptions = [
+    '<option value="">Select category</option>',
+    ...(adminCache?.categories || [])
+      .slice()
+      .sort(sortFactoryCategoriesForForms)
+      .map((category) => {
+        const suffix = category.archived ? " (Archived)" : "";
+        return `
+          <option value="${category.id}" ${category.id === selectedCategoryId ? "selected" : ""}>
+            ${escapeHtml(`${sectionLabel(category.section)} - ${category.name}${suffix}`)}
+          </option>
+        `;
+      })
+  ].join("");
+
+  sessionForm.elements.userId.innerHTML = workerOptions;
+  sessionForm.elements.categoryId.innerHTML = categoryOptions;
 }
 
 function sectionLabel(section) {
@@ -290,20 +352,53 @@ function fillWorkEntryForm(category) {
   mountFormError(workEntryError, "");
 }
 
-function resetSessionForm() {
+function resetSessionForm({
+  source = "",
+  roundId = "",
+  roundLabel = "selected week",
+  opener = null,
+  restoreParentOnClose = false
+} = {}) {
   sessionForm.reset();
+  setSessionFormContext({
+    source,
+    roundId,
+    roundLabel,
+    opener,
+    restoreParentOnClose
+  });
   sessionIdField.value = "";
-  sessionFormTitle.textContent = "Correct session";
-  sessionFormSubtitle.textContent = "Adjust the worker’s session times here. Overlapping blocks are blocked automatically.";
-  sessionSubmitButton.textContent = "Save correction";
+  sessionRoundIdField.value = roundId;
+  populateSessionFormOptions();
+  sessionFormTitle.textContent = "Add work block";
+  sessionFormSubtitle.textContent = source === "roundDetail"
+    ? `Attribute a missed block into ${roundLabel}. The unpaid split will recalculate straight away.`
+    : `Add a manual work block into ${roundLabel}. Overlapping blocks are still blocked automatically.`;
+  sessionSubmitButton.textContent = "Save work block";
   deleteSessionButton?.classList.add("hidden");
   mountFormError(sessionError, "");
 }
 
-function fillSessionForm(session) {
+function fillSessionForm(session, {
+  source = "",
+  opener = null,
+  roundLabel = "selected week",
+  restoreParentOnClose = false
+} = {}) {
+  setSessionFormContext({
+    source,
+    roundId: session.roundId || "",
+    roundLabel,
+    opener,
+    restoreParentOnClose
+  });
   sessionIdField.value = session.id;
+  sessionRoundIdField.value = session.roundId || "";
+  populateSessionFormOptions(session.userId, session.categoryId);
   sessionFormTitle.textContent = `Correct ${session.userName}`;
-  sessionFormSubtitle.textContent = `Update the ${session.categoryName} block here if the worker forgot to clock cleanly.`;
+  sessionFormSubtitle.textContent = source === "roundDetail"
+    ? `Update the ${session.categoryName} block here. This unpaid week will recalculate after you save.`
+    : `Update the ${session.categoryName} block here if the worker forgot to clock cleanly.`;
   sessionSubmitButton.textContent = "Save correction";
   sessionForm.elements.startedAt.value = toInputDateTimeValue(session.startedAt);
   sessionForm.elements.endedAt.value = toInputDateTimeValue(session.endedAt);
@@ -370,12 +465,17 @@ function showSessionFormModal(opener = document.activeElement) {
   openFormModal({
     content: sessionFormContent,
     host: sessionFormHost,
-    focusSelector: '[name="startedAt"]',
+    focusSelector: '[name="userId"]',
     opener,
     onClose: () => {
-      if (reopenSessionsListAfterClose) {
-        reopenSessionsListAfterClose = false;
-        window.setTimeout(() => showSessionsModal(opener), 0);
+      if (!sessionFormContext.restoreParentOnClose) {
+        return;
+      }
+
+      if (sessionFormContext.source === "activeList") {
+        window.setTimeout(() => showSessionsModal(sessionFormContext.opener || opener), 0);
+      } else if (sessionFormContext.source === "roundDetail" && roundDetailState.roundId) {
+        window.setTimeout(() => showRoundDetailModal(sessionFormContext.opener || opener), 0);
       }
     }
   });
@@ -409,6 +509,11 @@ function showRoundDetailModal(opener = document.activeElement) {
     focusSelector: ".form-modal-close",
     opener,
     onClose: () => {
+      if (preserveRoundDetailStateOnClose) {
+        preserveRoundDetailStateOnClose = false;
+        return;
+      }
+
       roundDetailState = {
         roundId: "",
         salesPage: 1,
@@ -1202,7 +1307,7 @@ function renderRoundDetail(detail) {
     <div class="panel-header">
       <h2>Week ${detail.round.roundNumber}</h2>
       <p>${detail.round.status === "FROZEN"
-        ? "Worker percentages are locked here while sales can still be added until payout is marked complete."
+        ? "Workers are locked out of this week while admins can still add sales and correct missed time until payout is marked complete."
         : "This week is archived and read-only. Use it to review how worker time and sales were recorded."}</p>
     </div>
 
@@ -1229,10 +1334,11 @@ function renderRoundDetail(detail) {
       <div class="action-launch-card">
         <div class="action-launch-copy">
           <strong>Frozen week controls</strong>
-          <p class="muted">Add late sales while the worker split stays frozen, then mark the week paid once management is done.</p>
+          <p class="muted">Add late sales, correct missed work blocks, and then mark the week paid once management is done.</p>
         </div>
         <div class="inline-actions">
           ${detail.round.canEditSales ? `<button class="primary-button" type="button" data-add-detail-sale="${detail.round.id}">Add sale entry</button>` : ""}
+          ${detail.round.canCorrectSessions ? `<button class="secondary-button" type="button" data-add-detail-session="${detail.round.id}">Add work block</button>` : ""}
           ${detail.round.canMarkPaid ? `<button class="ghost-button" type="button" data-mark-detail-paid="${detail.round.id}">Mark paid</button>` : ""}
         </div>
       </div>
@@ -1241,7 +1347,7 @@ function renderRoundDetail(detail) {
     <div class="panel-divider"></div>
     <div class="panel-header compact-panel-header">
       <h3>Locked payout split</h3>
-      <p>The worker percentages below are the frozen split that sales continue to flow through for this week.</p>
+      <p>The worker percentages below are the frozen split that sales continue to flow through for this week. If you correct the work history below, this split recalculates.</p>
     </div>
     ${payoutRows.length ? `
       <div class="table-shell">
@@ -1311,7 +1417,9 @@ function renderRoundDetail(detail) {
     <div class="panel-divider"></div>
     <div class="panel-header compact-panel-header">
       <h3>Work history</h3>
-      <p>Paginated worker blocks so you can backtrack the week without the page turning into a wall of sessions.</p>
+      <p>${detail.round.canCorrectSessions
+        ? "Paginated worker blocks so you can backtrack the week and still correct missed or bad time before payout."
+        : "Paginated worker blocks so you can backtrack the week without the page turning into a wall of sessions."}</p>
     </div>
     ${sessions.length ? `
       <div class="table-shell">
@@ -1323,6 +1431,8 @@ function renderRoundDetail(detail) {
               <th>Mode</th>
               <th>Duration</th>
               <th>Started</th>
+              <th>Ended</th>
+              <th>${detail.round.canCorrectSessions ? "Action" : "State"}</th>
             </tr>
           </thead>
           <tbody>
@@ -1330,18 +1440,29 @@ function renderRoundDetail(detail) {
               <tr>
                 <td>
                   <strong>${escapeHtml(session.userName)}</strong>
-                  <span class="subtle-row">${session.note ? escapeHtml(session.note) : "No note"}</span>
+                  <span class="subtle-row">${session.note ? escapeHtml(session.note) : "No note"}${session.correctedByName ? ` - Corrected by ${escapeHtml(session.correctedByName)}` : ""}</span>
                 </td>
                 <td>${escapeHtml(session.categoryName)}</td>
                 <td>${workModeBadge(session.workMode)}</td>
                 <td>${formatHours(session.durationHours)} h<span class="subtle-row">${session.durationMinutes} minutes</span></td>
                 <td>${formatDate(session.startedAt)}</td>
+                <td>${session.endedAt ? formatDate(session.endedAt) : "Still active"}</td>
+                <td>
+                  ${detail.round.canCorrectSessions ? `
+                    <div class="inline-table-actions">
+                      <button class="mini-action" type="button" data-edit-detail-session="${session.id}">Edit</button>
+                      <button class="mini-action danger-action" type="button" data-delete-detail-session="${session.id}">Delete</button>
+                    </div>
+                  ` : badge("Locked", "neutral")}
+                </td>
               </tr>
             `).join("")}
           </tbody>
         </table>
       </div>
-    ` : renderEmptyState("No work blocks stored", "No work sessions were found for this week.")}
+    ` : renderEmptyState("No work blocks stored", detail.round.canCorrectSessions
+      ? "No work sessions were found for this week yet. You can still add a missed work block before payout."
+      : "No work sessions were found for this week.")}
     <div class="pager" id="factoryRoundDetailSessionsPagination"></div>
 
     <div class="panel-divider"></div>
@@ -1392,6 +1513,20 @@ function renderRoundDetail(detail) {
       saleFormTitle.textContent = "Add frozen week sale";
       saleFormSubtitle.textContent = `Log another sale into week ${detail.round.roundNumber}. The worker split stays frozen while the payout amount updates.`;
       showSaleModal(button);
+    });
+  });
+
+  roundDetailContent.querySelectorAll("[data-add-detail-session]").forEach((button) => {
+    button.addEventListener("click", () => {
+      resetSessionForm({
+        source: "roundDetail",
+        roundId: detail.round.id,
+        roundLabel: `week ${detail.round.roundNumber}`,
+        opener: button,
+        restoreParentOnClose: true
+      });
+      preserveRoundDetailStateOnClose = true;
+      showSessionFormModal(button);
     });
   });
 
@@ -1457,6 +1592,53 @@ function renderRoundDetail(detail) {
       }
     });
   });
+
+  roundDetailContent.querySelectorAll("[data-edit-detail-session]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const session = sessions.find((candidate) => candidate.id === button.dataset.editDetailSession);
+
+      if (!session) {
+        return;
+      }
+
+      fillSessionForm(session, {
+        source: "roundDetail",
+        opener: button,
+        roundLabel: `week ${detail.round.roundNumber}`,
+        restoreParentOnClose: true
+      });
+      preserveRoundDetailStateOnClose = true;
+      showSessionFormModal(button);
+    });
+  });
+
+  roundDetailContent.querySelectorAll("[data-delete-detail-session]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const session = sessions.find((candidate) => candidate.id === button.dataset.deleteDetailSession);
+
+      if (!session) {
+        return;
+      }
+
+      const confirmed = window.confirm(`Delete ${session.userName}'s ${session.categoryName} work block from week ${detail.round.roundNumber}?`);
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        await api(`/factory/sessions/${session.id}`, {
+          method: "DELETE"
+        });
+        showToast("Factory session deleted.", "success");
+        await loadPage();
+        await loadRoundDetail(detail.round.id, button);
+        announceMutation(["factory"]);
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    });
+  });
 }
 
 async function loadRoundDetail(roundId, opener = document.activeElement) {
@@ -1486,18 +1668,46 @@ async function loadSessionCorrections(page = 1) {
     currentSessionsPagination = data.pagination || currentSessionsPagination;
     currentSessionsCache = data.sessions || [];
 
+    const manualEntryCard = data.round ? `
+      <div class="action-launch-card">
+        <div class="action-launch-copy">
+          <strong>Add missed work block</strong>
+          <p class="muted">Use this when somebody forgot to clock in or you need to attribute a clean manual block into the active week.</p>
+        </div>
+        <div class="inline-actions">
+          <button class="primary-button" type="button" data-add-active-session="${data.round.id}">Add work block</button>
+        </div>
+      </div>
+    ` : "";
+
     if (!currentSessionsCache.length) {
-      sessionsTableContainer.innerHTML = renderEmptyState(
-        "No active week sessions yet",
-        data.round
-          ? "Once the team starts clocking or logging work into this week, the correction list will appear here."
-          : "There is no active week to correct right now."
-      );
+      sessionsTableContainer.innerHTML = `
+        ${manualEntryCard}
+        ${renderEmptyState(
+          "No active week sessions yet",
+          data.round
+            ? "Once the team starts clocking or logging work into this week, the correction list will appear here."
+            : "There is no active week to correct right now."
+        )}
+      `;
       sessionsPaginationContainer.innerHTML = "";
+      sessionsTableContainer.querySelectorAll("[data-add-active-session]").forEach((button) => {
+        button.addEventListener("click", () => {
+          resetSessionForm({
+            source: "activeList",
+            roundId: data.round.id,
+            roundLabel: `week ${data.round.roundNumber}`,
+            opener: button,
+            restoreParentOnClose: true
+          });
+          showSessionFormModal(button);
+        });
+      });
       return;
     }
 
     sessionsTableContainer.innerHTML = `
+      ${manualEntryCard}
       <div class="table-shell">
         <table class="data-table">
           <thead>
@@ -1534,6 +1744,19 @@ async function loadSessionCorrections(page = 1) {
       </div>
     `;
 
+    sessionsTableContainer.querySelectorAll("[data-add-active-session]").forEach((button) => {
+      button.addEventListener("click", () => {
+        resetSessionForm({
+          source: "activeList",
+          roundId: data.round.id,
+          roundLabel: `week ${data.round.roundNumber}`,
+          opener: button,
+          restoreParentOnClose: true
+        });
+        showSessionFormModal(button);
+      });
+    });
+
     sessionsTableContainer.querySelectorAll("[data-edit-session]").forEach((button) => {
       button.addEventListener("click", () => {
         const session = currentSessionsCache.find((entry) => entry.id === button.dataset.editSession);
@@ -1542,8 +1765,12 @@ async function loadSessionCorrections(page = 1) {
           return;
         }
 
-        fillSessionForm(session);
-        reopenSessionsListAfterClose = true;
+        fillSessionForm(session, {
+          source: "activeList",
+          opener: button,
+          roundLabel: `week ${data.round?.roundNumber || activeRoundCache?.roundNumber || ""}`,
+          restoreParentOnClose: true
+        });
         showSessionFormModal(button);
       });
     });
@@ -1616,6 +1843,7 @@ async function loadPage() {
     activeRoundCache = data.activeRound || null;
     adminCache = data.admin || null;
     categoriesManagerCache = data.admin?.categories || [];
+    factoryWorkersCache = data.admin?.workers || [];
     currentSalesPage = data.activeRound?.salesPagination?.page || currentSalesPage;
     currentFrozenPage = data.admin?.frozenRounds?.pagination?.page || currentFrozenPage;
     currentArchivePage = data.admin?.archives?.pagination?.page || currentArchivePage;
@@ -1730,21 +1958,44 @@ sessionForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   mountFormError(sessionError, "");
 
+  const submitContext = {
+    ...sessionFormContext
+  };
   const payload = {
+    roundId: sessionRoundIdField.value,
+    userId: sessionForm.elements.userId.value,
+    categoryId: sessionForm.elements.categoryId.value,
     startedAt: toIsoFromLocalInput(sessionForm.elements.startedAt.value),
     endedAt: sessionForm.elements.endedAt.value ? toIsoFromLocalInput(sessionForm.elements.endedAt.value) : "",
     note: sessionForm.elements.note.value
   };
 
   try {
-    await api(`/factory/sessions/${sessionIdField.value}`, {
-      method: "PATCH",
-      body: payload
-    });
-    showToast("Factory session corrected.", "success");
+    if (sessionIdField.value) {
+      await api(`/factory/sessions/${sessionIdField.value}`, {
+        method: "PATCH",
+        body: payload
+      });
+      showToast("Factory session corrected.", "success");
+    } else {
+      await api("/factory/sessions", {
+        method: "POST",
+        body: payload
+      });
+      showToast("Factory work block saved.", "success");
+    }
+
+    sessionFormContext.restoreParentOnClose = false;
     resetSessionForm();
     closeFormModal();
-    await loadSessionCorrections(currentSessionsPage);
+
+    if (submitContext.source === "activeList") {
+      await loadSessionCorrections(currentSessionsPage);
+      showSessionsModal(submitContext.opener || openSessionsButton);
+    } else if (submitContext.source === "roundDetail" && submitContext.roundId) {
+      await loadRoundDetail(submitContext.roundId, submitContext.opener || roundDetailHost);
+    }
+
     await loadPage();
     announceMutation(["factory"]);
   } catch (error) {
@@ -1812,31 +2063,72 @@ openSessionsButton?.addEventListener("click", async () => {
 });
 
 sessionResetButton?.addEventListener("click", () => {
-  resetSessionForm();
+  const existingSession = sessionIdField.value
+    ? currentSessionsCache.find((entry) => entry.id === sessionIdField.value)
+      || roundDetailCache?.sessions?.find((entry) => entry.id === sessionIdField.value)
+      || null
+    : null;
+
+  if (existingSession) {
+    fillSessionForm(existingSession, {
+      source: sessionFormContext.source,
+      opener: sessionFormContext.opener,
+      roundLabel: sessionFormContext.roundLabel,
+      restoreParentOnClose: sessionFormContext.restoreParentOnClose
+    });
+    return;
+  }
+
+  resetSessionForm({
+    source: sessionFormContext.source,
+    roundId: sessionFormContext.roundId,
+    roundLabel: sessionFormContext.roundLabel,
+    opener: sessionFormContext.opener,
+    restoreParentOnClose: sessionFormContext.restoreParentOnClose
+  });
 });
 
 deleteSessionButton?.addEventListener("click", async () => {
-  const session = currentSessionsCache.find((entry) => entry.id === sessionIdField.value);
+  const session = currentSessionsCache.find((entry) => entry.id === sessionIdField.value)
+    || roundDetailCache?.sessions?.find((entry) => entry.id === sessionIdField.value)
+    || null;
+  const submitContext = {
+    ...sessionFormContext
+  };
 
-  if (!session) {
+  if (!session && submitContext.source !== "roundDetail") {
     mountFormError(sessionError, "That session could not be found.");
     return;
   }
 
-  const confirmed = window.confirm(`Delete ${session.userName}'s ${session.categoryName} work block from the active week?`);
+  const sessionLabel = session
+    ? `${session.userName}'s ${session.categoryName}`
+    : "this worker block";
+  const targetLabel = submitContext.source === "roundDetail"
+    ? submitContext.roundLabel || "this unpaid week"
+    : "the active week";
+  const confirmed = window.confirm(`Delete ${sessionLabel} work block from ${targetLabel}?`);
 
   if (!confirmed) {
     return;
   }
 
   try {
-    await api(`/factory/sessions/${session.id}`, {
+    await api(`/factory/sessions/${sessionIdField.value}`, {
       method: "DELETE"
     });
     showToast("Factory session deleted.", "success");
+    sessionFormContext.restoreParentOnClose = false;
     resetSessionForm();
     closeFormModal();
-    await loadSessionCorrections(currentSessionsPage);
+
+    if (submitContext.source === "activeList") {
+      await loadSessionCorrections(currentSessionsPage);
+      showSessionsModal(submitContext.opener || openSessionsButton);
+    } else if (submitContext.source === "roundDetail" && submitContext.roundId) {
+      await loadRoundDetail(submitContext.roundId, submitContext.opener || roundDetailHost);
+    }
+
     await loadPage();
     announceMutation(["factory"]);
   } catch (error) {

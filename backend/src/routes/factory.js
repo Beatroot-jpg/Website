@@ -241,6 +241,10 @@ async function getRoundSalesTotal(client, roundId) {
   return Number(aggregate._sum.amount || 0);
 }
 
+function canCorrectRoundSessions(status) {
+  return ["ACTIVE", "FROZEN"].includes(`${status || ""}`.toUpperCase());
+}
+
 async function syncLockedRoundPayouts(client, roundId) {
   const salesTotal = await getRoundSalesTotal(client, roundId);
   const payouts = await client.factoryRoundPayout.findMany({
@@ -277,6 +281,71 @@ async function syncLockedRoundPayouts(client, roundId) {
   });
 
   return salesTotal;
+}
+
+async function rebuildLockedRoundPayouts(client, roundId, now = new Date()) {
+  const [sessions, salesTotal] = await Promise.all([
+    client.factorySession.findMany({
+      where: {
+        roundId
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            section: true,
+            workMode: true
+          }
+        }
+      },
+      orderBy: [
+        { startedAt: "asc" },
+        { id: "asc" }
+      ]
+    }),
+    getRoundSalesTotal(client, roundId)
+  ]);
+
+  const shareSnapshot = buildFactoryShareRows(sessions, salesTotal, now);
+
+  await client.factoryRoundPayout.deleteMany({
+    where: {
+      roundId
+    }
+  });
+
+  if (shareSnapshot.shareRows.length) {
+    await client.factoryRoundPayout.createMany({
+      data: shareSnapshot.shareRows.map((row) => ({
+        roundId,
+        userId: row.userId,
+        totalMinutes: row.totalMinutes,
+        sharePercent: row.sharePercent.toFixed(4),
+        payoutAmount: row.projectedPayout.toFixed(2)
+      }))
+    });
+  }
+
+  await client.factoryRound.update({
+    where: {
+      id: roundId
+    },
+    data: {
+      finalizedSalesTotal: salesTotal.toFixed(2)
+    }
+  });
+
+  return {
+    salesTotal,
+    shareRows: shareSnapshot.shareRows
+  };
 }
 
 function roundBaseDetailInclude() {
@@ -454,7 +523,7 @@ router.get(
     if (req.user.role === "ADMIN") {
       const frozenPagination = buildPagination(frozenCount, frozenPage, ROUND_LIST_PAGE_SIZE);
       const archivePagination = buildPagination(archiveCount, archivePage, ROUND_LIST_PAGE_SIZE);
-      const [frozenRounds, archivedRounds] = await Promise.all([
+      const [frozenRounds, archivedRounds, workers] = await Promise.all([
         prisma.factoryRound.findMany({
           where: {
             status: "FROZEN"
@@ -507,10 +576,24 @@ router.get(
               }
             }
           }
+        }),
+        prisma.user.findMany({
+          where: {
+            archived: false,
+            active: true
+          },
+          select: {
+            id: true,
+            name: true
+          },
+          orderBy: [
+            { name: "asc" }
+          ]
         })
       ]);
 
       adminPayload = {
+        workers,
         categories: allCategories.map((category) => ({
           id: category.id,
           slug: category.slug,
@@ -907,6 +990,118 @@ router.get(
   })
 );
 
+router.post(
+  "/sessions",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const targetRoundId = normalizeOptionalString(req.body.roundId);
+    const round = targetRoundId
+      ? await prisma.factoryRound.findUnique({
+        where: {
+          id: targetRoundId
+        }
+      })
+      : await requireActiveRound();
+
+    if (!round) {
+      throw createError(404, "Factory round not found.");
+    }
+
+    if (!canCorrectRoundSessions(round.status)) {
+      throw createError(400, "Work blocks can only be added to the current active week or a frozen unpaid week.");
+    }
+
+    const userId = requireString(req.body.userId, "Worker");
+    const categoryId = requireString(req.body.categoryId, "Category");
+    const startedAt = requireDateTime(req.body.startedAt, "Session start time");
+    const endedAt = requireDateTime(req.body.endedAt, "Session end time");
+
+    if (endedAt <= startedAt) {
+      throw createError(400, "Session end time must be after the start time.");
+    }
+
+    const [worker, category] = await Promise.all([
+      prisma.user.findUnique({
+        where: {
+          id: userId
+        },
+        select: {
+          id: true,
+          name: true,
+          archived: true
+        }
+      }),
+      prisma.factoryCategory.findUnique({
+        where: {
+          id: categoryId
+        }
+      })
+    ]);
+
+    if (!worker || worker.archived) {
+      throw createError(404, "Worker not found.");
+    }
+
+    if (!category) {
+      throw createError(404, "Factory category not found.");
+    }
+
+    await assertNoSessionOverlap(prisma, {
+      userId,
+      roundId: round.id,
+      startedAt,
+      endedAt
+    });
+
+    let session = null;
+
+    await prisma.$transaction(async (tx) => {
+      session = await tx.factorySession.create({
+        data: {
+          roundId: round.id,
+          userId,
+          categoryId: category.id,
+          workMode: category.workMode,
+          startedAt,
+          endedAt,
+          note: normalizeOptionalString(req.body.note),
+          correctedById: req.user.id
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          category: {
+            select: {
+              id: true,
+              name: true,
+              section: true,
+              workMode: true
+            }
+          },
+          correctedBy: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+
+      if (round.status === "FROZEN") {
+        await rebuildLockedRoundPayouts(tx, round.id);
+      }
+    });
+
+    res.status(201).json({
+      session: serializeSession(session)
+    });
+  })
+);
+
 router.patch(
   "/sessions/:id",
   requireAdmin,
@@ -924,10 +1119,16 @@ router.patch(
       throw createError(404, "Factory session not found.");
     }
 
-    if (existingSession.round.status !== "ACTIVE") {
-      throw createError(400, "Only the current active week can have its sessions corrected.");
+    if (!canCorrectRoundSessions(existingSession.round.status)) {
+      throw createError(400, "Only the active week and frozen unpaid weeks can have sessions corrected.");
     }
 
+    const nextUserId = req.body.userId !== undefined
+      ? requireString(req.body.userId, "Worker")
+      : existingSession.userId;
+    const nextCategoryId = req.body.categoryId !== undefined
+      ? requireString(req.body.categoryId, "Category")
+      : existingSession.categoryId;
     const startedAt = req.body.startedAt !== undefined
       ? requireDateTime(req.body.startedAt, "Session start time")
       : existingSession.startedAt;
@@ -939,47 +1140,95 @@ router.patch(
       throw createError(400, "Session end time must be after the start time.");
     }
 
+    const [worker, category] = await Promise.all([
+      prisma.user.findUnique({
+        where: {
+          id: nextUserId
+        },
+        select: {
+          id: true,
+          archived: true
+        }
+      }),
+      prisma.factoryCategory.findUnique({
+        where: {
+          id: nextCategoryId
+        }
+      })
+    ]);
+
+    if (!worker) {
+      throw createError(404, "Worker not found.");
+    }
+
+    if (worker.archived && nextUserId !== existingSession.userId) {
+      throw createError(400, "Archived workers cannot be assigned new work blocks.");
+    }
+
+    if (!category) {
+      throw createError(404, "Factory category not found.");
+    }
+
+    if (existingSession.round.status === "FROZEN" && !endedAt) {
+      throw createError(400, "Frozen unpaid weeks can only store closed work blocks.");
+    }
+
+    if (category.workMode === "LOGGED_ENTRY" && !endedAt) {
+      throw createError(400, "Logged-entry categories must have a start and end time.");
+    }
+
     await assertNoSessionOverlap(prisma, {
       sessionId: existingSession.id,
-      userId: existingSession.userId,
+      userId: nextUserId,
       roundId: existingSession.roundId,
       startedAt,
       endedAt
     });
 
-    const updatedSession = await prisma.factorySession.update({
-      where: {
-        id: existingSession.id
-      },
-      data: {
-        startedAt,
-        endedAt,
-        note: req.body.note !== undefined
-          ? normalizeOptionalString(req.body.note)
-          : existingSession.note,
-        correctedById: req.user.id
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true
-          }
+    let updatedSession = null;
+
+    await prisma.$transaction(async (tx) => {
+      updatedSession = await tx.factorySession.update({
+        where: {
+          id: existingSession.id
         },
-        category: {
-          select: {
-            id: true,
-            name: true,
-            section: true,
-            workMode: true
-          }
+        data: {
+          userId: nextUserId,
+          categoryId: nextCategoryId,
+          workMode: category.workMode,
+          startedAt,
+          endedAt,
+          note: req.body.note !== undefined
+            ? normalizeOptionalString(req.body.note)
+            : existingSession.note,
+          correctedById: req.user.id
         },
-        correctedBy: {
-          select: {
-            id: true,
-            name: true
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          category: {
+            select: {
+              id: true,
+              name: true,
+              section: true,
+              workMode: true
+            }
+          },
+          correctedBy: {
+            select: {
+              id: true,
+              name: true
+            }
           }
         }
+      });
+
+      if (existingSession.round.status === "FROZEN") {
+        await rebuildLockedRoundPayouts(tx, existingSession.roundId);
       }
     });
 
@@ -1006,13 +1255,19 @@ router.delete(
       throw createError(404, "Factory session not found.");
     }
 
-    if (existingSession.round.status !== "ACTIVE") {
-      throw createError(400, "Only the current active week can remove work blocks.");
+    if (!canCorrectRoundSessions(existingSession.round.status)) {
+      throw createError(400, "Only the active week and frozen unpaid weeks can remove work blocks.");
     }
 
-    await prisma.factorySession.delete({
-      where: {
-        id: existingSession.id
+    await prisma.$transaction(async (tx) => {
+      await tx.factorySession.delete({
+        where: {
+          id: existingSession.id
+        }
+      });
+
+      if (existingSession.round.status === "FROZEN") {
+        await rebuildLockedRoundPayouts(tx, existingSession.roundId);
       }
     });
 
@@ -1319,55 +1574,7 @@ router.post(
           endedAt: now
         }
       });
-
-      const [sessions, salesTotal] = await Promise.all([
-        tx.factorySession.findMany({
-          where: {
-            roundId: activeRound.id
-          },
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true
-              }
-            },
-            category: {
-              select: {
-                id: true,
-                name: true,
-                section: true,
-                workMode: true
-              }
-            }
-          },
-          orderBy: [
-            { startedAt: "asc" },
-            { id: "asc" }
-          ]
-        }),
-        getRoundSalesTotal(tx, activeRound.id)
-      ]);
-
-      const shareSnapshot = buildFactoryShareRows(sessions, salesTotal, now);
-
-      await tx.factoryRoundPayout.deleteMany({
-        where: {
-          roundId: activeRound.id
-        }
-      });
-
-      if (shareSnapshot.shareRows.length) {
-        await tx.factoryRoundPayout.createMany({
-          data: shareSnapshot.shareRows.map((row) => ({
-            roundId: activeRound.id,
-            userId: row.userId,
-            totalMinutes: row.totalMinutes,
-            sharePercent: row.sharePercent.toFixed(4),
-            payoutAmount: row.projectedPayout.toFixed(2)
-          }))
-        });
-      }
+      const { salesTotal } = await rebuildLockedRoundPayouts(tx, activeRound.id, now);
 
       const frozenRound = await tx.factoryRound.update({
         where: {
@@ -1457,7 +1664,7 @@ router.post(
 
     const now = new Date();
     const updatedRound = await prisma.$transaction(async (tx) => {
-      const salesTotal = await syncLockedRoundPayouts(tx, round.id);
+      const { salesTotal } = await rebuildLockedRoundPayouts(tx, round.id, now);
 
       return tx.factoryRound.update({
         where: {
@@ -1629,7 +1836,8 @@ router.get(
         totalMinutes,
         participantCount: round.payouts.length,
         canEditSales: round.status === "FROZEN",
-        canMarkPaid: round.status === "FROZEN"
+        canMarkPaid: round.status === "FROZEN",
+        canCorrectSessions: round.status === "FROZEN"
       },
       payouts: round.payouts.map((payout) => ({
         id: payout.id,
