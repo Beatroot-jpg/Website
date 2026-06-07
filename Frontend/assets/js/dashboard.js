@@ -15,9 +15,10 @@ import {
 
 initProtectedPage({
   pageKey: "DASHBOARD",
-  title: "Home",
-  subtitle: "Open the panel you need, glance at the important numbers, and keep the week moving without the old business-system clutter.",
-  showQuickActions: false
+  title: "The Shites",
+  subtitle: "A personal workspace for money, stock, pricing, and the parts of the week that matter.",
+  showQuickActions: false,
+  showWorkspaceTools: false
 });
 
 const themeToggleButton = document.querySelector("#themeToggleButton");

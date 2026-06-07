@@ -16,119 +16,74 @@
     <script src="./assets/js/runtime-config.js"></script>
     <script src="./assets/js/config.js"></script>
   </head>
-  <body class="app-body">
-    <div class="app-shell">
-      <aside class="sidebar">
-        <div class="sidebar-brand">
-          <img class="brand-logo" src="./assets/images/Main Logo.png" alt="The Shites logo">
-          <div>
-            <strong>The Shites</strong>
-            <span class="muted">Daily workspace</span>
-          </div>
+  <body class="app-body home-body">
+    <main class="home-shell">
+      <section class="home-utility-bar">
+        <div class="home-utility-copy">
+          <p class="eyebrow">Private Workspace</p>
+          <span class="muted">Built for fast decisions, cleaner tracking, and a better week-to-week flow.</span>
         </div>
-        <p class="sidebar-section-title">Sections</p>
-        <nav class="nav-list" id="sidebarNav"></nav>
-        <div class="sidebar-footer">The new personal launcher for money, stock, pages, and the everyday flow around your FiveM life.</div>
-      </aside>
 
-      <main class="workspace">
-        <header class="workspace-header">
-          <div>
-            <p class="eyebrow">Home</p>
+        <div class="home-utility-actions">
+          <button class="ghost-button theme-toggle-button" id="themeToggleButton" type="button" aria-pressed="false">Switch to light</button>
+          <div class="user-pill" id="userPill"></div>
+          <button class="ghost-button" id="logoutButton" type="button">Log out</button>
+        </div>
+      </section>
+
+      <section class="home-stage">
+        <article class="home-mural-panel">
+          <div class="home-mural-frame">
+            <div class="home-mural-glow"></div>
+            <img class="home-mural-logo" src="./assets/images/Main Logo.png" alt="The Shites logo">
+          </div>
+
+          <div class="home-center-copy">
+            <p class="home-section-label">Home</p>
             <h1 id="pageTitle"></h1>
-            <p class="muted" id="pageSubtitle"></p>
+            <p class="muted home-center-subtitle" id="pageSubtitle"></p>
           </div>
-          <div class="header-controls">
-            <button class="ghost-button theme-toggle-button" id="themeToggleButton" type="button" aria-pressed="false">Switch to light</button>
-            <div class="user-pill" id="userPill"></div>
-            <button class="ghost-button" id="logoutButton" type="button">Log out</button>
+
+          <div class="home-action-grid" id="homeLauncherGrid"></div>
+        </article>
+
+        <section class="home-summary-panel">
+          <div class="panel-header compact-panel-header">
+            <h2>Quick read</h2>
+            <p>The useful numbers stay here, but the home page is now a cleaner front door instead of a chunky dashboard.</p>
           </div>
-        </header>
-
-        <section class="workflow-stack home-workspace">
-          <article class="panel home-hero-panel">
-            <div class="home-hero-grid">
-              <div class="home-hero-copy">
-                <div class="home-brand-mark">
-                  <div class="home-logo-beacon">
-                    <img class="home-logo" src="./assets/images/Main Logo.png" alt="The Shites logo">
-                  </div>
-                  <div class="home-brand-copy">
-                    <p class="home-section-label">Private Workspace</p>
-                    <h2>The Shites</h2>
-                    <p class="home-hero-text">
-                      A sharper personal launcher for money, sales, stock, tasks, and whatever keeps the week moving.
-                    </p>
-                  </div>
-                </div>
-
-                <div class="badge-group home-hero-badges">
-                  <span class="badge accent">Money tracking</span>
-                  <span class="badge good">Stock control</span>
-                  <span class="badge neutral">Daily flow</span>
-                  <span class="badge warn">FiveM RP workspace</span>
-                </div>
-              </div>
-
-              <div class="home-hero-side">
-                <article class="home-highlight-card">
-                  <p class="home-section-label">What this becomes</p>
-                  <strong>Google docs on steroids for your RP life.</strong>
-                  <p class="muted">
-                    Track what you made, what you sold, what you still hold, and what needs to happen next without the old business-system clutter.
-                  </p>
-                </article>
-              </div>
-            </div>
-          </article>
-
-          <article class="panel">
-            <div class="panel-header">
-              <h2>Open a panel</h2>
-              <p>Jump straight into the part of the workspace you need. This is the new home launcher layer we’ll build the rest of the redesign around.</p>
-            </div>
-            <div class="home-launch-grid" id="homeLauncherGrid"></div>
-          </article>
-
-          <article class="panel">
-            <div class="panel-header">
-              <h2>At a glance</h2>
-              <p>A calmer summary of the main numbers, so the home page still gives you useful signal without feeling like an old operations dashboard.</p>
-            </div>
-            <div class="metric-grid home-metric-grid" id="metricsGrid"></div>
-          </article>
-
-          <div class="home-focus-grid">
-            <article class="panel">
-              <div class="panel-header">
-                <h2>Inventory watch</h2>
-                <p>Your latest stock movement and quantity signals.</p>
-              </div>
-              <div class="stack-list" id="lowStockFeed"></div>
-            </article>
-
-            <article class="panel">
-              <div class="panel-header">
-                <h2>Money watch</h2>
-                <p>The newest money entries recorded in the system.</p>
-              </div>
-              <div class="stack-list" id="transactionFeed"></div>
-            </article>
-
-            <article class="panel">
-              <div class="panel-header">
-                <h2>Recent movement</h2>
-                <p>Latest cross-workspace activity worth keeping an eye on.</p>
-              </div>
-              <div class="stack-list" id="activityFeed"></div>
-            </article>
-          </div>
+          <div class="metric-grid home-metric-grid" id="metricsGrid"></div>
         </section>
-      </main>
-    </div>
+
+        <section class="home-insight-grid">
+          <article class="panel home-compact-panel">
+            <div class="panel-header compact-panel-header">
+              <h2>Inventory watch</h2>
+              <p>Current stock and the latest updates.</p>
+            </div>
+            <div class="stack-list" id="lowStockFeed"></div>
+          </article>
+
+          <article class="panel home-compact-panel">
+            <div class="panel-header compact-panel-header">
+              <h2>Money watch</h2>
+              <p>Recent clean and dirty money changes.</p>
+            </div>
+            <div class="stack-list" id="transactionFeed"></div>
+          </article>
+
+          <article class="panel home-compact-panel">
+            <div class="panel-header compact-panel-header">
+              <h2>Recent movement</h2>
+              <p>The latest important activity across the workspace.</p>
+            </div>
+            <div class="stack-list" id="activityFeed"></div>
+          </article>
+        </section>
+      </section>
+    </main>
 
     <div class="toast-stack" id="toastStack"></div>
     <script type="module" src="./assets/js/dashboard.js"></script>
   </body>
 </html>
-

@@ -7,7 +7,8 @@ export function initProtectedPage({
   title,
   subtitle,
   requiredPermission = pageKey,
-  showQuickActions = pageKey === "DASHBOARD"
+  showQuickActions = pageKey === "DASHBOARD",
+  showWorkspaceTools = true
 }) {
   const user = requiredPermission ? requireAuth(requiredPermission) : (getUser() || requireAuth());
 
@@ -48,7 +49,9 @@ export function initProtectedPage({
     });
   }
 
-  mountWorkspaceTools({ showQuickActions });
+  if (showWorkspaceTools) {
+    mountWorkspaceTools({ showQuickActions });
+  }
 
   return user;
 }
