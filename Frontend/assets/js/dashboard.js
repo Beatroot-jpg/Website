@@ -4,7 +4,6 @@ import { subscribeToMutations } from "./live.js";
 import { hasPermission } from "./session.js";
 import { initThemeToggle } from "./theme.js";
 import {
-  badge,
   formatCurrency,
   formatDate,
   initProtectedPage,
@@ -16,7 +15,7 @@ import {
 initProtectedPage({
   pageKey: "DASHBOARD",
   title: "The Shites",
-  subtitle: "A personal workspace for money, stock, pricing, and the parts of the week that matter.",
+  subtitle: "Pick a panel. Track the week. Keep the numbers straight.",
   showQuickActions: false,
   showWorkspaceTools: false
 });
@@ -89,23 +88,29 @@ function renderLauncherPanels() {
     return;
   }
 
-  homeLauncherGrid.innerHTML = visiblePanels.map((panel) => {
+  homeLauncherGrid.innerHTML = visiblePanels.map((panel, index) => {
     const look = PANEL_LOOKUP[panel.key] || {
       eyebrow: "Panel",
       summary: panel.description,
       tone: "neutral"
     };
 
+    const itemNumber = String(index + 1).padStart(2, "0");
+
     return `
       <a class="home-launch-card ${look.tone}" href="${panel.href}">
+        <div class="home-launch-index">${itemNumber}</div>
         <div class="home-launch-copy">
-          <p class="home-launch-eyebrow">${look.eyebrow}</p>
+          <div class="home-launch-row">
+            <p class="home-launch-eyebrow">${look.eyebrow}</p>
+            <span class="home-launch-enter">Enter</span>
+          </div>
           <strong>${panel.label}</strong>
           <p>${look.summary}</p>
         </div>
         <div class="home-launch-meta">
-          ${badge(panel.description, look.tone)}
-          <span>Open panel</span>
+          <span>${panel.description}</span>
+          <span class="home-launch-arrow">↗</span>
         </div>
       </a>
     `;
