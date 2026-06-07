@@ -1,8 +1,10 @@
 import { api } from "./api.js";
+import { NAV_ITEMS } from "./constants.js";
 import { subscribeToMutations } from "./live.js";
+import { hasPermission } from "./session.js";
+import { initThemeToggle } from "./theme.js";
 import {
   badge,
-  distributionStatusBadge,
   formatCurrency,
   formatDate,
   initProtectedPage,
@@ -13,25 +15,114 @@ import {
 
 initProtectedPage({
   pageKey: "DASHBOARD",
-  title: "Operations dashboard",
-  subtitle: "Your live snapshot across stock, money, and distribution activity."
+  title: "Home",
+  subtitle: "Open the panel you need, glance at the important numbers, and keep the week moving without the old business-system clutter.",
+  showQuickActions: false
 });
 
+const themeToggleButton = document.querySelector("#themeToggleButton");
+const homeLauncherGrid = document.querySelector("#homeLauncherGrid");
 const metricsGrid = document.querySelector("#metricsGrid");
 const lowStockFeed = document.querySelector("#lowStockFeed");
 const activityFeed = document.querySelector("#activityFeed");
-const distributionFeed = document.querySelector("#distributionFeed");
 const transactionFeed = document.querySelector("#transactionFeed");
+
+const PANEL_LOOKUP = {
+  ANALYTICS: {
+    eyebrow: "Numbers",
+    summary: "See weekly trends, output comparisons, and money movement.",
+    tone: "accent"
+  },
+  PRICE_LIST: {
+    eyebrow: "Quotes",
+    summary: "Shared pricing plus a fast sale calculator when deals change on the fly.",
+    tone: "good"
+  },
+  FACTORY: {
+    eyebrow: "Rounds",
+    summary: "Track time, freeze unpaid weeks, and keep payout work moving cleanly.",
+    tone: "warn"
+  },
+  SECRETARY: {
+    eyebrow: "Records",
+    summary: "Meetings, notes, calendar items, and shared organization history.",
+    tone: "neutral"
+  },
+  INVENTORY: {
+    eyebrow: "Stock",
+    summary: "Track what is on hand, what changed, and what needs attention next.",
+    tone: "good"
+  },
+  TAX: {
+    eyebrow: "Access",
+    summary: "Monitor active and inactive access periods in one place.",
+    tone: "neutral"
+  },
+  BANK: {
+    eyebrow: "Money",
+    summary: "Log payments, watch clean and dirty totals, and keep the ledger tidy.",
+    tone: "accent"
+  },
+  DISTRIBUTION: {
+    eyebrow: "Runs",
+    summary: "Keep track of assigned movement and what has or has not come back yet.",
+    tone: "warn"
+  },
+  USERS: {
+    eyebrow: "Admin",
+    summary: "Create users and control who can see what in the workspace.",
+    tone: "neutral"
+  }
+};
+
+function renderLauncherPanels() {
+  const visiblePanels = NAV_ITEMS
+    .filter((item) => item.key !== "DASHBOARD")
+    .filter((item) => item.visibleToAllAuthenticated || hasPermission(item.key));
+
+  if (!visiblePanels.length) {
+    homeLauncherGrid.innerHTML = renderEmptyState(
+      "No panels available",
+      "This account does not currently have access to any workspace panels."
+    );
+    return;
+  }
+
+  homeLauncherGrid.innerHTML = visiblePanels.map((panel) => {
+    const look = PANEL_LOOKUP[panel.key] || {
+      eyebrow: "Panel",
+      summary: panel.description,
+      tone: "neutral"
+    };
+
+    return `
+      <a class="home-launch-card ${look.tone}" href="${panel.href}">
+        <div class="home-launch-copy">
+          <p class="home-launch-eyebrow">${look.eyebrow}</p>
+          <strong>${panel.label}</strong>
+          <p>${look.summary}</p>
+        </div>
+        <div class="home-launch-meta">
+          ${badge(panel.description, look.tone)}
+          <span>Open panel</span>
+        </div>
+      </a>
+    `;
+  }).join("");
+}
 
 function renderMetrics(metrics) {
   if (!metrics.length) {
-    metricsGrid.innerHTML = renderEmptyState("No metrics available", "This user does not currently have dashboard-linked module access.");
+    metricsGrid.innerHTML = renderEmptyState(
+      "No summary cards available",
+      "Once more workspace tools are rebuilt, the home summary cards will populate here."
+    );
     return;
   }
 
   metricsGrid.innerHTML = metrics.map((metric) => `
     <a class="metric-link" href="${metric.href || "#"}">
-      <article class="metric-card ${metric.tone}">
+      <article class="metric-card ${metric.tone} home-metric-card">
         <p>${metric.label}</p>
         <strong>${metric.currency ? formatCurrency(metric.value) : metric.value}</strong>
         <small>${metric.note || "Live value"}</small>
@@ -42,12 +133,15 @@ function renderMetrics(metrics) {
 
 function renderInventoryOverview(items) {
   if (!items.length) {
-    lowStockFeed.innerHTML = renderEmptyState("No inventory yet", "Items you create will show here with their current stock on hand.");
+    lowStockFeed.innerHTML = renderEmptyState(
+      "No inventory tracked yet",
+      "Once inventory starts getting entered, your latest stock signals will show up here."
+    );
     return;
   }
 
   lowStockFeed.innerHTML = items.map((item) => `
-    <a class="activity-link" href="./inventory.html?editItem=${item.id}#inventoryForm">
+    <a class="activity-link" href="./inventory.html?editItem=${item.id}">
       <article class="activity-card">
         <div>
           <strong>${item.name}</strong>
@@ -64,7 +158,10 @@ function renderInventoryOverview(items) {
 
 function renderActivity(items) {
   if (!items.length) {
-    activityFeed.innerHTML = renderEmptyState("No activity yet", "New stock movements, distributions, and payments will appear here.");
+    activityFeed.innerHTML = renderEmptyState(
+      "No recent movement",
+      "As new inventory, money, or other workspace activity lands, it will show up here."
+    );
     return;
   }
 
@@ -84,48 +181,17 @@ function renderActivity(items) {
   `).join("");
 }
 
-function renderDistributionFeed(items) {
-  if (!items.length) {
-    distributionFeed.innerHTML = renderEmptyState("No distributions yet", "Active runner distributions will show up here after the first one is created.");
-    return;
-  }
-
-  distributionFeed.innerHTML = items.map((item) => `
-    <a class="activity-link" href="./distribution.html?editDistribution=${item.id}#collectionForm">
-      <article class="activity-card">
-        <div>
-          <strong>${item.item.name}</strong>
-          <p>${item.quantity} units with ${item.distributor.name} (${item.distributor.number})</p>
-        </div>
-        <div class="activity-meta">
-          ${distributionStatusBadge(item.status)}
-          <small>${formatDate(item.updatedAt || item.createdAt)}</small>
-        </div>
-      </article>
-    </a>
-  `).join("");
-}
-
 function renderTransactionFeed(items) {
   if (!items.length) {
-    transactionFeed.innerHTML = renderEmptyState("No bank transactions yet", "When new clean or dirty money entries land, they will show here.");
+    transactionFeed.innerHTML = renderEmptyState(
+      "No money entries yet",
+      "Clean and dirty money activity will appear here once entries start landing."
+    );
     return;
-  }
-
-  function buildTransactionHref(item) {
-    if (item.sourceSystem === "distribution_deposit") {
-      return "./bank.html?view=dirty#transactionTable";
-    }
-
-    if (item.distribution?.id) {
-      return `./bank.html?search=${encodeURIComponent(item.description || item.moneyType)}#transactionTable`;
-    }
-
-    return `./bank.html?editTransaction=${item.id}#transactionForm`;
   }
 
   transactionFeed.innerHTML = items.map((item) => `
-    <a class="activity-link" href="${buildTransactionHref(item)}">
+    <a class="activity-link" href="./bank.html?view=${item.moneyType === "DIRTY" ? "dirty" : "clean"}">
       <article class="activity-card">
         <div>
           <strong>${item.moneyType} Money</strong>
@@ -141,10 +207,10 @@ function renderTransactionFeed(items) {
 }
 
 async function loadDashboard() {
-  metricsGrid.innerHTML = renderMetricSkeleton(5);
+  renderLauncherPanels();
+  metricsGrid.innerHTML = renderMetricSkeleton(4);
   lowStockFeed.innerHTML = "<div class='activity-card skeleton-card'></div><div class='activity-card skeleton-card'></div>";
   activityFeed.innerHTML = "<div class='activity-card skeleton-card'></div><div class='activity-card skeleton-card'></div>";
-  distributionFeed.innerHTML = "<div class='activity-card skeleton-card'></div><div class='activity-card skeleton-card'></div>";
   transactionFeed.innerHTML = "<div class='activity-card skeleton-card'></div><div class='activity-card skeleton-card'></div>";
 
   try {
@@ -152,20 +218,20 @@ async function loadDashboard() {
     renderMetrics(data.metrics || []);
     renderInventoryOverview(data.lowStockItems || []);
     renderActivity(data.recentActivity || []);
-    renderDistributionFeed(data.recentDistributions || []);
     renderTransactionFeed(data.recentTransactions || []);
   } catch (error) {
-    metricsGrid.innerHTML = renderEmptyState("Unable to load dashboard", error.message);
+    metricsGrid.innerHTML = renderEmptyState("Unable to load home summary", error.message);
     lowStockFeed.innerHTML = "";
     activityFeed.innerHTML = "";
-    distributionFeed.innerHTML = "";
     transactionFeed.innerHTML = "";
     showToast(error.message, "error");
   }
 }
 
+initThemeToggle(themeToggleButton);
+
 subscribeToMutations(["inventory", "bank", "distribution", "users"], () => {
-  showToast("Dashboard refreshed with live changes.", "info");
+  showToast("Home refreshed with live changes.", "info");
   loadDashboard();
 });
 

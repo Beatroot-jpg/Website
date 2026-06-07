@@ -1,9 +1,9 @@
 export const NAV_ITEMS = [
   {
     key: "DASHBOARD",
-    label: "Dashboard",
+    label: "Home",
     href: "./dashboard.html",
-    description: "Overview"
+    description: "Launcher"
   },
   {
     key: "ANALYTICS",
@@ -128,7 +128,7 @@ export const QUICK_ACTIONS = [
 ];
 
 export const PERMISSION_LABELS = {
-  DASHBOARD: "Dashboard",
+  DASHBOARD: "Home",
   ANALYTICS: "Analytics",
   SECRETARY: "Secretary",
   INVENTORY: "Inventory",

@@ -3,7 +3,15 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
+    <title>Home</title>
+    <script>
+      try {
+        const savedTheme = window.localStorage.getItem("the-shites-theme");
+        if (savedTheme === "light" || savedTheme === "dark") {
+          document.documentElement.dataset.theme = savedTheme;
+        }
+      } catch (_error) {}
+    </script>
     <link rel="stylesheet" href="./assets/css/styles.css">
     <script src="./assets/js/runtime-config.js"></script>
     <script src="./assets/js/config.js"></script>
@@ -20,61 +28,101 @@
         </div>
         <p class="sidebar-section-title">Sections</p>
         <nav class="nav-list" id="sidebarNav"></nav>
-        <div class="sidebar-footer">A lighter daily overview for stock, money, movement, and team access.</div>
+        <div class="sidebar-footer">The new personal launcher for money, stock, pages, and the everyday flow around your FiveM life.</div>
       </aside>
 
       <main class="workspace">
         <header class="workspace-header">
           <div>
-            <p class="eyebrow">Overview</p>
+            <p class="eyebrow">Home</p>
             <h1 id="pageTitle"></h1>
             <p class="muted" id="pageSubtitle"></p>
           </div>
           <div class="header-controls">
+            <button class="ghost-button theme-toggle-button" id="themeToggleButton" type="button" aria-pressed="false">Switch to light</button>
             <div class="user-pill" id="userPill"></div>
             <button class="ghost-button" id="logoutButton" type="button">Log out</button>
           </div>
         </header>
 
-        <section class="workflow-stack">
-          <article class="panel">
-            <div class="panel-header">
-              <h2>Overview metrics</h2>
-              <p>The main numbers are stacked first so the page opens as a readable status list.</p>
+        <section class="workflow-stack home-workspace">
+          <article class="panel home-hero-panel">
+            <div class="home-hero-grid">
+              <div class="home-hero-copy">
+                <div class="home-brand-mark">
+                  <div class="home-logo-beacon">
+                    <img class="home-logo" src="./assets/images/Main Logo.png" alt="The Shites logo">
+                  </div>
+                  <div class="home-brand-copy">
+                    <p class="home-section-label">Private Workspace</p>
+                    <h2>The Shites</h2>
+                    <p class="home-hero-text">
+                      A sharper personal launcher for money, sales, stock, tasks, and whatever keeps the week moving.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="badge-group home-hero-badges">
+                  <span class="badge accent">Money tracking</span>
+                  <span class="badge good">Stock control</span>
+                  <span class="badge neutral">Daily flow</span>
+                  <span class="badge warn">FiveM RP workspace</span>
+                </div>
+              </div>
+
+              <div class="home-hero-side">
+                <article class="home-highlight-card">
+                  <p class="home-section-label">What this becomes</p>
+                  <strong>Google docs on steroids for your RP life.</strong>
+                  <p class="muted">
+                    Track what you made, what you sold, what you still hold, and what needs to happen next without the old business-system clutter.
+                  </p>
+                </article>
+              </div>
             </div>
-            <div class="metric-grid" id="metricsGrid"></div>
           </article>
 
           <article class="panel">
             <div class="panel-header">
-              <h2>Inventory overview</h2>
-              <p>Quick look at current stock on hand across your main items.</p>
+              <h2>Open a panel</h2>
+              <p>Jump straight into the part of the workspace you need. This is the new home launcher layer we’ll build the rest of the redesign around.</p>
             </div>
-            <div class="stack-list" id="lowStockFeed"></div>
+            <div class="home-launch-grid" id="homeLauncherGrid"></div>
           </article>
 
           <article class="panel">
             <div class="panel-header">
-              <h2>Recent activity</h2>
-              <p>A blended feed of stock, bank, and distribution changes.</p>
+              <h2>At a glance</h2>
+              <p>A calmer summary of the main numbers, so the home page still gives you useful signal without feeling like an old operations dashboard.</p>
             </div>
-            <div class="stack-list" id="activityFeed"></div>
-          </article>
-          <article class="panel">
-            <div class="panel-header">
-              <h2>Recent distributions</h2>
-              <p>Latest runner distributions and what is happening with them now.</p>
-            </div>
-            <div class="stack-list" id="distributionFeed"></div>
+            <div class="metric-grid home-metric-grid" id="metricsGrid"></div>
           </article>
 
-          <article class="panel">
-            <div class="panel-header">
-              <h2>Recent transactions</h2>
-              <p>Latest clean and dirty money entries captured by the bank ledger.</p>
-            </div>
-            <div class="stack-list" id="transactionFeed"></div>
-          </article>
+          <div class="home-focus-grid">
+            <article class="panel">
+              <div class="panel-header">
+                <h2>Inventory watch</h2>
+                <p>Your latest stock movement and quantity signals.</p>
+              </div>
+              <div class="stack-list" id="lowStockFeed"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <h2>Money watch</h2>
+                <p>The newest money entries recorded in the system.</p>
+              </div>
+              <div class="stack-list" id="transactionFeed"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <h2>Recent movement</h2>
+                <p>Latest cross-workspace activity worth keeping an eye on.</p>
+              </div>
+              <div class="stack-list" id="activityFeed"></div>
+            </article>
+          </div>
         </section>
       </main>
     </div>
