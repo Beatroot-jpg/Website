@@ -1,76 +1,63 @@
-import { api } from "./api.js";
 import { NAV_ITEMS } from "./constants.js";
-import { subscribeToMutations } from "./live.js";
 import { hasPermission } from "./session.js";
 import { initThemeToggle } from "./theme.js";
-import {
-  formatCurrency,
-  formatDate,
-  initProtectedPage,
-  renderEmptyState,
-  renderMetricSkeleton,
-  showToast
-} from "./ui.js";
+import { initProtectedPage, renderEmptyState } from "./ui.js";
 
 initProtectedPage({
   pageKey: "DASHBOARD",
   title: "The Shites",
-  subtitle: "Pick a panel. Track the week. Keep the numbers straight.",
+  subtitle: "",
   showQuickActions: false,
   showWorkspaceTools: false
 });
 
 const themeToggleButton = document.querySelector("#themeToggleButton");
 const homeLauncherGrid = document.querySelector("#homeLauncherGrid");
-const metricsGrid = document.querySelector("#metricsGrid");
-const lowStockFeed = document.querySelector("#lowStockFeed");
-const activityFeed = document.querySelector("#activityFeed");
-const transactionFeed = document.querySelector("#transactionFeed");
 
 const PANEL_LOOKUP = {
   ANALYTICS: {
     eyebrow: "Numbers",
-    summary: "See weekly trends, output comparisons, and money movement.",
+    summary: "Money trends, week totals, and the broader picture.",
     tone: "accent"
   },
   PRICE_LIST: {
     eyebrow: "Quotes",
-    summary: "Shared pricing plus a fast sale calculator when deals change on the fly.",
+    summary: "Shared pricing and a quick calculator for deals on the fly.",
     tone: "good"
   },
   FACTORY: {
     eyebrow: "Rounds",
-    summary: "Track time, freeze unpaid weeks, and keep payout work moving cleanly.",
+    summary: "Time blocks, frozen weeks, and payout tracking.",
     tone: "warn"
   },
   SECRETARY: {
     eyebrow: "Records",
-    summary: "Meetings, notes, calendar items, and shared organization history.",
+    summary: "Meetings, notes, and shared planning documents.",
     tone: "neutral"
   },
   INVENTORY: {
     eyebrow: "Stock",
-    summary: "Track what is on hand, what changed, and what needs attention next.",
+    summary: "Current items, changes, and stock adjustments.",
     tone: "good"
   },
   TAX: {
     eyebrow: "Access",
-    summary: "Monitor active and inactive access periods in one place.",
+    summary: "Active and inactive access periods in one place.",
     tone: "neutral"
   },
   BANK: {
     eyebrow: "Money",
-    summary: "Log payments, watch clean and dirty totals, and keep the ledger tidy.",
+    summary: "Ledger tracking for clean and dirty totals.",
     tone: "accent"
   },
   DISTRIBUTION: {
     eyebrow: "Runs",
-    summary: "Keep track of assigned movement and what has or has not come back yet.",
+    summary: "Assignments, returns, and outstanding movement.",
     tone: "warn"
   },
   USERS: {
     eyebrow: "Admin",
-    summary: "Create users and control who can see what in the workspace.",
+    summary: "Accounts, access, and who can see what.",
     tone: "neutral"
   }
 };
@@ -103,7 +90,7 @@ function renderLauncherPanels() {
         <div class="home-launch-copy">
           <div class="home-launch-row">
             <p class="home-launch-eyebrow">${look.eyebrow}</p>
-            <span class="home-launch-enter">Enter</span>
+            <span class="home-launch-enter">Open</span>
           </div>
           <strong>${panel.label}</strong>
           <p>${look.summary}</p>
@@ -117,128 +104,5 @@ function renderLauncherPanels() {
   }).join("");
 }
 
-function renderMetrics(metrics) {
-  if (!metrics.length) {
-    metricsGrid.innerHTML = renderEmptyState(
-      "No summary cards available",
-      "Once more workspace tools are rebuilt, the home summary cards will populate here."
-    );
-    return;
-  }
-
-  metricsGrid.innerHTML = metrics.map((metric) => `
-    <a class="metric-link" href="${metric.href || "#"}">
-      <article class="metric-card ${metric.tone} home-metric-card">
-        <p>${metric.label}</p>
-        <strong>${metric.currency ? formatCurrency(metric.value) : metric.value}</strong>
-        <small>${metric.note || "Live value"}</small>
-      </article>
-    </a>
-  `).join("");
-}
-
-function renderInventoryOverview(items) {
-  if (!items.length) {
-    lowStockFeed.innerHTML = renderEmptyState(
-      "No inventory tracked yet",
-      "Once inventory starts getting entered, your latest stock signals will show up here."
-    );
-    return;
-  }
-
-  lowStockFeed.innerHTML = items.map((item) => `
-    <a class="activity-link" href="./inventory.html?editItem=${item.id}">
-      <article class="activity-card">
-        <div>
-          <strong>${item.name}</strong>
-          <p><span class="emphasis-inline">${item.quantity} ${item.unit}</span> on hand${item.category ? ` - ${item.category}` : ""}</p>
-        </div>
-        <div class="activity-meta">
-          ${badge("Inventory", "neutral")}
-          <small>${formatDate(item.updatedAt)}</small>
-        </div>
-      </article>
-    </a>
-  `).join("");
-}
-
-function renderActivity(items) {
-  if (!items.length) {
-    activityFeed.innerHTML = renderEmptyState(
-      "No recent movement",
-      "As new inventory, money, or other workspace activity lands, it will show up here."
-    );
-    return;
-  }
-
-  activityFeed.innerHTML = items.map((item) => `
-    <a class="activity-link" href="${item.href || "#"}">
-      <article class="activity-card">
-        <div>
-          <strong>${item.title}</strong>
-          <p>${item.detail}</p>
-        </div>
-        <div class="activity-meta">
-          ${badge(item.badgeLabel, item.tone || "accent")}
-          <small>${item.category} - ${formatDate(item.createdAt)}</small>
-        </div>
-      </article>
-    </a>
-  `).join("");
-}
-
-function renderTransactionFeed(items) {
-  if (!items.length) {
-    transactionFeed.innerHTML = renderEmptyState(
-      "No money entries yet",
-      "Clean and dirty money activity will appear here once entries start landing."
-    );
-    return;
-  }
-
-  transactionFeed.innerHTML = items.map((item) => `
-    <a class="activity-link" href="./bank.html?view=${item.moneyType === "DIRTY" ? "dirty" : "clean"}">
-      <article class="activity-card">
-        <div>
-          <strong>${item.moneyType} Money</strong>
-          <p>${item.createdBy?.name || "System"} - ${item.description || "Manual entry"} <span class="emphasis-inline">${formatCurrency(item.amount)}</span></p>
-        </div>
-        <div class="activity-meta">
-          ${badge(`${item.entryType} ${formatCurrency(item.amount)}`, item.entryType === "SUBTRACT" ? "danger" : item.moneyType === "DIRTY" ? "accent" : "good")}
-          <small>${formatDate(item.createdAt)}</small>
-        </div>
-      </article>
-    </a>
-  `).join("");
-}
-
-async function loadDashboard() {
-  renderLauncherPanels();
-  metricsGrid.innerHTML = renderMetricSkeleton(4);
-  lowStockFeed.innerHTML = "<div class='activity-card skeleton-card'></div><div class='activity-card skeleton-card'></div>";
-  activityFeed.innerHTML = "<div class='activity-card skeleton-card'></div><div class='activity-card skeleton-card'></div>";
-  transactionFeed.innerHTML = "<div class='activity-card skeleton-card'></div><div class='activity-card skeleton-card'></div>";
-
-  try {
-    const data = await api("/dashboard/summary");
-    renderMetrics(data.metrics || []);
-    renderInventoryOverview(data.lowStockItems || []);
-    renderActivity(data.recentActivity || []);
-    renderTransactionFeed(data.recentTransactions || []);
-  } catch (error) {
-    metricsGrid.innerHTML = renderEmptyState("Unable to load home summary", error.message);
-    lowStockFeed.innerHTML = "";
-    activityFeed.innerHTML = "";
-    transactionFeed.innerHTML = "";
-    showToast(error.message, "error");
-  }
-}
-
 initThemeToggle(themeToggleButton);
-
-subscribeToMutations(["inventory", "bank", "distribution", "users"], () => {
-  showToast("Home refreshed with live changes.", "info");
-  loadDashboard();
-});
-
-loadDashboard();
+renderLauncherPanels();
