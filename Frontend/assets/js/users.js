@@ -26,8 +26,8 @@ import {
 
 const currentUser = initProtectedPage({
   pageKey: "USERS",
-  title: "Users and permissions",
-  subtitle: "Create staff accounts and assign page-by-page access."
+  title: "Users and access",
+  subtitle: "Create admins, members, and the people trusted to run the club."
 });
 
 const userForm = document.querySelector("#userForm");

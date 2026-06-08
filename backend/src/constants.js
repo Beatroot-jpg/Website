@@ -1,7 +1,5 @@
 export const APP_PERMISSIONS = [
-  "DASHBOARD",
-  "SECRETARY",
   "USERS"
 ];
 
-export const DEFAULT_USER_PERMISSIONS = ["DASHBOARD"];
+export const DEFAULT_USER_PERMISSIONS = [];

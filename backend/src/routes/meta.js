@@ -25,46 +25,77 @@ router.get(
     }
 
     const containsFilter = { contains: query, mode: "insensitive" };
-    const canEditSecretary = req.user.role === "ADMIN" || req.user.permissions.includes("SECRETARY");
     const canViewUsers = req.user.role === "ADMIN" || req.user.permissions.includes("USERS");
 
-    const [meetings, records, users] = await Promise.all([
-      prisma.secretaryMeeting.findMany({
+    const [fighters, hallOfFame, fights, wagers, users] = await Promise.all([
+      prisma.fightFighter.findMany({
         where: {
-          OR: [
-            { title: containsFilter },
-            { location: containsFilter },
-            { audience: containsFilter },
-            { details: containsFilter }
-          ]
+          active: true,
+          OR: [{ name: containsFilter }]
         },
-        orderBy: [{ startsAt: "asc" }, { updatedAt: "desc" }],
+        orderBy: [{ points: "desc" }, { name: "asc" }],
         take: 6,
         select: {
           id: true,
-          title: true,
-          location: true,
-          status: true,
-          startsAt: true,
+          name: true,
+          points: true,
           updatedAt: true
         }
       }),
-      prisma.secretaryRecord.findMany({
+      prisma.fightHallOfFameEntry.findMany({
         where: {
           OR: [
+            { fighterName: containsFilter },
             { title: containsFilter },
-            { summary: containsFilter },
-            { content: containsFilter },
-            { audience: containsFilter }
+            { notes: containsFilter }
+          ]
+        },
+        orderBy: { wonAt: "desc" },
+        take: 6,
+        select: {
+          id: true,
+          fighterName: true,
+          title: true,
+          updatedAt: true
+        }
+      }),
+      prisma.fightCard.findMany({
+        where: {
+          OR: [
+            { fighterRedName: containsFilter },
+            { fighterBlueName: containsFilter },
+            { venue: containsFilter },
+            { notes: containsFilter },
+            { winnerName: containsFilter }
+          ]
+        },
+        orderBy: [{ scheduledAt: "asc" }, { updatedAt: "desc" }],
+        take: 6,
+        select: {
+          id: true,
+          fighterRedName: true,
+          fighterBlueName: true,
+          status: true,
+          scheduledAt: true,
+          updatedAt: true
+        }
+      }),
+      prisma.wagerEntry.findMany({
+        where: {
+          OR: [
+            { bettorName: containsFilter },
+            { pickedFighterName: containsFilter },
+            { notes: containsFilter },
+            { settlementNote: containsFilter }
           ]
         },
         orderBy: { updatedAt: "desc" },
         take: 6,
         select: {
           id: true,
-          title: true,
-          type: true,
-          summary: true,
+          bettorName: true,
+          pickedFighterName: true,
+          status: true,
           updatedAt: true
         }
       }),
@@ -91,27 +122,41 @@ router.get(
     ]);
 
     const results = [
-      ...meetings.map((meeting) => ({
-        id: `meeting-${meeting.id}`,
-        group: "Secretary",
-        title: meeting.title,
-        subtitle: `${meeting.status} - ${meeting.location || "No location set"}`,
-        href: canEditSecretary
-          ? `./secretary.html?editMeeting=${meeting.id}#meetingTable`
-          : `./secretary.html?viewMeeting=${meeting.id}#meetingTable`,
-        tone: meeting.status === "CANCELLED" ? "danger" : meeting.status === "COMPLETED" ? "good" : "accent",
-        sortAt: meeting.updatedAt
+      ...fighters.map((fighter) => ({
+        id: `fighter-${fighter.id}`,
+        group: "Leaderboard",
+        title: fighter.name,
+        subtitle: `${fighter.points} points`,
+        href: `./dashboard.html?search=${encodeURIComponent(fighter.name)}#leaderboardTable`,
+        tone: "accent",
+        sortAt: fighter.updatedAt
       })),
-      ...records.map((record) => ({
-        id: `record-${record.id}`,
-        group: "Secretary",
-        title: record.title,
-        subtitle: record.summary || record.type.replaceAll("_", " "),
-        href: canEditSecretary
-          ? `./secretary.html?editRecord=${record.id}#recordTable`
-          : `./secretary.html?viewRecord=${record.id}#recordTable`,
-        tone: record.type === "NOTICE" ? "accent" : record.type === "JOURNAL_ENTRY" ? "neutral" : "good",
-        sortAt: record.updatedAt
+      ...hallOfFame.map((entry) => ({
+        id: `hall-of-fame-${entry.id}`,
+        group: "Hall of Fame",
+        title: entry.fighterName,
+        subtitle: entry.title || "Champion",
+        href: "./dashboard.html#hallOfFameTable",
+        tone: "good",
+        sortAt: entry.updatedAt
+      })),
+      ...fights.map((fight) => ({
+        id: `fight-${fight.id}`,
+        group: "Fight Card",
+        title: `${fight.fighterRedName} vs ${fight.fighterBlueName}`,
+        subtitle: `${fight.status} - ${new Intl.DateTimeFormat("en-AU", { dateStyle: "medium", timeStyle: "short" }).format(new Date(fight.scheduledAt))}`,
+        href: "./dashboard.html#fightCardTable",
+        tone: fight.status === "COMPLETED" ? "good" : fight.status === "CANCELLED" ? "danger" : "accent",
+        sortAt: fight.updatedAt
+      })),
+      ...wagers.map((bet) => ({
+        id: `wager-${bet.id}`,
+        group: "Wagers",
+        title: bet.bettorName,
+        subtitle: `${bet.pickedFighterName} - ${bet.status}`,
+        href: "./wagers.html#wagerTable",
+        tone: bet.status === "PAID_OUT" ? "good" : bet.status === "HOUSE_KEPT" ? "accent" : bet.status === "LOST_PENDING" ? "warn" : "neutral",
+        sortAt: bet.updatedAt
       })),
       ...users.map((user) => ({
         id: `user-${user.id}`,

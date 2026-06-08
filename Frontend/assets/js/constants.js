@@ -1,15 +1,16 @@
 export const NAV_ITEMS = [
   {
     key: "DASHBOARD",
-    label: "Home",
+    label: "Leaderboard",
     href: "./dashboard.html",
-    description: "Launcher"
+    description: "Live rankings",
+    visibleToAllAuthenticated: true
   },
   {
-    key: "SECRETARY",
-    label: "Secretary",
-    href: "./secretary.html",
-    description: "Meetings and notes",
+    key: "WAGERS",
+    label: "Wagers",
+    href: "./wagers.html",
+    description: "Fight night bets",
     visibleToAllAuthenticated: true
   },
   {
@@ -23,20 +24,13 @@ export const NAV_ITEMS = [
 export const QUICK_ACTIONS = [];
 
 export const PERMISSION_LABELS = {
-  DASHBOARD: "Home",
-  SECRETARY: "Secretary",
   USERS: "Users"
 };
 
 export const PERMISSION_PRESETS = [
   {
-    key: "SECRETARY_EDITOR",
-    label: "Secretary editor",
-    permissions: ["DASHBOARD", "SECRETARY"]
-  },
-  {
-    key: "VIEWER",
-    label: "Viewer",
-    permissions: ["DASHBOARD"]
+    key: "MEMBER",
+    label: "Member",
+    permissions: []
   }
 ];

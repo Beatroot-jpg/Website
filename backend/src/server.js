@@ -7,7 +7,8 @@ import { ensureInitialAdmin } from "./services/bootstrap.js";
 import authRoutes from "./routes/auth.js";
 import metaRoutes from "./routes/meta.js";
 import userRoutes from "./routes/users.js";
-import secretaryRoutes from "./routes/secretary.js";
+import leaderboardRoutes from "./routes/leaderboard.js";
+import wagersRoutes from "./routes/wagers.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -39,7 +40,8 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/meta", metaRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/secretary", secretaryRoutes);
+app.use("/api/leaderboard", leaderboardRoutes);
+app.use("/api/wagers", wagersRoutes);
 
 app.use((error, _req, res, _next) => {
   console.error(error);

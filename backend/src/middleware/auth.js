@@ -68,9 +68,13 @@ export function requireAdmin(req, res, next) {
 }
 
 export function listPermissionMetadata() {
+  const labels = {
+    USERS: "Users"
+  };
+
   return APP_PERMISSIONS.map((key) => ({
     key,
-    label: key
+    label: labels[key] || key
       .toLowerCase()
       .split("_")
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))

@@ -114,6 +114,26 @@ enum FactoryCategoryWorkMode {
   LOGGED_ENTRY
 }
 
+enum FightCardStatus {
+  UPCOMING
+  COMPLETED
+  CANCELLED
+}
+
+enum WagerNightStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum WagerEntryStatus {
+  ACTIVE
+  WON_PENDING
+  LOST_PENDING
+  PAID_OUT
+  HOUSE_KEPT
+  VOIDED
+}
+
 model User {
   id                     String            @id @default(cuid())
   email                  String            @unique
@@ -534,4 +554,81 @@ model TaxPeriod {
 
   @@index([memberId, createdAt])
   @@index([expiresAt])
+}
+
+model FightFighter {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  points    Int      @default(20)
+  active    Boolean  @default(true)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, points])
+}
+
+model FightHallOfFameEntry {
+  id            String   @id @default(cuid())
+  fighterName   String
+  title         String   @default("Champion")
+  pointsAtTitle Int?
+  notes         String?
+  wonAt         DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([wonAt])
+}
+
+model FightCard {
+  id             String         @id @default(cuid())
+  fighterRedName String
+  fighterBlueName String
+  scheduledAt    DateTime
+  venue          String?
+  notes          String?
+  status         FightCardStatus @default(UPCOMING)
+  winnerName     String?
+  wagers         WagerEntry[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([status, scheduledAt])
+}
+
+model WagerNight {
+  id        String           @id @default(cuid())
+  label     String
+  status    WagerNightStatus @default(ACTIVE)
+  notes     String?
+  openedAt  DateTime         @default(now())
+  closedAt  DateTime?
+  wagers    WagerEntry[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([status, openedAt])
+}
+
+model WagerEntry {
+  id                String           @id @default(cuid())
+  nightId           String
+  fightId           String?
+  bettorName        String
+  pickedFighterName String
+  stake             Decimal          @db.Decimal(12, 2)
+  payoutMultiplier  Decimal          @db.Decimal(6, 2)
+  projectedReturn   Decimal          @db.Decimal(12, 2)
+  status            WagerEntryStatus @default(ACTIVE)
+  settlementNote    String?
+  notes             String?
+  settledAt         DateTime?
+  night             WagerNight       @relation(fields: [nightId], references: [id], onDelete: Cascade)
+  fight             FightCard?       @relation(fields: [fightId], references: [id], onDelete: SetNull)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([nightId, status])
+  @@index([fightId])
 }

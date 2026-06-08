@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home</title>
+    <title>Leaderboard</title>
     <script>
       try {
         const savedTheme = window.localStorage.getItem("the-shites-theme");
@@ -16,33 +16,187 @@
     <script src="./assets/js/runtime-config.js"></script>
     <script src="./assets/js/config.js"></script>
   </head>
-  <body class="app-body home-body">
-    <main class="home-shell">
-      <section class="home-utility-bar">
-        <div class="home-utility-actions">
-          <button class="ghost-button theme-toggle-button" id="themeToggleButton" type="button" aria-pressed="false">Switch to light</button>
-          <div class="user-pill" id="userPill"></div>
-          <button class="ghost-button" id="logoutButton" type="button">Log out</button>
+  <body class="app-body">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <img class="brand-logo" src="./assets/images/Main Logo.png" alt="The Shites logo">
+          <div>
+            <strong>The Shites</strong>
+            <span class="muted">Fight Club</span>
+          </div>
         </div>
-      </section>
+        <p class="sidebar-section-title">Fight Night</p>
+        <nav class="nav-list" id="sidebarNav"></nav>
+        <div class="sidebar-footer">Live rankings, upcoming cards, and the names that matter when the bell rings.</div>
+      </aside>
 
-      <section class="home-stage">
-        <article class="home-mural-panel">
-          <div class="home-mural-frame">
-            <div class="home-mural-glow"></div>
-            <img class="home-mural-logo" src="./assets/images/Main Logo.png" alt="The Shites logo">
-          </div>
-
-          <div class="home-center-copy">
-            <p class="home-section-label">Home</p>
+      <main class="workspace">
+        <header class="workspace-header">
+          <div>
+            <p class="eyebrow">Underground Leaderboard</p>
             <h1 id="pageTitle"></h1>
-            <p class="muted home-center-subtitle" id="pageSubtitle"></p>
+            <p class="muted" id="pageSubtitle"></p>
           </div>
+          <div class="header-controls">
+            <button class="ghost-button theme-toggle-button" id="themeToggleButton" type="button" aria-pressed="false">Switch to light</button>
+            <div class="user-pill" id="userPill"></div>
+            <button class="ghost-button" id="logoutButton" type="button">Log out</button>
+          </div>
+        </header>
 
-          <div class="home-action-grid" id="homeLauncherGrid"></div>
-        </article>
-      </section>
-    </main>
+        <section class="workflow-stack">
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Leaderboard</h2>
+              <p>The current ladder. Search the roster, page through it, and keep the point totals clean.</p>
+            </div>
+
+            <div class="collection-tools">
+              <div class="global-search-panel">
+                <label class="tool-label" for="fighterSearchInput">Find a fighter</label>
+                <div class="global-search-field">
+                  <input type="search" id="fighterSearchInput" placeholder="Search by fighter name" autocomplete="off">
+                </div>
+              </div>
+            </div>
+
+            <div id="leaderboardTable"></div>
+            <div class="pager" id="leaderboardPagination"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Hall of Fame</h2>
+              <p>Every previous champion kept in one clean table.</p>
+            </div>
+            <div id="hallOfFameTable"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h2>Fight Card</h2>
+              <p>The upcoming card for the next fights on deck.</p>
+            </div>
+            <div id="fightCardTable"></div>
+          </article>
+
+          <article class="panel hidden" id="leaderboardAdminPanel">
+            <div class="panel-header">
+              <h2>Admin control room</h2>
+              <p>Add fighters, update points, record champions, and keep the next card ready.</p>
+            </div>
+
+            <section class="workflow-stack">
+              <div class="workflow-pair">
+                <article class="panel">
+                  <div class="panel-header compact-panel-header">
+                    <h3 id="fighterFormTitle">Add fighter to leaderboard</h3>
+                    <p>New fighters start on 20 points by default, then move from there.</p>
+                  </div>
+
+                  <form class="stack-form" id="fighterForm">
+                    <input type="hidden" name="fighterId" id="fighterId">
+                    <label class="field-stack">
+                      <span>Fighter name</span>
+                      <input type="text" name="name" placeholder="Johnny Razor" required>
+                    </label>
+                    <label class="field-stack">
+                      <span>Total points</span>
+                      <input type="number" name="points" value="20" required>
+                    </label>
+                    <label class="field-stack">
+                      <span>Notes</span>
+                      <textarea name="notes" placeholder="Optional admin note"></textarea>
+                    </label>
+                    <div class="inline-actions">
+                      <button class="primary-button" type="submit">Save fighter</button>
+                      <button class="ghost-button" id="resetFighterForm" type="button">Reset</button>
+                      <button class="mini-action danger-action hidden" id="deleteFighterButton" type="button">Delete fighter</button>
+                    </div>
+                    <p class="form-error hidden" id="fighterError"></p>
+                  </form>
+                </article>
+
+                <article class="panel">
+                  <div class="panel-header compact-panel-header">
+                    <h3 id="hallOfFameFormTitle">Add champion</h3>
+                    <p>Keep the previous title holders visible in the history table.</p>
+                  </div>
+
+                  <form class="stack-form" id="hallOfFameForm">
+                    <input type="hidden" name="entryId" id="hallOfFameEntryId">
+                    <label class="field-stack">
+                      <span>Champion name</span>
+                      <input type="text" name="fighterName" placeholder="The Butcher" required>
+                    </label>
+                    <label class="field-stack">
+                      <span>Title</span>
+                      <input type="text" name="title" placeholder="Lightweight Champion">
+                    </label>
+                    <label class="field-stack">
+                      <span>Points at title</span>
+                      <input type="number" name="pointsAtTitle" placeholder="140">
+                    </label>
+                    <label class="field-stack">
+                      <span>Won at</span>
+                      <input type="datetime-local" name="wonAt">
+                    </label>
+                    <div class="inline-actions">
+                      <button class="secondary-button" type="submit">Save champion</button>
+                      <button class="ghost-button" id="resetHallOfFameForm" type="button">Reset</button>
+                      <button class="mini-action danger-action hidden" id="deleteHallOfFameButton" type="button">Delete entry</button>
+                    </div>
+                    <p class="form-error hidden" id="hallOfFameError"></p>
+                  </form>
+                </article>
+              </div>
+
+              <article class="panel">
+                <div class="panel-header compact-panel-header">
+                  <h3 id="fightFormTitle">Schedule fight</h3>
+                  <p>Build the next card, then switch to the wagers tab when the bets start flowing in.</p>
+                </div>
+
+                <form class="stack-form" id="fightForm">
+                  <input type="hidden" name="fightId" id="fightId">
+                  <div class="field-grid">
+                    <label class="field-stack">
+                      <span>Red corner</span>
+                      <input type="text" name="fighterRedName" placeholder="Johnny Razor" required>
+                    </label>
+                    <label class="field-stack">
+                      <span>Blue corner</span>
+                      <input type="text" name="fighterBlueName" placeholder="Brick Mason" required>
+                    </label>
+                  </div>
+                  <div class="field-grid">
+                    <label class="field-stack">
+                      <span>Fight time</span>
+                      <input type="datetime-local" name="scheduledAt" required>
+                    </label>
+                    <label class="field-stack">
+                      <span>Venue</span>
+                      <input type="text" name="venue" placeholder="Basement ring">
+                    </label>
+                  </div>
+                  <label class="field-stack">
+                    <span>Notes</span>
+                    <textarea name="notes" placeholder="Add any fight card details here"></textarea>
+                  </label>
+                  <div class="inline-actions">
+                    <button class="secondary-button" type="submit">Save fight</button>
+                    <button class="ghost-button" id="resetFightForm" type="button">Reset</button>
+                    <button class="mini-action danger-action hidden" id="deleteFightButton" type="button">Delete fight</button>
+                  </div>
+                  <p class="form-error hidden" id="fightError"></p>
+                </form>
+              </article>
+            </section>
+          </article>
+        </section>
+      </main>
+    </div>
 
     <div class="toast-stack" id="toastStack"></div>
     <script type="module" src="./assets/js/dashboard.js"></script>
