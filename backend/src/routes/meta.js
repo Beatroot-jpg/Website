@@ -6,18 +6,6 @@ import { authenticateToken, listPermissionMetadata } from "../middleware/auth.js
 
 const router = Router();
 
-function buildBankResultHref(transaction) {
-  if (transaction.sourceSystem === "distribution_deposit") {
-    return "./bank.html?view=dirty#transactionTable";
-  }
-
-  if (transaction.distributionId) {
-    return `./bank.html?search=${encodeURIComponent(transaction.description || transaction.moneyType)}#transactionTable`;
-  }
-
-  return `./bank.html?editTransaction=${transaction.id}#transactionForm`;
-}
-
 router.get(
   "/bootstrap-status",
   asyncHandler(async (_req, res) => {
@@ -36,317 +24,50 @@ router.get(
       return res.json({ results: [] });
     }
 
-    const allowed = new Set(req.user.permissions);
-    const canViewInventory = allowed.has("INVENTORY") || req.user.role === "ADMIN";
-    const canViewAnalytics = allowed.has("ANALYTICS") || req.user.role === "ADMIN";
-    const canViewPriceList = true;
-    const canViewFactory = true;
-    const canEditSecretary = allowed.has("SECRETARY") || req.user.role === "ADMIN";
-    const canViewSecretary = true;
-    const canViewBank = allowed.has("BANK") || req.user.role === "ADMIN";
-    const canViewTax = allowed.has("TAX") || req.user.role === "ADMIN";
-    const canViewDistribution = allowed.has("DISTRIBUTION") || req.user.role === "ADMIN";
-    const canViewUsers = allowed.has("USERS") || req.user.role === "ADMIN";
     const containsFilter = { contains: query, mode: "insensitive" };
-    const normalizedQuery = query.toUpperCase();
-    const bankMoneyTypeFilter = normalizedQuery.startsWith("DIR")
-      ? "DIRTY"
-      : normalizedQuery.startsWith("CLE")
-        ? "CLEAN"
-        : null;
+    const canEditSecretary = req.user.role === "ADMIN" || req.user.permissions.includes("SECRETARY");
+    const canViewUsers = req.user.role === "ADMIN" || req.user.permissions.includes("USERS");
 
-    const resultSets = await Promise.all([
-      canViewInventory
-        ? prisma.inventoryItem.findMany({
-          where: {
-            OR: [
-              { name: containsFilter },
-              { category: containsFilter },
-              { unit: containsFilter }
-            ]
-          },
-          orderBy: { updatedAt: "desc" },
-          take: 4,
-          select: {
-            id: true,
-            name: true,
-            category: true,
-            quantity: true,
-            unit: true,
-            updatedAt: true
-          }
-        }).then((items) => items.map((item) => ({
-          id: `inventory-${item.id}`,
-          group: "Inventory",
-          title: item.name,
-          subtitle: `${item.quantity} ${item.unit}${item.category ? ` - ${item.category}` : ""}`,
-          href: `./inventory.html?editItem=${item.id}#inventoryForm`,
-          tone: item.quantity <= 0 ? "warn" : "accent",
-          sortAt: item.updatedAt
-        })))
-        : [],
-      canViewAnalytics && /(analytics|stats|trend|weekly|sales|output|performance)/i.test(query)
-        ? Promise.resolve([
-          {
-            id: "analytics-page",
-            group: "Analytics",
-            title: "Analytics page",
-            subtitle: "Weekly comparisons, top movers, and output trends.",
-            href: "./analytics.html",
-            tone: "accent",
-            sortAt: new Date().toISOString()
-          }
-        ])
-        : Promise.resolve([]),
-      canViewPriceList && /(price|pricing|quote|calculator|sale|sales)/i.test(query)
-        ? Promise.resolve([
-          {
-            id: "price-list-page",
-            group: "Price List",
-            title: "Price list page",
-            subtitle: "Shared pricing plus the live sale calculator.",
-            href: "./price-list.html",
-            tone: "accent",
-            sortAt: new Date().toISOString()
-          }
-        ])
-        : Promise.resolve([]),
-      canViewPriceList
-        ? prisma.priceListItem.findMany({
-          where: {
-            name: containsFilter
-          },
-          orderBy: { updatedAt: "desc" },
-          take: 4,
-          select: {
-            id: true,
-            name: true,
-            unitPrice: true,
-            updatedAt: true
-          }
-        }).then((items) => items.map((item) => ({
-          id: `price-list-${item.id}`,
-          group: "Price List",
-          title: item.name,
-          subtitle: `$${Number(item.unitPrice || 0).toFixed(2)} per item`,
-          href: `./price-list.html?editPriceItem=${item.id}#priceTable`,
-          tone: "accent",
-          sortAt: item.updatedAt
-        })))
-        : [],
-      canViewFactory && /(factory|clock|clocking|payout|payouts|mining|smelting|crafting|bullet|logistics|transit|copper|coal|zinc|brass)/i.test(query)
-        ? Promise.resolve([
-          {
-            id: "factory-page",
-            group: "Factory",
-            title: "Factory page",
-            subtitle: "Clock time, log round sales, and project worker payouts.",
-            href: "./factory.html",
-            tone: "accent",
-            sortAt: new Date().toISOString()
-          }
-        ])
-        : Promise.resolve([]),
-      canViewFactory
-        ? prisma.factoryCategory.findMany({
-          where: {
-            archived: false,
-            OR: [
-              { name: containsFilter },
-              { helperText: containsFilter },
-              { slug: containsFilter }
-            ]
-          },
-          orderBy: [
-            { section: "asc" },
-            { sortOrder: "asc" }
-          ],
-          take: 6,
-          select: {
-            id: true,
-            name: true,
-            section: true,
-            locked: true,
-            updatedAt: true
-          }
-        }).then((items) => items.map((item) => ({
-          id: `factory-category-${item.id}`,
-          group: "Factory",
-          title: item.name,
-          subtitle: `${item.section.toLowerCase()}${item.locked ? " - locked" : " - open"}`,
-          href: "./factory.html#factoryCategories",
-          tone: item.locked ? "warn" : "accent",
-          sortAt: item.updatedAt
-        })))
-        : [],
-      canViewDistribution
-        ? prisma.runnerDistribution.findMany({
-          where: {
-            OR: [
-              { item: { name: containsFilter } },
-              { distributor: { name: containsFilter } },
-              { distributor: { number: containsFilter } },
-              { notes: containsFilter }
-            ]
-          },
-          orderBy: { updatedAt: "desc" },
-          take: 4,
-          include: {
-            item: {
-              select: {
-                id: true,
-                name: true
-              }
-            },
-            distributor: {
-              select: {
-                name: true,
-                number: true
-              }
-            }
-          }
-        }).then((items) => items.map((item) => ({
-          id: `distribution-${item.id}`,
-          group: "Distribution",
-          title: item.item.name,
-          subtitle: `${item.quantity} units for ${item.distributor.name} - ${item.status}`,
-          href: `./distribution.html?editDistribution=${item.id}#collectionForm`,
-          tone: item.status === "CLEARED" ? "good" : item.status === "FAULTY" ? "danger" : item.status === "PARTIAL" ? "warn" : "accent",
-          sortAt: item.updatedAt
-        })))
-        : [],
-      canViewSecretary
-        ? Promise.all([
-          prisma.secretaryMeeting.findMany({
-            where: {
-              OR: [
-                { title: containsFilter },
-                { location: containsFilter },
-                { audience: containsFilter },
-                { details: containsFilter }
-              ]
-            },
-            orderBy: [{ startsAt: "asc" }, { updatedAt: "desc" }],
-            take: 4,
-            select: {
-              id: true,
-              title: true,
-              location: true,
-              audience: true,
-              status: true,
-              startsAt: true,
-              updatedAt: true
-            }
-          }),
-          prisma.secretaryRecord.findMany({
-            where: {
-              OR: [
-                { title: containsFilter },
-                { summary: containsFilter },
-                { content: containsFilter },
-                { audience: containsFilter }
-              ]
-            },
-            orderBy: { updatedAt: "desc" },
-            take: 4,
-            select: {
-              id: true,
-              type: true,
-              title: true,
-              summary: true,
-              updatedAt: true
-            }
-          })
-        ]).then(([meetingItems, recordItems]) => [
-          ...meetingItems.map((item) => ({
-            id: `secretary-meeting-${item.id}`,
-            group: "Secretary",
-            title: item.title,
-            subtitle: `${item.status} - ${item.location || item.audience || "Meeting details"}`,
-            href: canEditSecretary
-              ? `./secretary.html?editMeeting=${item.id}#meetingTable`
-              : `./secretary.html?viewMeeting=${item.id}#meetingTable`,
-            tone: item.status === "COMPLETED" ? "good" : item.status === "CANCELLED" ? "danger" : "accent",
-            sortAt: item.updatedAt || item.startsAt
-          })),
-          ...recordItems.map((item) => ({
-            id: `secretary-record-${item.id}`,
-            group: "Secretary",
-            title: item.title,
-            subtitle: `${item.type.replaceAll("_", " ")}${item.summary ? ` - ${item.summary}` : ""}`,
-            href: canEditSecretary
-              ? `./secretary.html?editRecord=${item.id}#recordTable`
-              : `./secretary.html?viewRecord=${item.id}#recordTable`,
-            tone: item.type === "NOTICE" ? "accent" : item.type === "MEETING_MINUTES" ? "good" : "neutral",
-            sortAt: item.updatedAt
-          }))
-        ])
-        : [],
-      canViewBank
-        ? prisma.bankTransaction.findMany({
-          where: {
-            OR: [
-              { description: containsFilter },
-              { sourceSystem: containsFilter },
-              ...(bankMoneyTypeFilter ? [{ moneyType: bankMoneyTypeFilter }] : [])
-            ]
-          },
-          orderBy: { createdAt: "desc" },
-          take: 4,
-          select: {
-            id: true,
-            description: true,
-            type: true,
-            moneyType: true,
-            sourceSystem: true,
-            amount: true,
-            distributionId: true,
-            createdAt: true
-          }
-        }).then((items) => items.map((item) => ({
-          id: `bank-${item.id}`,
-          group: "Bank",
-          title: item.description || `${item.moneyType} ${item.type === "DEBIT" ? "subtract" : "correction"}`,
-          subtitle: `${item.moneyType} money - ${item.sourceSystem} - ${item.amount}`,
-          href: buildBankResultHref(item),
-          tone: item.type === "DEBIT" ? "danger" : "good",
-          sortAt: item.createdAt
-        })))
-        : [],
-      canViewTax
-        ? prisma.taxMember.findMany({
-          where: {
-            OR: [
-              { fullName: containsFilter },
-              { mobileNumber: containsFilter },
-              { organizationName: containsFilter },
-              { notes: containsFilter }
-            ]
-          },
-          orderBy: { updatedAt: "desc" },
-          take: 4,
-          include: {
-            periods: {
-              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-              take: 1
-            }
-          }
-        }).then((items) => items.map((item) => {
-          const latestPeriod = item.periods[0] || null;
-          const expiry = latestPeriod?.expiresAt ? new Date(latestPeriod.expiresAt) : null;
-          const active = Boolean(expiry && expiry >= new Date());
-
-          return {
-            id: `tax-${item.id}`,
-            group: "Tax",
-            title: item.fullName,
-            subtitle: `${item.mobileNumber}${item.organizationName ? ` - ${item.organizationName}` : ""}${expiry ? ` - ${active ? "Active until" : "Expired"} ${expiry.toLocaleDateString()}` : " - No renewal history"}`,
-            href: `./tax.html?editMember=${item.id}${active ? "#activeTaxTable" : "#inactiveTaxTable"}`,
-            tone: active ? "accent" : "neutral",
-            sortAt: latestPeriod?.createdAt || item.updatedAt
-          };
-        }))
-        : [],
+    const [meetings, records, users] = await Promise.all([
+      prisma.secretaryMeeting.findMany({
+        where: {
+          OR: [
+            { title: containsFilter },
+            { location: containsFilter },
+            { audience: containsFilter },
+            { details: containsFilter }
+          ]
+        },
+        orderBy: [{ startsAt: "asc" }, { updatedAt: "desc" }],
+        take: 6,
+        select: {
+          id: true,
+          title: true,
+          location: true,
+          status: true,
+          startsAt: true,
+          updatedAt: true
+        }
+      }),
+      prisma.secretaryRecord.findMany({
+        where: {
+          OR: [
+            { title: containsFilter },
+            { summary: containsFilter },
+            { content: containsFilter },
+            { audience: containsFilter }
+          ]
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 6,
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          summary: true,
+          updatedAt: true
+        }
+      }),
       canViewUsers
         ? prisma.user.findMany({
           where: {
@@ -356,8 +77,8 @@ router.get(
               { email: containsFilter }
             ]
           },
-          orderBy: { updatedAt: "desc" },
-          take: 4,
+          orderBy: [{ role: "asc" }, { name: "asc" }],
+          take: 6,
           select: {
             id: true,
             name: true,
@@ -365,24 +86,47 @@ router.get(
             role: true,
             updatedAt: true
           }
-        }).then((items) => items.map((item) => ({
-          id: `user-${item.id}`,
-          group: "Users",
-          title: item.name,
-          subtitle: `${item.email} - ${item.role}`,
-          href: `./users.html?editUser=${item.id}#userForm`,
-          tone: item.role === "ADMIN" ? "accent" : "neutral",
-          sortAt: item.updatedAt
-        })))
+        })
         : []
     ]);
 
-    return res.json({
-      results: resultSets
-        .flat()
-        .sort((left, right) => new Date(right.sortAt) - new Date(left.sortAt))
-        .slice(0, 12)
-    });
+    const results = [
+      ...meetings.map((meeting) => ({
+        id: `meeting-${meeting.id}`,
+        group: "Secretary",
+        title: meeting.title,
+        subtitle: `${meeting.status} - ${meeting.location || "No location set"}`,
+        href: canEditSecretary
+          ? `./secretary.html?editMeeting=${meeting.id}#meetingTable`
+          : `./secretary.html?viewMeeting=${meeting.id}#meetingTable`,
+        tone: meeting.status === "CANCELLED" ? "danger" : meeting.status === "COMPLETED" ? "good" : "accent",
+        sortAt: meeting.updatedAt
+      })),
+      ...records.map((record) => ({
+        id: `record-${record.id}`,
+        group: "Secretary",
+        title: record.title,
+        subtitle: record.summary || record.type.replaceAll("_", " "),
+        href: canEditSecretary
+          ? `./secretary.html?editRecord=${record.id}#recordTable`
+          : `./secretary.html?viewRecord=${record.id}#recordTable`,
+        tone: record.type === "NOTICE" ? "accent" : record.type === "JOURNAL_ENTRY" ? "neutral" : "good",
+        sortAt: record.updatedAt
+      })),
+      ...users.map((user) => ({
+        id: `user-${user.id}`,
+        group: "Users",
+        title: user.name,
+        subtitle: `${user.email} - ${user.role}`,
+        href: `./users.html?editUser=${user.id}#userTable`,
+        tone: user.role === "ADMIN" ? "accent" : "neutral",
+        sortAt: user.updatedAt
+      }))
+    ]
+      .sort((left, right) => new Date(right.sortAt).getTime() - new Date(left.sortAt).getTime())
+      .slice(0, 12);
+
+    res.json({ results });
   })
 );
 
@@ -390,26 +134,8 @@ router.get(
   "/options",
   authenticateToken,
   asyncHandler(async (_req, res) => {
-    const users = await prisma.user.findMany({
-      where: {
-        active: true,
-        archived: false
-      },
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true
-      }
-    });
-
     res.json({
-      permissions: listPermissionMetadata(),
-      users: users.map((user) => ({
-        ...user,
-        username: user.email
-      }))
+      permissions: listPermissionMetadata()
     });
   })
 );

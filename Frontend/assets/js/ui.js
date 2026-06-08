@@ -79,7 +79,7 @@ function mountWorkspaceTools({ showQuickActions = false } = {}) {
         <input
           type="search"
           id="globalSearchInput"
-          placeholder="Search factory, price list items, tax trackers, inventory, distributions, bank records, meetings, records, or users"
+          placeholder="Search meetings, records, or users"
           autocomplete="off"
         >
       </div>

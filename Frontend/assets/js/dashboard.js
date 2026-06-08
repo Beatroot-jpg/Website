@@ -15,45 +15,10 @@ const themeToggleButton = document.querySelector("#themeToggleButton");
 const homeLauncherGrid = document.querySelector("#homeLauncherGrid");
 
 const PANEL_LOOKUP = {
-  ANALYTICS: {
-    eyebrow: "Numbers",
-    summary: "Money trends, week totals, and the broader picture.",
-    tone: "accent"
-  },
-  PRICE_LIST: {
-    eyebrow: "Quotes",
-    summary: "Shared pricing and a quick calculator for deals on the fly.",
-    tone: "good"
-  },
-  FACTORY: {
-    eyebrow: "Rounds",
-    summary: "Time blocks, frozen weeks, and payout tracking.",
-    tone: "warn"
-  },
   SECRETARY: {
     eyebrow: "Records",
     summary: "Meetings, notes, and shared planning documents.",
     tone: "neutral"
-  },
-  INVENTORY: {
-    eyebrow: "Stock",
-    summary: "Current items, changes, and stock adjustments.",
-    tone: "good"
-  },
-  TAX: {
-    eyebrow: "Access",
-    summary: "Active and inactive access periods in one place.",
-    tone: "neutral"
-  },
-  BANK: {
-    eyebrow: "Money",
-    summary: "Ledger tracking for clean and dirty totals.",
-    tone: "accent"
-  },
-  DISTRIBUTION: {
-    eyebrow: "Runs",
-    summary: "Assignments, returns, and outstanding movement.",
-    tone: "warn"
   },
   USERS: {
     eyebrow: "Admin",

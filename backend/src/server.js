@@ -7,16 +7,6 @@ import { ensureInitialAdmin } from "./services/bootstrap.js";
 import authRoutes from "./routes/auth.js";
 import metaRoutes from "./routes/meta.js";
 import userRoutes from "./routes/users.js";
-import inventoryRoutes from "./routes/inventory.js";
-import bankRoutes from "./routes/bank.js";
-import taxRoutes from "./routes/tax.js";
-import distributionRoutes from "./routes/distribution.js";
-import dashboardRoutes from "./routes/dashboard.js";
-import rosterRoutes from "./routes/roster.js";
-import analyticsRoutes from "./routes/analytics.js";
-import dailyTaskRoutes from "./routes/daily-tasks.js";
-import priceListRoutes from "./routes/price-list.js";
-import factoryRoutes from "./routes/factory.js";
 import secretaryRoutes from "./routes/secretary.js";
 
 const app = express();
@@ -49,16 +39,6 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/meta", metaRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/inventory", inventoryRoutes);
-app.use("/api/bank", bankRoutes);
-app.use("/api/tax", taxRoutes);
-app.use("/api/distribution", distributionRoutes);
-app.use("/api/roster", rosterRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/analytics", analyticsRoutes);
-app.use("/api/daily-tasks", dailyTaskRoutes);
-app.use("/api/price-list", priceListRoutes);
-app.use("/api/factory", factoryRoutes);
 app.use("/api/secretary", secretaryRoutes);
 
 app.use((error, _req, res, _next) => {
