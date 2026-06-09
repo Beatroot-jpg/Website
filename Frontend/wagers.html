@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wagers | The Shites Fight Club</title>
+    <script>
+      try {
+        const savedTheme = window.localStorage.getItem("the-shites-theme");
+        if (savedTheme === "light" || savedTheme === "dark") {
+          document.documentElement.dataset.theme = savedTheme;
+        }
+      } catch (_error) {}
+    </script>
+    <link rel="stylesheet" href="./assets/css/styles.css">
+  </head>
+  <body class="placeholder-body">
+    <main class="placeholder-shell">
+      <a class="placeholder-home-link" href="./index.html">Back home</a>
+      <img class="placeholder-logo" src="./assets/images/Main Logo.png" alt="The Shites Fight Club logo">
+      <section class="placeholder-card">
+        <p class="section-kicker">Wagers</p>
+        <h1>Wagers page scaffolded.</h1>
+        <p>This tab exists now and is ready for us to build the live bet book and fight-night tracking next.</p>
+      </section>
+    </main>
+  </body>
+</html>

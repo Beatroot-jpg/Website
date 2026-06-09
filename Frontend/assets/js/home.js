@@ -1,0 +1,110 @@
+import { api } from "./api.js";
+import { clearSession, getSession, saveSession } from "./session.js";
+import { initThemeToggle } from "./theme.js";
+
+const themeToggleButton = document.querySelector("#themeToggleButton");
+const loginButton = document.querySelector("#loginButton");
+const loginModal = document.querySelector("#loginModal");
+const closeLoginButton = document.querySelector("#closeLoginButton");
+const closeLoginBackdrop = document.querySelector("#closeLoginBackdrop");
+const loginForm = document.querySelector("#loginForm");
+const loginError = document.querySelector("#loginError");
+const loginHint = document.querySelector("#loginHint");
+
+function showToast(message, tone = "success") {
+  const stack = document.querySelector("#toastStack");
+
+  if (!stack) {
+    return;
+  }
+
+  const toast = document.createElement("div");
+  toast.className = `toast ${tone}`;
+  toast.textContent = message;
+  stack.appendChild(toast);
+
+  window.setTimeout(() => {
+    toast.remove();
+  }, 3200);
+}
+
+function setFormMessage(message = "") {
+  loginError.textContent = message;
+  loginError.classList.toggle("hidden", !message);
+}
+
+function openLoginModal() {
+  loginModal.classList.remove("hidden");
+  loginModal.setAttribute("aria-hidden", "false");
+  setFormMessage("");
+  window.requestAnimationFrame(() => {
+    loginForm?.elements.username?.focus();
+  });
+}
+
+function closeLoginModal() {
+  loginModal.classList.add("hidden");
+  loginModal.setAttribute("aria-hidden", "true");
+}
+
+function syncLoginButton() {
+  const session = getSession();
+
+  if (session?.user?.name) {
+    loginButton.textContent = session.user.name;
+    loginHint.textContent = "You are already signed in. Close this window or clear the session below.";
+    loginButton.dataset.state = "session";
+  } else {
+    loginButton.textContent = "Login";
+    loginHint.textContent = "Private access for trusted members of The Shites Fight Club.";
+    loginButton.dataset.state = "login";
+  }
+}
+
+loginButton?.addEventListener("click", () => {
+  if (loginButton.dataset.state === "session") {
+    if (window.confirm("Log out of the current session?")) {
+      clearSession();
+      syncLoginButton();
+      showToast("Logged out.", "success");
+    }
+    return;
+  }
+
+  openLoginModal();
+});
+
+closeLoginButton?.addEventListener("click", closeLoginModal);
+closeLoginBackdrop?.addEventListener("click", closeLoginModal);
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !loginModal.classList.contains("hidden")) {
+    closeLoginModal();
+  }
+});
+
+loginForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setFormMessage("");
+
+  const payload = Object.fromEntries(new FormData(loginForm).entries());
+
+  try {
+    const session = await api("/auth/login", {
+      method: "POST",
+      body: payload
+    });
+
+    saveSession(session);
+    syncLoginButton();
+    closeLoginModal();
+    loginForm.reset();
+    showToast("Logged in successfully.", "success");
+  } catch (error) {
+    setFormMessage(error.message);
+    showToast(error.message, "error");
+  }
+});
+
+initThemeToggle(themeToggleButton);
+syncLoginButton();
