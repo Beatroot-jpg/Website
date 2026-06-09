@@ -10,6 +10,7 @@ const closeLoginBackdrop = document.querySelector("#closeLoginBackdrop");
 const loginForm = document.querySelector("#loginForm");
 const loginError = document.querySelector("#loginError");
 const loginHint = document.querySelector("#loginHint");
+const loginSubmitButton = document.querySelector("#loginSubmitButton");
 
 function showToast(message, tone = "success") {
   const stack = document.querySelector("#toastStack");
@@ -31,6 +32,14 @@ function showToast(message, tone = "success") {
 function setFormMessage(message = "") {
   loginError.textContent = message;
   loginError.classList.toggle("hidden", !message);
+}
+
+function setLoginLoadingState(loading) {
+  if (loginSubmitButton) {
+    loginSubmitButton.classList.toggle("is-loading", loading);
+    loginSubmitButton.disabled = loading;
+    loginSubmitButton.textContent = loading ? "Entering" : "Enter";
+  }
 }
 
 function openLoginModal() {
@@ -86,6 +95,7 @@ window.addEventListener("keydown", (event) => {
 loginForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   setFormMessage("");
+  setLoginLoadingState(true);
 
   const payload = Object.fromEntries(new FormData(loginForm).entries());
 
@@ -103,8 +113,13 @@ loginForm?.addEventListener("submit", async (event) => {
   } catch (error) {
     setFormMessage(error.message);
     showToast(error.message, "error");
+  } finally {
+    setLoginLoadingState(false);
   }
 });
 
 initThemeToggle(themeToggleButton);
 syncLoginButton();
+window.requestAnimationFrame(() => {
+  document.body.classList.remove("is-loading");
+});

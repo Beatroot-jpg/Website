@@ -16,7 +16,7 @@
     <script src="./assets/js/runtime-config.js"></script>
     <script src="./assets/js/config.js"></script>
   </head>
-  <body class="landing-body">
+  <body class="landing-body is-loading">
     <div class="landing-shell">
       <header class="landing-topbar">
         <div class="landing-topbar-spacer" aria-hidden="true"></div>
@@ -29,30 +29,31 @@
       <main class="landing-main">
         <section class="hero-stage">
           <div class="hero-stage-glow" aria-hidden="true"></div>
-          <div class="hero-stage-frame">
-            <img
-              class="hero-logo"
-              src="./assets/images/Main Logo.png"
-              alt="The Shites Fight Club logo"
-            >
-          </div>
+          <img
+            class="hero-logo"
+            src="./assets/images/Main Logo.png"
+            alt="The Shites Fight Club logo"
+          >
         </section>
 
-        <section class="launcher-grid" aria-label="Site sections">
-          <a class="launcher-card" href="./leaderboard.html">
-            <strong>Leaderboard</strong>
-            <p>Track the live ladder, champions, and who is sitting at the top of the club.</p>
-          </a>
+        <section class="launcher-stage" aria-label="Site sections">
+          <div class="launcher-stage-fade" aria-hidden="true"></div>
+          <div class="launcher-grid">
+            <a class="launcher-card" href="./leaderboard.html">
+              <strong>Leaderboard</strong>
+              <p>Track the live ladder, champions, and who is sitting at the top of the club.</p>
+            </a>
 
-          <a class="launcher-card" href="./wagers.html">
-            <strong>Wagers</strong>
-            <p>Watch the night book, active bets, and what the house is projected to walk with.</p>
-          </a>
+            <a class="launcher-card" href="./wagers.html">
+              <strong>Wagers</strong>
+              <p>Watch the night book, active bets, and what the house is projected to walk with.</p>
+            </a>
 
-          <a class="launcher-card" href="./admin.html">
-            <strong>Admin</strong>
-            <p>Run the back room, manage access, and keep the club tight when the real work starts.</p>
-          </a>
+            <a class="launcher-card" href="./admin.html">
+              <strong>Admin</strong>
+              <p>Run the back room, manage access, and keep the club tight when the real work starts.</p>
+            </a>
+          </div>
         </section>
       </main>
     </div>
@@ -76,10 +77,10 @@
 
           <label class="field-block">
             <span>Password</span>
-            <input type="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
+            <input type="password" name="password" placeholder="********" autocomplete="current-password" required>
           </label>
 
-          <button class="topbar-button accent wide" type="submit">Enter</button>
+          <button class="topbar-button accent wide" id="loginSubmitButton" type="submit">Enter</button>
           <p class="form-message hidden" id="loginError"></p>
           <p class="helper-copy" id="loginHint">Private access for trusted members of The Shites Fight Club.</p>
         </form>
