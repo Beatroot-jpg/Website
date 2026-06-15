@@ -4,31 +4,60 @@ import { prisma } from "../db.js";
 import { APP_PERMISSIONS } from "../constants.js";
 import { getJwtSecret, serializeUser } from "../services/auth.js";
 
-export async function authenticateToken(req, res, next) {
+function readBearerToken(req) {
   const header = req.headers.authorization;
 
   if (!header?.startsWith("Bearer ")) {
+    return null;
+  }
+
+  return header.slice("Bearer ".length);
+}
+
+async function resolveAuthenticatedUser(token) {
+  const payload = jwt.verify(token, getJwtSecret());
+  const user = await prisma.user.findUnique({
+    where: { id: payload.sub },
+    include: { permissions: true }
+  });
+
+  if (!user || !user.active || user.archived) {
+    throw new Error("Your account is unavailable.");
+  }
+
+  return serializeUser(user);
+}
+
+export async function authenticateToken(req, res, next) {
+  const token = readBearerToken(req);
+
+  if (!token) {
     return res.status(401).json({ message: "Authentication required." });
   }
 
-  const token = header.slice("Bearer ".length);
-
   try {
-    const payload = jwt.verify(token, getJwtSecret());
-    const user = await prisma.user.findUnique({
-      where: { id: payload.sub },
-      include: { permissions: true }
-    });
-
-    if (!user || !user.active || user.archived) {
-      return res.status(401).json({ message: "Your account is unavailable." });
-    }
-
-    req.user = serializeUser(user);
+    req.user = await resolveAuthenticatedUser(token);
     return next();
   } catch (error) {
     return res.status(401).json({ message: "Invalid or expired session." });
   }
+}
+
+export async function authenticateTokenOptional(req, _res, next) {
+  const token = readBearerToken(req);
+
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+
+  try {
+    req.user = await resolveAuthenticatedUser(token);
+  } catch (_error) {
+    req.user = null;
+  }
+
+  return next();
 }
 
 export function requirePermission(...requiredPermissions) {
@@ -69,7 +98,7 @@ export function requireAdmin(req, res, next) {
 
 export function listPermissionMetadata() {
   const labels = {
-    USERS: "Users"
+    USERS: "Admin Panel Access"
   };
 
   return APP_PERMISSIONS.map((key) => ({

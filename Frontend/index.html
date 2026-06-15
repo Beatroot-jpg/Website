@@ -19,7 +19,6 @@
   <body class="landing-body is-loading">
     <div class="landing-shell">
       <header class="landing-topbar">
-        <div class="landing-topbar-spacer" aria-hidden="true"></div>
         <div class="landing-topbar-actions">
           <button class="topbar-button ghost" id="themeToggleButton" type="button" aria-pressed="false">Light mode</button>
           <button class="topbar-button accent" id="loginButton" type="button">Login</button>
@@ -49,14 +48,23 @@
               <p>Watch the night book, active bets, and what the house is projected to walk with.</p>
             </a>
 
-            <a class="launcher-card" href="./admin.html">
+            <a class="launcher-card is-locked" id="adminLauncherCard">
               <strong>Admin</strong>
               <p>Run the back room, manage access, and keep the club tight when the real work starts.</p>
+              <span class="launcher-card-state" id="adminLauncherState">Login required</span>
             </a>
           </div>
         </section>
       </main>
     </div>
+
+    <button class="scroll-cue" id="scrollCue" type="button" aria-label="Scroll down to site sections">
+      <span class="scroll-cue-copy">Scroll</span>
+      <span class="scroll-cue-arrows" aria-hidden="true">
+        <span></span>
+        <span></span>
+      </span>
+    </button>
 
     <div class="modal-shell hidden" id="loginModal" aria-hidden="true">
       <button class="modal-backdrop" id="closeLoginBackdrop" type="button" aria-label="Close login"></button>

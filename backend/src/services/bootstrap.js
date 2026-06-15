@@ -4,20 +4,16 @@ import { hashPassword } from "./auth.js";
 import { normalizeUsername } from "../validators.js";
 
 export async function ensureInitialAdmin() {
-  const adminIdentity = process.env.ADMIN_USERNAME || process.env.ADMIN_EMAIL;
-
-  if (!adminIdentity || !process.env.ADMIN_PASSWORD) {
-    console.warn("No users found and ADMIN_USERNAME / ADMIN_PASSWORD are not configured yet.");
-    return;
-  }
-
-  const passwordHash = await hashPassword(process.env.ADMIN_PASSWORD);
+  const adminIdentity = process.env.ADMIN_USERNAME || process.env.ADMIN_EMAIL || "admin";
+  const adminPassword = process.env.ADMIN_PASSWORD || "CAZ";
+  const adminName = process.env.ADMIN_NAME || "Admin";
+  const passwordHash = await hashPassword(adminPassword);
   const username = normalizeUsername(adminIdentity, "Admin username");
 
   await prisma.user.upsert({
     where: { email: username },
     update: {
-      name: process.env.ADMIN_NAME || "Primary Admin",
+      name: adminName,
       passwordHash,
       role: "ADMIN",
       active: true,
@@ -29,7 +25,7 @@ export async function ensureInitialAdmin() {
     },
     create: {
       email: username,
-      name: process.env.ADMIN_NAME || "Primary Admin",
+      name: adminName,
       passwordHash,
       role: "ADMIN",
       active: true,

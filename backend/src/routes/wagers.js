@@ -2,12 +2,10 @@ import { Router } from "express";
 
 import { prisma } from "../db.js";
 import { asyncHandler, createError } from "../http.js";
-import { authenticateToken, requireAdmin } from "../middleware/auth.js";
+import { authenticateToken, authenticateTokenOptional } from "../middleware/auth.js";
 import { normalizeOptionalString, requireMoney, requireString } from "../validators.js";
 
 const router = Router();
-
-router.use(authenticateToken);
 
 function defaultNightLabel(date = new Date()) {
   return `${new Intl.DateTimeFormat("en-AU", {
@@ -105,6 +103,7 @@ function assertFightWinner(fight, winnerName) {
 
 router.get(
   "/",
+  authenticateTokenOptional,
   asyncHandler(async (req, res) => {
     const activeNight = await getOrCreateActiveNight();
 
@@ -130,15 +129,18 @@ router.get(
       fights,
       totals: buildNightTotals(night?.wagers || []),
       viewer: {
-        isAdmin: req.user.role === "ADMIN"
+        isLoggedIn: Boolean(req.user),
+        canManage: Boolean(req.user),
+        canUseAdminPanel: Boolean(req.user?.role === "ADMIN" || req.user?.permissions?.includes("USERS"))
       }
     });
   })
 );
 
+router.use(authenticateToken);
+
 router.post(
   "/nights/start",
-  requireAdmin,
   asyncHandler(async (req, res) => {
     const label = req.body.label ? requireString(req.body.label, "Night label") : defaultNightLabel();
 
@@ -166,7 +168,6 @@ router.post(
 
 router.post(
   "/bets",
-  requireAdmin,
   asyncHandler(async (req, res) => {
     const activeNight = await getOrCreateActiveNight();
     const stake = requireMoney(req.body.stake, "Stake");
@@ -200,7 +201,6 @@ router.post(
 
 router.patch(
   "/bets/:id",
-  requireAdmin,
   asyncHandler(async (req, res) => {
     const existingBet = await prisma.wagerEntry.findUnique({
       where: { id: req.params.id },
@@ -257,7 +257,6 @@ router.patch(
 
 router.delete(
   "/bets/:id",
-  requireAdmin,
   asyncHandler(async (req, res) => {
     const existingBet = await prisma.wagerEntry.findUnique({
       where: { id: req.params.id }
@@ -277,7 +276,6 @@ router.delete(
 
 router.patch(
   "/fights/:id/resolve",
-  requireAdmin,
   asyncHandler(async (req, res) => {
     const existingFight = await prisma.fightCard.findUnique({
       where: { id: req.params.id }
@@ -335,7 +333,6 @@ router.patch(
 
 router.patch(
   "/bets/:id/settle",
-  requireAdmin,
   asyncHandler(async (req, res) => {
     const existingBet = await prisma.wagerEntry.findUnique({
       where: { id: req.params.id }

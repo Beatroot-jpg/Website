@@ -13,16 +13,684 @@
       } catch (_error) {}
     </script>
     <link rel="stylesheet" href="./assets/css/styles.css">
+    <script src="./assets/js/runtime-config.js"></script>
+    <script src="./assets/js/config.js"></script>
   </head>
-  <body class="placeholder-body">
-    <main class="placeholder-shell">
-      <a class="placeholder-home-link" href="./index.html">Back home</a>
-      <img class="placeholder-logo" src="./assets/images/Main Logo.png" alt="The Shites Fight Club logo">
-      <section class="placeholder-card">
-        <p class="section-kicker">Leaderboard</p>
-        <h1>Leaderboard page scaffolded.</h1>
-        <p>This tab exists now and is ready for us to build the live fighter rankings next.</p>
+  <body class="panel-body leaderboard-body">
+    <div class="panel-shell leaderboard-shell">
+      <header class="panel-topbar">
+        <div class="panel-title-block">
+          <a class="panel-home-link" href="./index.html">Back home</a>
+          <p class="section-kicker">Live Ladder</p>
+          <h1>Fight club leaderboard</h1>
+          <p class="panel-intro">Champion first. Contenders underneath. Points rise and fall with results, charisma, dominance, and time away from the pit.</p>
+        </div>
+
+        <div class="panel-topbar-actions">
+          <button class="topbar-button ghost" id="themeToggleButton" type="button" aria-pressed="false">Light mode</button>
+          <button class="topbar-button accent" id="sessionButton" type="button">Login</button>
+        </div>
+      </header>
+
+      <main class="panel-stack">
+        <section class="leaderboard-stage-card">
+          <div class="leaderboard-stage-header">
+            <div class="leaderboard-stage-copy">
+              <p class="section-kicker">Live Ladder</p>
+              <h2>Current ladder</h2>
+              <p class="helper-copy">Clean rank order, live points, and a clear read on who owns the belt and who is next in line.</p>
+            </div>
+
+            <div class="leaderboard-toolbar">
+              <label class="field-block leaderboard-search">
+                <span>Search fighters</span>
+                <input id="leaderboardSearchInput" type="search" placeholder="Search by fighter name">
+              </label>
+            </div>
+          </div>
+
+          <div class="leaderboard-hero-card">
+            <div class="champion-spotlight" id="championSpotlight"></div>
+            <div class="contender-rail" id="contenderRail"></div>
+          </div>
+
+          <div class="table-shell leaderboard-main-table-shell">
+            <div class="table-scroll">
+              <table class="data-table leaderboard-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Rank</th>
+                    <th scope="col">Fighter</th>
+                    <th scope="col">Score</th>
+                    <th scope="col">Record</th>
+                    <th scope="col">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="leaderboardTableBody"></tbody>
+              </table>
+            </div>
+
+            <div class="table-footer">
+              <p class="helper-copy" id="leaderboardTableMeta">Loading ladder...</p>
+              <div class="pagination-controls">
+                <button class="topbar-button ghost compact" id="previousLeaderboardPageButton" type="button">Previous</button>
+                <span class="pagination-label" id="leaderboardPageLabel">Page 1 of 1</span>
+                <button class="topbar-button ghost compact" id="nextLeaderboardPageButton" type="button">Next</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel-card">
+          <div class="panel-card-header">
+            <div>
+              <p class="section-kicker">Markers</p>
+              <h2>Stat leaders</h2>
+            </div>
+          </div>
+
+          <div class="leaderboard-rule-grid" id="leaderCardsGrid"></div>
+        </section>
+
+        <section class="panel-card">
+          <div class="panel-card-header">
+            <div>
+              <p class="section-kicker">Fight Card</p>
+              <h2>Upcoming bouts</h2>
+            </div>
+          </div>
+
+          <div class="table-shell">
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Matchup</th>
+                    <th scope="col">When</th>
+                    <th scope="col">Venue</th>
+                    <th scope="col">Notes</th>
+                    <th class="hidden" id="fightCardActionsHeader" scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="fightCardTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel-card">
+          <div class="panel-card-header">
+            <div>
+              <p class="section-kicker">Archive</p>
+              <h2>Hall of fame</h2>
+            </div>
+          </div>
+
+          <div class="table-shell">
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Fighter</th>
+                    <th scope="col">Title</th>
+                    <th scope="col">Points</th>
+                    <th scope="col">Won at</th>
+                    <th scope="col">Notes</th>
+                  </tr>
+                </thead>
+                <tbody id="hallOfFameTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <div class="leaderboard-utility-grid hidden" id="leaderboardUtilityGrid">
+          <section class="panel-card hidden" id="leaderboardScoringCard">
+            <div class="panel-card-header">
+              <div>
+                <p class="section-kicker">Scoring</p>
+                <h2>Points table</h2>
+              </div>
+            </div>
+
+            <div class="leaderboard-rule-grid" id="leaderboardRuleGrid"></div>
+          </section>
+
+          <section class="panel-card hidden" id="leaderboardScoreLogCard">
+            <div class="panel-card-header">
+              <div>
+                <p class="section-kicker">Audit</p>
+                <h2>Recent scoring</h2>
+              </div>
+            </div>
+
+            <div class="table-shell">
+              <div class="table-scroll">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Fighter</th>
+                      <th scope="col">Type</th>
+                      <th scope="col">Change</th>
+                      <th scope="col">Fight</th>
+                      <th scope="col">When</th>
+                    </tr>
+                  </thead>
+                  <tbody id="scoreLogTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel-card hidden" id="leaderboardAdminCard">
+            <div class="panel-card-header">
+              <div>
+                <p class="section-kicker">Admin</p>
+                <h2>Leaderboard forms</h2>
+              </div>
+            </div>
+
+            <div class="admin-action-grid">
+              <button class="admin-action-button" id="openCreateFighterButton" type="button">
+                <strong>Add fighter</strong>
+                <span>Create a new ladder entry and set whether they hold the belt.</span>
+              </button>
+
+              <button class="admin-action-button" id="openAwardPointsButton" type="button">
+                <strong>Manual scoring</strong>
+                <span>Use this for one-off corrections or special point changes outside a scheduled fight.</span>
+              </button>
+
+              <button class="admin-action-button" id="openEditFighterButton" type="button">
+                <strong>Edit fighter</strong>
+                <span>Adjust totals, champion status, activity, or notes through a focused form.</span>
+              </button>
+
+              <button class="admin-action-button" id="openScoringConfigButton" type="button">
+                <strong>Edit scoring</strong>
+                <span>Change the rules table used to calculate point awards and decay.</span>
+              </button>
+
+              <button class="admin-action-button" id="openHallOfFameButton" type="button">
+                <strong>Add hall of fame</strong>
+                <span>Record previous champions and title eras in the archive table.</span>
+              </button>
+
+              <button class="admin-action-button" id="openFightCardButton" type="button">
+                <strong>Schedule fight</strong>
+                <span>Add the next bout to the upcoming fight card table.</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div class="modal-shell hidden" id="loginModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeLoginBackdrop" type="button" aria-label="Close login"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Members Only</p>
+            <h2 id="loginTitle">Log in to continue</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeLoginButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="loginForm">
+          <label class="field-block">
+            <span>Username</span>
+            <input type="text" name="username" placeholder="admin" autocomplete="username" required>
+          </label>
+
+          <label class="field-block">
+            <span>Password</span>
+            <input type="password" name="password" placeholder="********" autocomplete="current-password" required>
+          </label>
+
+          <button class="topbar-button accent wide" id="loginSubmitButton" type="submit">Enter</button>
+          <p class="form-message hidden" id="loginError"></p>
+          <p class="helper-copy" id="loginHint">Logged-in users can run the leaderboard forms.</p>
+        </form>
       </section>
-    </main>
+    </div>
+
+    <div class="modal-shell hidden" id="fighterFormModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeFighterBackdrop" type="button" aria-label="Close fighter form"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fighterFormTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker" id="fighterFormKicker">Fighter</p>
+            <h2 id="fighterFormTitle">Manage fighter</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeFighterButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="fighterForm">
+          <div class="hidden" id="fighterSelectBlock">
+            <label class="field-block">
+              <span>Select fighter</span>
+              <select class="styled-select" name="id" id="fighterSelect"></select>
+            </label>
+          </div>
+
+          <label class="field-block">
+            <span>Name</span>
+            <input type="text" name="name" required>
+          </label>
+
+          <label class="field-block">
+            <span>Total points</span>
+            <input type="number" name="points" required>
+          </label>
+
+          <div class="stack-form hidden" id="fighterAdvancedFields">
+            <div class="dual-field-grid">
+              <label class="field-block">
+                <span>Wins</span>
+                <input type="number" name="wins" min="0" required>
+              </label>
+
+              <label class="field-block">
+                <span>Losses</span>
+                <input type="number" name="losses" min="0" required>
+              </label>
+            </div>
+
+            <div class="dual-field-grid">
+              <label class="field-block">
+                <span>Charisma points</span>
+                <input type="number" name="charismaPoints" min="0" required>
+              </label>
+
+              <label class="field-block">
+                <span>Dominance points</span>
+                <input type="number" name="dominancePoints" min="0" required>
+              </label>
+            </div>
+
+            <label class="field-block">
+              <span>Last fight date</span>
+              <input type="datetime-local" name="lastFightAt">
+            </label>
+          </div>
+
+          <label class="checkbox-field">
+            <input type="checkbox" name="isChampion">
+            <span>Current belt holder</span>
+          </label>
+
+          <label class="checkbox-field">
+            <input type="checkbox" name="active" checked>
+            <span>Show on the live ladder</span>
+          </label>
+
+          <label class="field-block">
+            <span>Notes</span>
+            <input type="text" name="notes" placeholder="Optional notes">
+          </label>
+
+          <div class="modal-action-row">
+            <button class="topbar-button accent wide" id="fighterFormSubmitButton" type="submit">Save fighter</button>
+            <button class="topbar-button danger hidden" id="openDeleteFighterButton" type="button">Delete fighter</button>
+          </div>
+          <p class="form-message hidden" id="fighterFormMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="deleteFighterModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeDeleteFighterBackdrop" type="button" aria-label="Close delete fighter confirmation"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="deleteFighterTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Remove Fighter</p>
+            <h2 id="deleteFighterTitle">Delete ladder entry</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeDeleteFighterButton" type="button">Close</button>
+        </div>
+
+        <div class="delete-confirm-copy">
+          <p>This permanently removes the fighter from the live ladder and clears their recorded score history.</p>
+          <strong id="deleteFighterName">Selected fighter</strong>
+        </div>
+
+        <div class="delete-confirm-actions">
+          <button class="topbar-button ghost" id="cancelDeleteFighterButton" type="button">Cancel</button>
+          <button class="topbar-button danger" id="confirmDeleteFighterButton" type="button">Delete fighter</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="awardPointsModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeAwardBackdrop" type="button" aria-label="Close award points form"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="awardPointsTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Award Points</p>
+            <h2 id="awardPointsTitle">Record scoring</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeAwardButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="awardPointsForm">
+          <p class="helper-copy">Use this form for manual changes. Scheduled fights can be scored directly from the fight card.</p>
+
+          <label class="field-block">
+            <span>Fighter</span>
+            <select class="styled-select" name="fighterId" id="awardFighterSelect"></select>
+          </label>
+
+          <label class="field-block">
+            <span>Entry type</span>
+            <select class="styled-select" name="entryType" id="awardEntryTypeSelect">
+              <option value="BOUT">Bout result</option>
+              <option value="CORRECTION">Correction</option>
+            </select>
+          </label>
+
+          <div id="boutFields">
+            <label class="field-block">
+              <span>Result</span>
+              <select class="styled-select" name="result" id="awardResultSelect">
+                <option value="WIN">Win</option>
+                <option value="LOSS">Loss</option>
+              </select>
+            </label>
+
+            <div class="dual-field-grid">
+              <label class="field-block">
+                <span>Charisma points</span>
+                <input type="number" name="charismaPoints" min="0" required>
+              </label>
+
+              <label class="field-block">
+                <span>Dominance points</span>
+                <input type="number" name="dominancePoints" min="0" required>
+              </label>
+            </div>
+
+            <label class="checkbox-field">
+              <input type="checkbox" name="applyTitleWinBonus">
+              <span>Apply title win bonus</span>
+            </label>
+
+            <label class="checkbox-field">
+              <input type="checkbox" name="applyFinishBonus">
+              <span>Apply finish bonus</span>
+            </label>
+          </div>
+
+          <div class="hidden" id="correctionFields">
+            <label class="field-block">
+              <span>Correction points</span>
+              <input type="number" name="correctionPoints" value="0">
+            </label>
+          </div>
+
+          <label class="field-block">
+            <span>Linked fight card</span>
+            <select class="styled-select" name="fightId" id="awardFightSelect">
+              <option value="">No linked fight</option>
+            </select>
+          </label>
+
+          <label class="field-block">
+            <span>Awarded at</span>
+            <input type="datetime-local" name="awardedAt">
+          </label>
+
+          <label class="field-block">
+            <span>Note</span>
+            <input type="text" name="note" placeholder="Optional note">
+          </label>
+
+          <button class="topbar-button accent wide" id="awardPointsSubmitButton" type="submit">Submit points</button>
+          <p class="form-message hidden" id="awardPointsMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="scoringConfigModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeScoringBackdrop" type="button" aria-label="Close scoring config"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="scoringConfigTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Scoring Table</p>
+            <h2 id="scoringConfigTitle">Update scoring</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeScoringButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="scoringConfigForm">
+          <div class="dual-field-grid">
+            <label class="field-block">
+              <span>Starting points</span>
+              <input type="number" name="startingPoints" min="0" required>
+            </label>
+
+            <label class="field-block">
+              <span>Win points</span>
+              <input type="number" name="winPoints" required>
+            </label>
+          </div>
+
+          <div class="dual-field-grid">
+            <label class="field-block">
+              <span>Loss points</span>
+              <input type="number" name="lossPoints" required>
+            </label>
+
+            <label class="field-block">
+              <span>Charisma max</span>
+              <input type="number" name="charismaMax" min="0" required>
+            </label>
+          </div>
+
+          <div class="dual-field-grid">
+            <label class="field-block">
+              <span>Dominance max</span>
+              <input type="number" name="dominanceMax" min="0" required>
+            </label>
+
+            <label class="field-block">
+              <span>Title win bonus</span>
+              <input type="number" name="titleWinBonus" min="0" required>
+            </label>
+          </div>
+
+          <div class="dual-field-grid">
+            <label class="field-block">
+              <span>Finish bonus</span>
+              <input type="number" name="finishBonus" min="0" required>
+            </label>
+
+            <label class="field-block">
+              <span>Grace days</span>
+              <input type="number" name="inactivityGraceDays" min="0" required>
+            </label>
+          </div>
+
+          <div class="dual-field-grid">
+            <label class="field-block">
+              <span>Weekly decay</span>
+              <input type="number" name="inactivityWeeklyPenalty" min="0" required>
+            </label>
+
+            <label class="field-block">
+              <span>Elimination days</span>
+              <input type="number" name="eliminationDays" min="1" required>
+            </label>
+          </div>
+
+          <button class="topbar-button accent wide" id="scoringConfigSubmitButton" type="submit">Save scoring</button>
+          <p class="form-message hidden" id="scoringConfigMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="hallOfFameModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeHallOfFameBackdrop" type="button" aria-label="Close hall of fame form"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="hallOfFameTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Hall of Fame</p>
+            <h2 id="hallOfFameTitle">Add archive entry</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeHallOfFameButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="hallOfFameForm">
+          <label class="field-block">
+            <span>Fighter</span>
+            <input type="text" name="fighterName" required>
+          </label>
+
+          <label class="field-block">
+            <span>Title</span>
+            <input type="text" name="title" value="Champion" required>
+          </label>
+
+          <label class="field-block">
+            <span>Points at title</span>
+            <input type="number" name="pointsAtTitle">
+          </label>
+
+          <label class="field-block">
+            <span>Won at</span>
+            <input type="datetime-local" name="wonAt">
+          </label>
+
+          <label class="field-block">
+            <span>Notes</span>
+            <input type="text" name="notes" placeholder="Optional note">
+          </label>
+
+          <button class="topbar-button accent wide" id="hallOfFameSubmitButton" type="submit">Add entry</button>
+          <p class="form-message hidden" id="hallOfFameMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="fightCardModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeFightCardBackdrop" type="button" aria-label="Close fight card form"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fightCardTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Fight Card</p>
+            <h2 id="fightCardTitle">Schedule bout</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeFightCardButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="fightCardForm">
+          <label class="field-block">
+            <span>Red corner fighter</span>
+            <select class="styled-select" name="fighterRedName" id="fightCardRedSelect" required></select>
+          </label>
+
+          <label class="field-block">
+            <span>Blue corner fighter</span>
+            <select class="styled-select" name="fighterBlueName" id="fightCardBlueSelect" required></select>
+          </label>
+
+          <label class="field-block">
+            <span>Fight time</span>
+            <input type="datetime-local" name="scheduledAt" required>
+          </label>
+
+          <label class="field-block">
+            <span>Venue</span>
+            <input type="text" name="venue" placeholder="Optional venue">
+          </label>
+
+          <label class="field-block">
+            <span>Notes</span>
+            <input type="text" name="notes" placeholder="Optional note">
+          </label>
+
+          <button class="topbar-button accent wide" id="fightCardSubmitButton" type="submit">Schedule fight</button>
+          <p class="form-message hidden" id="fightCardMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="scoreFightModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeScoreFightBackdrop" type="button" aria-label="Close fight scoring form"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="scoreFightTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Score Fight</p>
+            <h2 id="scoreFightTitle">Record bout result</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeScoreFightButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="scoreFightForm">
+          <div class="panel-lock">
+            <strong id="scoreFightMatchup">Selected fight</strong>
+            <p>Score both fighters in one pass. This updates the ladder and closes the fight card entry.</p>
+          </div>
+
+          <label class="field-block">
+            <span>Winner</span>
+            <select class="styled-select" name="winnerCorner" id="scoreFightWinnerSelect" required>
+              <option value="RED">Red corner</option>
+              <option value="BLUE">Blue corner</option>
+            </select>
+          </label>
+
+          <div class="dual-field-grid">
+            <label class="field-block">
+              <span>Red charisma</span>
+              <input type="number" name="redCharismaPoints" min="0" value="0" required>
+            </label>
+
+            <label class="field-block">
+              <span>Red dominance</span>
+              <input type="number" name="redDominancePoints" min="0" value="0" required>
+            </label>
+          </div>
+
+          <div class="dual-field-grid">
+            <label class="field-block">
+              <span>Blue charisma</span>
+              <input type="number" name="blueCharismaPoints" min="0" value="0" required>
+            </label>
+
+            <label class="field-block">
+              <span>Blue dominance</span>
+              <input type="number" name="blueDominancePoints" min="0" value="0" required>
+            </label>
+          </div>
+
+          <label class="checkbox-field">
+            <input type="checkbox" name="applyTitleWinBonus">
+            <span>Apply title win bonus to the winner</span>
+          </label>
+
+          <label class="checkbox-field">
+            <input type="checkbox" name="applyFinishBonus">
+            <span>Apply finish bonus to the winner</span>
+          </label>
+
+          <label class="field-block">
+            <span>Awarded at</span>
+            <input type="datetime-local" name="awardedAt">
+          </label>
+
+          <label class="field-block">
+            <span>Note</span>
+            <input type="text" name="note" placeholder="Optional note">
+          </label>
+
+          <button class="topbar-button accent wide" id="scoreFightSubmitButton" type="submit">Score fight</button>
+          <p class="form-message hidden" id="scoreFightMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="toast-stack" id="toastStack"></div>
+    <script type="module" src="./assets/js/leaderboard.js?v=20260615b"></script>
   </body>
 </html>

@@ -2,6 +2,7 @@ import { api } from "./api.js";
 import { clearSession, getSession, saveSession } from "./session.js";
 import { initThemeToggle } from "./theme.js";
 
+const FLASH_MESSAGE_KEY = "the-shites-flash-message";
 const themeToggleButton = document.querySelector("#themeToggleButton");
 const loginButton = document.querySelector("#loginButton");
 const loginModal = document.querySelector("#loginModal");
@@ -11,6 +12,11 @@ const loginForm = document.querySelector("#loginForm");
 const loginError = document.querySelector("#loginError");
 const loginHint = document.querySelector("#loginHint");
 const loginSubmitButton = document.querySelector("#loginSubmitButton");
+const adminLauncherCard = document.querySelector("#adminLauncherCard");
+const adminLauncherState = document.querySelector("#adminLauncherState");
+const scrollCue = document.querySelector("#scrollCue");
+const launcherStage = document.querySelector(".launcher-stage");
+const compactViewportQuery = window.matchMedia("(max-width: 980px), (max-height: 760px)");
 
 function showToast(message, tone = "success") {
   const stack = document.querySelector("#toastStack");
@@ -27,6 +33,21 @@ function showToast(message, tone = "success") {
   window.setTimeout(() => {
     toast.remove();
   }, 3200);
+}
+
+function consumeFlashMessage() {
+  try {
+    const message = window.sessionStorage.getItem(FLASH_MESSAGE_KEY);
+
+    if (!message) {
+      return "";
+    }
+
+    window.sessionStorage.removeItem(FLASH_MESSAGE_KEY);
+    return message;
+  } catch (_error) {
+    return "";
+  }
 }
 
 function setFormMessage(message = "") {
@@ -70,17 +91,58 @@ function syncLoginButton() {
   }
 }
 
+function syncAdminLauncher() {
+  const session = getSession();
+  const isLoggedIn = Boolean(session?.token);
+
+  if (!adminLauncherCard || !adminLauncherState) {
+    return;
+  }
+
+  if (isLoggedIn) {
+    adminLauncherCard.classList.remove("is-locked");
+    adminLauncherCard.setAttribute("href", "./admin.html");
+    adminLauncherCard.removeAttribute("aria-disabled");
+    adminLauncherCard.tabIndex = 0;
+    adminLauncherState.textContent = "Access available";
+    return;
+  }
+
+  adminLauncherCard.classList.add("is-locked");
+  adminLauncherCard.removeAttribute("href");
+  adminLauncherCard.setAttribute("aria-disabled", "true");
+  adminLauncherCard.tabIndex = -1;
+  adminLauncherState.textContent = "Login required";
+}
+
+function syncScrollCue() {
+  document.body.classList.toggle("has-scrolled", window.scrollY > 24);
+}
+
+function syncViewportMode() {
+  document.body.classList.toggle("compact-viewport", compactViewportQuery.matches);
+}
+
 loginButton?.addEventListener("click", () => {
   if (loginButton.dataset.state === "session") {
     if (window.confirm("Log out of the current session?")) {
       clearSession();
       syncLoginButton();
+      syncAdminLauncher();
       showToast("Logged out.", "success");
     }
     return;
   }
 
   openLoginModal();
+});
+
+adminLauncherCard?.addEventListener("click", (event) => {
+  if (adminLauncherCard.classList.contains("is-locked")) {
+    event.preventDefault();
+    showToast("Login required to access Admin.", "info");
+    openLoginModal();
+  }
 });
 
 closeLoginButton?.addEventListener("click", closeLoginModal);
@@ -107,6 +169,7 @@ loginForm?.addEventListener("submit", async (event) => {
 
     saveSession(session);
     syncLoginButton();
+    syncAdminLauncher();
     closeLoginModal();
     loginForm.reset();
     showToast("Logged in successfully.", "success");
@@ -118,8 +181,27 @@ loginForm?.addEventListener("submit", async (event) => {
   }
 });
 
+scrollCue?.addEventListener("click", () => {
+  launcherStage?.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+});
+
 initThemeToggle(themeToggleButton);
 syncLoginButton();
+syncAdminLauncher();
+syncScrollCue();
+syncViewportMode();
+window.addEventListener("scroll", syncScrollCue, { passive: true });
+compactViewportQuery.addEventListener("change", syncViewportMode);
 window.requestAnimationFrame(() => {
   document.body.classList.remove("is-loading");
 });
+
+const flashMessage = consumeFlashMessage();
+
+if (flashMessage === "admin-login-required") {
+  showToast("Login required to access Admin.", "info");
+  openLoginModal();
+}

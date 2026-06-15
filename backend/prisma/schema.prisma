@@ -134,6 +134,16 @@ enum WagerEntryStatus {
   VOIDED
 }
 
+enum FightScoreEntryType {
+  BOUT
+  CORRECTION
+}
+
+enum FightScoreResult {
+  WIN
+  LOSS
+}
+
 model User {
   id                     String            @id @default(cuid())
   email                  String            @unique
@@ -557,15 +567,62 @@ model TaxPeriod {
 }
 
 model FightFighter {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  points    Int      @default(20)
-  active    Boolean  @default(true)
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String            @id @default(cuid())
+  name            String            @unique
+  points          Int               @default(20)
+  wins            Int               @default(0)
+  losses          Int               @default(0)
+  charismaPoints  Int               @default(0)
+  dominancePoints Int               @default(0)
+  isChampion      Boolean           @default(false)
+  active          Boolean           @default(true)
+  notes           String?
+  lastFightAt     DateTime?
+  lastAwardedAt   DateTime?
+  scoreEntries    FightScoreEntry[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@index([active, points])
+}
+
+model FightScoringConfig {
+  id                     String   @id @default(cuid())
+  slug                   String   @unique @default("default")
+  startingPoints         Int      @default(20)
+  winPoints              Int      @default(10)
+  lossPoints             Int      @default(-6)
+  charismaMax            Int      @default(5)
+  dominanceMax           Int      @default(5)
+  titleWinBonus          Int      @default(2)
+  finishBonus            Int      @default(2)
+  inactivityGraceDays    Int      @default(14)
+  inactivityWeeklyPenalty Int     @default(2)
+  eliminationDays        Int      @default(56)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model FightScoreEntry {
+  id              String             @id @default(cuid())
+  fighterId       String
+  fightId         String?
+  entryType       FightScoreEntryType @default(BOUT)
+  result          FightScoreResult?
+  resultPoints    Int                @default(0)
+  charismaPoints  Int                @default(0)
+  dominancePoints Int                @default(0)
+  bonusPoints     Int                @default(0)
+  totalDelta      Int
+  note            String?
+  awardedAt       DateTime           @default(now())
+  fighter         FightFighter       @relation(fields: [fighterId], references: [id], onDelete: Cascade)
+  fight           FightCard?         @relation(fields: [fightId], references: [id], onDelete: SetNull)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([fighterId, awardedAt])
+  @@index([fightId])
 }
 
 model FightHallOfFameEntry {
@@ -582,17 +639,18 @@ model FightHallOfFameEntry {
 }
 
 model FightCard {
-  id             String         @id @default(cuid())
-  fighterRedName String
+  id              String            @id @default(cuid())
+  fighterRedName  String
   fighterBlueName String
-  scheduledAt    DateTime
-  venue          String?
-  notes          String?
-  status         FightCardStatus @default(UPCOMING)
-  winnerName     String?
-  wagers         WagerEntry[]
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  scheduledAt     DateTime
+  venue           String?
+  notes           String?
+  status          FightCardStatus   @default(UPCOMING)
+  winnerName      String?
+  wagers          WagerEntry[]
+  scoreEntries    FightScoreEntry[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@index([status, scheduledAt])
 }

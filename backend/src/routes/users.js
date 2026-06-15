@@ -2,7 +2,7 @@ import { Router } from "express";
 
 import { prisma } from "../db.js";
 import { asyncHandler, createError } from "../http.js";
-import { authenticateToken, requireAdmin } from "../middleware/auth.js";
+import { authenticateToken, requirePermission } from "../middleware/auth.js";
 import { hashPassword, serializeUser } from "../services/auth.js";
 import {
   normalizeUsername,
@@ -13,7 +13,7 @@ import {
 
 const router = Router();
 
-router.use(authenticateToken, requireAdmin);
+router.use(authenticateToken, requirePermission("USERS"));
 
 router.get(
   "/",
@@ -36,7 +36,7 @@ router.post(
     const username = normalizeUsername(req.body.username ?? req.body.email);
     const password = requireString(req.body.password, "Password");
     const name = requireString(req.body.name, "Name");
-    const role = req.body.role === "ADMIN" ? "ADMIN" : "USER";
+    const role = "USER";
     const permissions = normalizePermissions(req.body.permissions, role);
 
     const existingUser = await prisma.user.findUnique({ where: { email: username } });
@@ -117,11 +117,7 @@ router.patch(
       throw createError(404, "User not found.");
     }
 
-    const nextRole = req.body.role === "ADMIN"
-      ? "ADMIN"
-      : req.body.role === "USER"
-        ? "USER"
-        : existingUser.role;
+    const nextRole = existingUser.role;
     const permissions = normalizePermissions(
       req.body.permissions ?? existingUser.permissions.map((permission) => permission.key),
       nextRole

@@ -13,16 +13,236 @@
       } catch (_error) {}
     </script>
     <link rel="stylesheet" href="./assets/css/styles.css">
+    <script src="./assets/js/runtime-config.js"></script>
+    <script src="./assets/js/config.js"></script>
   </head>
-  <body class="placeholder-body">
-    <main class="placeholder-shell">
-      <a class="placeholder-home-link" href="./index.html">Back home</a>
-      <img class="placeholder-logo" src="./assets/images/Main Logo.png" alt="The Shites Fight Club logo">
-      <section class="placeholder-card">
-        <p class="section-kicker">Admin</p>
-        <h1>Admin page scaffolded.</h1>
-        <p>This tab exists now and is ready for us to build permissions, management tools, and the club back office next.</p>
+  <body class="panel-body">
+    <div class="panel-shell">
+      <header class="panel-topbar">
+        <div class="panel-title-block">
+          <a class="panel-home-link" href="./index.html">Back home</a>
+          <p class="section-kicker">Admin Panel</p>
+          <h1>User control and access</h1>
+          <p class="panel-intro">Run user access from a clean control panel without cluttering the page with open forms.</p>
+        </div>
+
+        <div class="panel-topbar-actions">
+          <button class="topbar-button ghost" id="themeToggleButton" type="button" aria-pressed="false">Light mode</button>
+          <button class="topbar-button accent" id="sessionButton" type="button">Login</button>
+        </div>
+      </header>
+
+      <main class="panel-stack">
+        <section class="panel-card">
+          <div class="panel-card-header">
+            <div>
+              <p class="section-kicker">Access</p>
+              <h2>Current session</h2>
+            </div>
+          </div>
+
+          <div class="status-grid" id="accessSummary"></div>
+        </section>
+
+        <section class="panel-card">
+          <div class="panel-card-header">
+            <div>
+              <p class="section-kicker">Functions</p>
+              <h2>Admin actions</h2>
+            </div>
+          </div>
+
+          <div class="panel-lock hidden" id="actionPanelLock"></div>
+
+          <div class="admin-action-grid" id="adminActionGrid">
+            <button class="admin-action-button" id="openCreateUserButton" type="button">
+              <strong>Add new login</strong>
+              <span>Open a focused form to create a new user account.</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="panel-card">
+          <div class="panel-card-header">
+            <div>
+              <p class="section-kicker">Users</p>
+              <h2>Existing accounts</h2>
+            </div>
+
+            <button class="topbar-button ghost compact" id="refreshUsersButton" type="button">Refresh</button>
+          </div>
+
+          <div class="panel-lock hidden" id="userTableLock"></div>
+
+          <div class="table-shell" id="userTableShell">
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Username</th>
+                    <th scope="col">Access</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Updated</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="userTableBody"></tbody>
+              </table>
+            </div>
+
+            <div class="table-footer">
+              <p class="helper-copy" id="userTableMeta">Loading users...</p>
+              <div class="pagination-controls">
+                <button class="topbar-button ghost compact" id="previousUsersPageButton" type="button">Previous</button>
+                <span class="pagination-label" id="usersPageLabel">Page 1 of 1</span>
+                <button class="topbar-button ghost compact" id="nextUsersPageButton" type="button">Next</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-shell hidden" id="loginModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeLoginBackdrop" type="button" aria-label="Close login"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Members Only</p>
+            <h2 id="loginTitle">Log in to continue</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeLoginButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="loginForm">
+          <label class="field-block">
+            <span>Username</span>
+            <input type="text" name="username" placeholder="admin" autocomplete="username" required>
+          </label>
+
+          <label class="field-block">
+            <span>Password</span>
+            <input type="password" name="password" placeholder="********" autocomplete="current-password" required>
+          </label>
+
+          <button class="topbar-button accent wide" id="loginSubmitButton" type="submit">Enter</button>
+          <p class="form-message hidden" id="loginError"></p>
+          <p class="helper-copy" id="loginHint">Only accounts with admin-panel access can run the user-management functions.</p>
+        </form>
       </section>
-    </main>
+    </div>
+
+    <div class="modal-shell hidden" id="createUserModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeCreateBackdrop" type="button" aria-label="Close create user"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="createUserTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Create User</p>
+            <h2 id="createUserTitle">Add a new login</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeCreateButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="createUserForm">
+          <label class="field-block">
+            <span>Name</span>
+            <input type="text" name="name" placeholder="Fight night operator" required>
+          </label>
+
+          <label class="field-block">
+            <span>Username</span>
+            <input type="text" name="username" placeholder="operator" autocomplete="off" required>
+          </label>
+
+          <label class="field-block">
+            <span>Password</span>
+            <input type="text" name="password" placeholder="Set a password" required>
+          </label>
+
+          <label class="checkbox-field">
+            <input type="checkbox" name="adminPanelAccess">
+            <span>Give this account admin-panel access</span>
+          </label>
+
+          <button class="topbar-button accent wide" id="createUserSubmitButton" type="submit">Create user</button>
+          <p class="form-message hidden" id="createUserMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="editUserModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeEditBackdrop" type="button" aria-label="Close edit user"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="editUserTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Edit User</p>
+            <h2 id="editUserTitle">Update account</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeEditButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="editUserForm">
+          <input type="hidden" name="id">
+
+          <label class="field-block">
+            <span>Name</span>
+            <input type="text" name="name" required>
+          </label>
+
+          <label class="field-block">
+            <span>Username</span>
+            <input type="text" name="username" autocomplete="off" required>
+          </label>
+
+          <label class="field-block">
+            <span>New password</span>
+            <input type="text" name="password" placeholder="Leave blank to keep current">
+          </label>
+
+          <label class="checkbox-field">
+            <input type="checkbox" name="active">
+            <span>Account is active</span>
+          </label>
+
+          <label class="checkbox-field">
+            <input type="checkbox" name="adminPanelAccess">
+            <span>Can use admin-panel tools</span>
+          </label>
+
+          <p class="helper-copy hidden" id="editUserRoleNote">This bootstrap account always keeps admin-panel access.</p>
+          <p class="helper-copy hidden" id="editCurrentUserNote">You are editing the account currently in use.</p>
+
+          <button class="topbar-button accent wide" id="editUserSubmitButton" type="submit">Save changes</button>
+          <p class="form-message hidden" id="editUserMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="deleteUserModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeDeleteBackdrop" type="button" aria-label="Close delete user"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="deleteUserTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Delete User</p>
+            <h2 id="deleteUserTitle">Are you sure?</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeDeleteButton" type="button">Close</button>
+        </div>
+
+        <div class="delete-confirm-copy">
+          <p>This will remove the selected login from the system.</p>
+          <strong id="deleteUserName">User</strong>
+        </div>
+
+        <div class="delete-confirm-actions">
+          <button class="topbar-button ghost" id="cancelDeleteUserButton" type="button">Cancel</button>
+          <button class="topbar-button danger" id="confirmDeleteUserButton" type="button">Delete user</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast-stack" id="toastStack"></div>
+    <script type="module" src="./assets/js/admin.js"></script>
   </body>
 </html>
