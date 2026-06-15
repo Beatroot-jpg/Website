@@ -40,6 +40,7 @@ export function serializeUser(user) {
     email: user.email,
     name: user.name,
     role: user.role,
+    owner: Boolean(user.owner),
     active: user.active,
     permissions: getEffectivePermissions(user),
     createdAt: user.createdAt,
@@ -52,6 +53,7 @@ export function signUserToken(user) {
     {
       sub: user.id,
       role: user.role,
+      owner: Boolean(user.owner),
       permissions: getEffectivePermissions(user)
     },
     getJwtSecret(),

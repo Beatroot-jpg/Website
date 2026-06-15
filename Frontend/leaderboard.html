@@ -156,32 +156,6 @@
             <div class="leaderboard-rule-grid" id="leaderboardRuleGrid"></div>
           </section>
 
-          <section class="panel-card hidden" id="leaderboardScoreLogCard">
-            <div class="panel-card-header">
-              <div>
-                <p class="section-kicker">Audit</p>
-                <h2>Recent scoring</h2>
-              </div>
-            </div>
-
-            <div class="table-shell">
-              <div class="table-scroll">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Fighter</th>
-                      <th scope="col">Type</th>
-                      <th scope="col">Change</th>
-                      <th scope="col">Fight</th>
-                      <th scope="col">When</th>
-                    </tr>
-                  </thead>
-                  <tbody id="scoreLogTableBody"></tbody>
-                </table>
-              </div>
-            </div>
-          </section>
-
           <section class="panel-card hidden" id="leaderboardAdminCard">
             <div class="panel-card-header">
               <div>
@@ -190,7 +164,15 @@
               </div>
             </div>
 
+            <div class="panel-lock" id="leaderboardSecurityStatus"></div>
+            <p class="helper-copy hidden" id="leaderboardSecurityOwnerNote">Only the owner account can lock or unlock leaderboard writes.</p>
+
             <div class="admin-action-grid">
+              <button class="admin-action-button" id="openSecurityLockButton" type="button">
+                <strong>Security lock</strong>
+                <span>Owner only. Freeze leaderboard writes while you preserve or review a fight night.</span>
+              </button>
+
               <button class="admin-action-button" id="openCreateFighterButton" type="button">
                 <strong>Add fighter</strong>
                 <span>Create a new ladder entry and drop them straight onto the contender board.</span>
@@ -225,6 +207,66 @@
                 <strong>Schedule fight</strong>
                 <span>Add the next bout to the upcoming fight card table.</span>
               </button>
+            </div>
+
+            <div class="panel-card-divider"></div>
+
+            <div class="panel-card-header">
+              <div>
+                <p class="section-kicker">Archive</p>
+                <h2>Archived fighters</h2>
+              </div>
+            </div>
+
+            <div class="table-shell">
+              <div class="table-scroll">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Fighter</th>
+                      <th scope="col">Score</th>
+                      <th scope="col">Record</th>
+                      <th scope="col">Archived</th>
+                      <th scope="col">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="archivedFightersTableBody"></tbody>
+                </table>
+              </div>
+
+              <div class="table-footer">
+                <p class="helper-copy" id="archivedFightersTableMeta">No archived fighters.</p>
+                <div class="pagination-controls">
+                  <button class="topbar-button ghost compact" id="previousArchivedFightersPageButton" type="button">Previous</button>
+                  <span class="pagination-label" id="archivedFightersPageLabel">Page 1 of 1</span>
+                  <button class="topbar-button ghost compact" id="nextArchivedFightersPageButton" type="button">Next</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel-card hidden" id="leaderboardScoreLogCard">
+            <div class="panel-card-header">
+              <div>
+                <p class="section-kicker">Audit</p>
+                <h2>Immutable activity log</h2>
+              </div>
+            </div>
+
+            <div class="table-shell">
+              <div class="table-scroll">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Action</th>
+                      <th scope="col">Details</th>
+                      <th scope="col">By</th>
+                      <th scope="col">When</th>
+                    </tr>
+                  </thead>
+                  <tbody id="scoreLogTableBody"></tbody>
+                </table>
+              </div>
             </div>
           </section>
         </div>
@@ -332,7 +374,7 @@
 
           <div class="modal-action-row">
             <button class="topbar-button accent wide" id="fighterFormSubmitButton" type="submit">Save fighter</button>
-            <button class="topbar-button danger hidden" id="openDeleteFighterButton" type="button">Delete fighter</button>
+            <button class="topbar-button danger hidden" id="openDeleteFighterButton" type="button">Archive fighter</button>
           </div>
           <p class="form-message hidden" id="fighterFormMessage"></p>
         </form>
@@ -344,20 +386,20 @@
       <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="deleteFighterTitle">
         <div class="modal-header">
           <div>
-            <p class="section-kicker">Remove Fighter</p>
-            <h2 id="deleteFighterTitle">Delete ladder entry</h2>
+            <p class="section-kicker">Archive Fighter</p>
+            <h2 id="deleteFighterTitle">Archive ladder entry</h2>
           </div>
           <button class="topbar-button ghost compact" id="closeDeleteFighterButton" type="button">Close</button>
         </div>
 
         <div class="delete-confirm-copy">
-          <p>This permanently removes the fighter from the live ladder and clears their recorded score history.</p>
+          <p>This removes the fighter from the live ladder and places them into the archived-fighters table so they can be restored later.</p>
           <strong id="deleteFighterName">Selected fighter</strong>
         </div>
 
         <div class="delete-confirm-actions">
           <button class="topbar-button ghost" id="cancelDeleteFighterButton" type="button">Cancel</button>
-          <button class="topbar-button danger" id="confirmDeleteFighterButton" type="button">Delete fighter</button>
+          <button class="topbar-button danger" id="confirmDeleteFighterButton" type="button">Archive fighter</button>
         </div>
       </section>
     </div>
@@ -413,11 +455,6 @@
             <label class="checkbox-field">
               <input type="checkbox" name="applyTitleWinBonus">
               <span>Apply title win bonus</span>
-            </label>
-
-            <label class="checkbox-field">
-              <input type="checkbox" name="applyFinishBonus">
-              <span>Apply finish bonus</span>
             </label>
           </div>
 
@@ -483,6 +520,36 @@
       </section>
     </div>
 
+    <div class="modal-shell hidden" id="securityLockModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeSecurityLockBackdrop" type="button" aria-label="Close security lock form"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="securityLockTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Security</p>
+            <h2 id="securityLockTitle">Leaderboard lock</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeSecurityLockButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="securityLockForm">
+          <p class="helper-copy">When this lock is on, only the owner account can change leaderboard data. Everyone else can still view the page.</p>
+
+          <label class="checkbox-field">
+            <input type="checkbox" name="writesLocked" id="securityWritesLockedInput">
+            <span>Freeze leaderboard writes</span>
+          </label>
+
+          <label class="field-block">
+            <span>Reason</span>
+            <input type="text" name="lockReason" id="securityLockReasonInput" placeholder="Optional reason for the lock">
+          </label>
+
+          <button class="topbar-button accent wide" id="securityLockSubmitButton" type="submit">Save security lock</button>
+          <p class="form-message hidden" id="securityLockMessage"></p>
+        </form>
+      </section>
+    </div>
+
     <div class="modal-shell hidden" id="scoringConfigModal" aria-hidden="true">
       <button class="modal-backdrop" id="closeScoringBackdrop" type="button" aria-label="Close scoring config"></button>
       <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="scoringConfigTitle">
@@ -533,22 +600,17 @@
 
           <div class="dual-field-grid">
             <label class="field-block">
-              <span>Finish bonus</span>
-              <input type="number" name="finishBonus" min="0" required>
-            </label>
-
-            <label class="field-block">
               <span>Grace days</span>
               <input type="number" name="inactivityGraceDays" min="0" required>
             </label>
-          </div>
 
-          <div class="dual-field-grid">
             <label class="field-block">
               <span>Weekly decay</span>
               <input type="number" name="inactivityWeeklyPenalty" min="0" required>
             </label>
+          </div>
 
+          <div class="dual-field-grid">
             <label class="field-block">
               <span>Elimination days</span>
               <input type="number" name="eliminationDays" min="1" required>
@@ -701,11 +763,6 @@
             <span>Apply title win bonus to the winner</span>
           </label>
 
-          <label class="checkbox-field">
-            <input type="checkbox" name="applyFinishBonus">
-            <span>Apply finish bonus to the winner</span>
-          </label>
-
           <label class="field-block">
             <span>Awarded at</span>
             <input type="datetime-local" name="awardedAt">
@@ -723,6 +780,6 @@
     </div>
 
     <div class="toast-stack" id="toastStack"></div>
-    <script type="module" src="./assets/js/leaderboard.js?v=20260615b"></script>
+    <script type="module" src="./assets/js/leaderboard.js?v=20260615c"></script>
   </body>
 </html>

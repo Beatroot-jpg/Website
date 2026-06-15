@@ -16,6 +16,7 @@ export async function ensureInitialAdmin() {
       name: adminName,
       passwordHash,
       role: "ADMIN",
+      owner: true,
       active: true,
       archived: false,
       permissions: {
@@ -28,6 +29,7 @@ export async function ensureInitialAdmin() {
       name: adminName,
       passwordHash,
       role: "ADMIN",
+      owner: true,
       active: true,
       archived: false,
       permissions: {

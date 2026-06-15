@@ -737,7 +737,7 @@ html[data-theme="light"] .launcher-stage {
 
 .admin-action-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.9rem;
 }
 
@@ -761,6 +761,14 @@ html[data-theme="light"] .launcher-stage {
   transform: translateY(-2px);
   border-color: rgba(25, 195, 95, 0.28);
   box-shadow: var(--shadow);
+}
+
+.admin-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+  transform: none;
+  border-color: var(--line);
+  box-shadow: var(--shadow-soft);
 }
 
 .admin-action-button strong {
@@ -1320,7 +1328,7 @@ html[data-theme="light"] .launcher-stage {
 
 .leaderboard-utility-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.15rem;
 }
 
@@ -1332,6 +1340,12 @@ html[data-theme="light"] .launcher-stage {
 
 .leaderboard-utility-grid > .hidden {
   display: none;
+}
+
+.panel-card-divider {
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--line-strong), transparent);
 }
 
 .placeholder-shell {

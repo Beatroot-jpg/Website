@@ -18,6 +18,14 @@ const leaderboardUtilityGrid = document.querySelector("#leaderboardUtilityGrid")
 const leaderboardScoringCard = document.querySelector("#leaderboardScoringCard");
 const leaderboardScoreLogCard = document.querySelector("#leaderboardScoreLogCard");
 const leaderboardAdminCard = document.querySelector("#leaderboardAdminCard");
+const leaderboardSecurityStatus = document.querySelector("#leaderboardSecurityStatus");
+const leaderboardSecurityOwnerNote = document.querySelector("#leaderboardSecurityOwnerNote");
+const openSecurityLockButton = document.querySelector("#openSecurityLockButton");
+const archivedFightersTableBody = document.querySelector("#archivedFightersTableBody");
+const archivedFightersTableMeta = document.querySelector("#archivedFightersTableMeta");
+const archivedFightersPageLabel = document.querySelector("#archivedFightersPageLabel");
+const previousArchivedFightersPageButton = document.querySelector("#previousArchivedFightersPageButton");
+const nextArchivedFightersPageButton = document.querySelector("#nextArchivedFightersPageButton");
 const scoreLogTableBody = document.querySelector("#scoreLogTableBody");
 const fightCardActionsHeader = document.querySelector("#fightCardActionsHeader");
 const fightCardTableBody = document.querySelector("#fightCardTableBody");
@@ -72,6 +80,14 @@ const awardBeltForm = document.querySelector("#awardBeltForm");
 const beltFighterSelect = document.querySelector("#beltFighterSelect");
 const awardBeltSubmitButton = document.querySelector("#awardBeltSubmitButton");
 const awardBeltMessage = document.querySelector("#awardBeltMessage");
+const securityLockModal = document.querySelector("#securityLockModal");
+const closeSecurityLockButton = document.querySelector("#closeSecurityLockButton");
+const closeSecurityLockBackdrop = document.querySelector("#closeSecurityLockBackdrop");
+const securityLockForm = document.querySelector("#securityLockForm");
+const securityWritesLockedInput = document.querySelector("#securityWritesLockedInput");
+const securityLockReasonInput = document.querySelector("#securityLockReasonInput");
+const securityLockSubmitButton = document.querySelector("#securityLockSubmitButton");
+const securityLockMessage = document.querySelector("#securityLockMessage");
 const scoringConfigModal = document.querySelector("#scoringConfigModal");
 const closeScoringButton = document.querySelector("#closeScoringButton");
 const closeScoringBackdrop = document.querySelector("#closeScoringBackdrop");
@@ -106,18 +122,23 @@ const state = {
   viewer: {
     isLoggedIn: false,
     canManage: false,
-    canUseAdminPanel: false
+    canUseAdminPanel: false,
+    isOwner: false
   },
   scoringConfig: null,
   fighters: [],
   fighterDirectory: [],
+  archivedFighters: [],
+  securityState: null,
   leaderCards: {},
   hallOfFame: [],
   fightCard: [],
-  scoreLog: [],
+  auditLog: [],
   lastPublicRefreshAt: null,
   leaderboardPage: 1,
   leaderboardPageSize: 25,
+  archivedFightersPage: 1,
+  archivedFightersPageSize: 6,
   leaderboardSearchQuery: "",
   fighterFormMode: "create",
   pendingDeleteFighterId: null,
@@ -130,12 +151,15 @@ let leaderboardRefreshHandle = null;
 function resetAdminState() {
   state.scoringConfig = null;
   state.fighterDirectory = [];
-  state.scoreLog = [];
+  state.archivedFighters = [];
+  state.securityState = null;
+  state.auditLog = [];
 }
 
 function normalizeViewer(viewer) {
   const canManage = Boolean(viewer?.canManage ?? viewer?.isAdmin ?? false);
   const canUseAdminPanel = Boolean(viewer?.canUseAdminPanel ?? viewer?.isAdmin ?? false);
+  const isOwner = Boolean(viewer?.isOwner);
   const hasExplicitLoginState = typeof viewer?.isLoggedIn === "boolean";
   const isLoggedIn = hasExplicitLoginState
     ? viewer.isLoggedIn
@@ -144,7 +168,8 @@ function normalizeViewer(viewer) {
   return {
     isLoggedIn,
     canManage,
-    canUseAdminPanel
+    canUseAdminPanel,
+    isOwner
   };
 }
 
@@ -152,7 +177,8 @@ function getSignedOutViewer() {
   return {
     isLoggedIn: false,
     canManage: false,
-    canUseAdminPanel: false
+    canUseAdminPanel: false,
+    isOwner: false
   };
 }
 
@@ -164,7 +190,8 @@ function getStoredSessionViewer() {
   return {
     isLoggedIn: true,
     canManage: false,
-    canUseAdminPanel: false
+    canUseAdminPanel: false,
+    isOwner: false
   };
 }
 
@@ -188,6 +215,9 @@ function normalizeFighter(fighter, index = 0) {
     inactivityPenalty: Number.isFinite(Number(fighter?.inactivityPenalty)) ? Number(fighter.inactivityPenalty) : 0,
     daysSinceFight: Number.isFinite(Number(fighter?.daysSinceFight)) ? Number(fighter.daysSinceFight) : 0,
     active: fighter?.active !== false,
+    archived: Boolean(fighter?.archived),
+    archivedAt: fighter?.archivedAt || null,
+    restoredAt: fighter?.restoredAt || null,
     isChampion: Boolean(fighter?.isChampion),
     badges: Array.isArray(fighter?.badges) ? fighter.badges : []
   };
@@ -292,6 +322,19 @@ function getTopContender() {
   return state.fighters.find((fighter) => fighter.rank === 2) || null;
 }
 
+function normalizeSecurityState(securityState) {
+  return {
+    writesLocked: Boolean(securityState?.writesLocked),
+    lockReason: securityState?.lockReason || "",
+    lockedAt: securityState?.lockedAt || null,
+    lockedByName: securityState?.lockedByName || ""
+  };
+}
+
+function isWriteLockedForViewer() {
+  return Boolean(state.securityState?.writesLocked && !state.viewer.isOwner);
+}
+
 function getSessionHeaders(headers = {}) {
   const merged = new Headers(headers);
 
@@ -383,7 +426,7 @@ function openDeleteFighterModal(fighter) {
 function closeDeleteFighterModal() {
   state.pendingDeleteFighterId = null;
   toggleModal(deleteFighterModal, false);
-  setButtonLoadingState(confirmDeleteFighterButton, false, "Deleting", "Delete fighter");
+  setButtonLoadingState(confirmDeleteFighterButton, false, "Archiving", "Archive fighter");
 }
 
 function openAwardPointsModal() {
@@ -439,6 +482,43 @@ function openAwardBeltModal() {
 
 function closeAwardBeltModal() {
   toggleModal(awardBeltModal, false);
+}
+
+function syncSecurityFormState() {
+  const writesLocked = securityWritesLockedInput.checked;
+  securityLockReasonInput.disabled = !writesLocked;
+
+  if (!writesLocked) {
+    securityLockReasonInput.value = "";
+  }
+}
+
+function openSecurityLockModal() {
+  if (!state.viewer.isOwner) {
+    showToast("Only the owner can change the security lock.", "info");
+    return;
+  }
+
+  setMessage(securityLockMessage, "");
+  securityWritesLockedInput.checked = Boolean(state.securityState?.writesLocked);
+  securityLockReasonInput.value = state.securityState?.lockReason || "";
+  syncSecurityFormState();
+  toggleModal(securityLockModal, true);
+  window.requestAnimationFrame(() => {
+    securityWritesLockedInput.focus();
+  });
+}
+
+function closeSecurityLockModal() {
+  toggleModal(securityLockModal, false);
+}
+
+function getArchivedFightersTotalPages() {
+  return Math.max(1, Math.ceil(state.archivedFighters.length / state.archivedFightersPageSize));
+}
+
+function normalizeArchivedFightersPage() {
+  state.archivedFightersPage = Math.min(Math.max(1, state.archivedFightersPage), getArchivedFightersTotalPages());
 }
 
 function openScoringConfigModal() {
@@ -959,6 +1039,7 @@ function renderLeaderCards() {
 function renderFightCardTable() {
   fightCardTableBody.textContent = "";
   fightCardActionsHeader.classList.toggle("hidden", !state.viewer.canManage);
+  const writesLocked = isWriteLockedForViewer();
 
   if (!state.fightCard.length) {
     fightCardTableBody.appendChild(createTableMessageRow("No upcoming fights scheduled.", state.viewer.canManage ? 5 : 4));
@@ -993,6 +1074,7 @@ function renderFightCardTable() {
       scoreButton.dataset.action = "score-fight";
       scoreButton.dataset.fightId = fight.id;
       scoreButton.textContent = "Score";
+      scoreButton.disabled = writesLocked;
       actionRow.appendChild(scoreButton);
 
       actions.appendChild(actionRow);
@@ -1003,47 +1085,140 @@ function renderFightCardTable() {
   });
 }
 
-function renderScoreLogTable() {
-  scoreLogTableBody.textContent = "";
-
-  if (!state.scoreLog.length) {
-    scoreLogTableBody.appendChild(createTableMessageRow("No scoring activity has been recorded yet.", 5));
+function renderSecurityStatus() {
+  if (!leaderboardSecurityStatus) {
     return;
   }
 
-  state.scoreLog.forEach((entry) => {
+  leaderboardSecurityStatus.textContent = "";
+
+  const heading = document.createElement("strong");
+  const paragraph = document.createElement("p");
+
+  if (state.securityState?.writesLocked) {
+    heading.textContent = "Leaderboard writes are locked";
+    paragraph.textContent = state.securityState.lockReason
+      ? `Locked by ${state.securityState.lockedByName || "Owner"} on ${formatDateTime(state.securityState.lockedAt)}. Reason: ${state.securityState.lockReason}`
+      : `Locked by ${state.securityState.lockedByName || "Owner"} on ${formatDateTime(state.securityState.lockedAt)}.`;
+  } else {
+    heading.textContent = "Leaderboard writes are open";
+    paragraph.textContent = "Staff with access can still submit leaderboard changes right now.";
+  }
+
+  leaderboardSecurityStatus.append(heading, paragraph);
+
+  if (leaderboardSecurityOwnerNote) {
+    leaderboardSecurityOwnerNote.classList.toggle("hidden", state.viewer.isOwner || !state.viewer.canManage);
+  }
+
+  if (openSecurityLockButton) {
+    openSecurityLockButton.disabled = !state.viewer.isOwner;
+  }
+}
+
+function renderArchivedFightersTable() {
+  archivedFightersTableBody.textContent = "";
+  const writesLocked = isWriteLockedForViewer();
+
+  if (!state.archivedFighters.length) {
+    archivedFightersTableBody.appendChild(createTableMessageRow("No archived fighters right now.", 5));
+    archivedFightersTableMeta.textContent = "No archived fighters.";
+    archivedFightersPageLabel.textContent = "Page 1 of 1";
+    previousArchivedFightersPageButton.disabled = true;
+    nextArchivedFightersPageButton.disabled = true;
+    return;
+  }
+
+  normalizeArchivedFightersPage();
+  const totalPages = getArchivedFightersTotalPages();
+  const pageStart = (state.archivedFightersPage - 1) * state.archivedFightersPageSize;
+  const visibleFighters = state.archivedFighters.slice(pageStart, pageStart + state.archivedFightersPageSize);
+
+  visibleFighters.forEach((fighter) => {
     const row = document.createElement("tr");
 
     const fighterCell = document.createElement("td");
-    fighterCell.textContent = entry.fighterName;
+    const fighterPrimary = document.createElement("div");
+    fighterPrimary.className = "table-primary";
+    const fighterName = document.createElement("strong");
+    fighterName.textContent = fighter.name;
+    const fighterNotes = document.createElement("span");
+    fighterNotes.textContent = fighter.notes || "Archived from the live ladder.";
+    fighterPrimary.append(fighterName, fighterNotes);
+    fighterCell.appendChild(fighterPrimary);
 
-    const typeCell = document.createElement("td");
-    typeCell.textContent = entry.entryType === "CORRECTION"
-      ? "Correction"
-      : entry.result === "WIN"
-        ? "Fight win"
-        : entry.result === "LOSS"
-          ? "Fight loss"
-          : "Fight";
+    const scoreCell = document.createElement("td");
+    scoreCell.textContent = `${fighter.effectivePoints}`;
 
-    const changeCell = document.createElement("td");
-    const changePrimary = document.createElement("div");
-    changePrimary.className = "table-primary";
-    const changeValue = document.createElement("strong");
-    changeValue.className = Number(entry.totalDelta) >= 0 ? "score-delta-positive" : "score-delta-negative";
-    changeValue.textContent = `${formatDelta(entry.totalDelta)} pts`;
-    const changeSub = document.createElement("span");
-    changeSub.textContent = `Result ${formatDelta(entry.resultPoints)} | Charisma ${formatDelta(entry.charismaPoints)} | Dominance ${formatDelta(entry.dominancePoints)} | Bonus ${formatDelta(entry.bonusPoints)}`;
-    changePrimary.append(changeValue, changeSub);
-    changeCell.appendChild(changePrimary);
+    const recordCell = document.createElement("td");
+    recordCell.textContent = `${fighter.wins}-${fighter.losses}`;
 
-    const fightCell = document.createElement("td");
-    fightCell.textContent = entry.fightLabel || "Manual";
+    const archivedCell = document.createElement("td");
+    archivedCell.textContent = formatDateTime(fighter.archivedAt);
+
+    const actionsCell = document.createElement("td");
+    const actionRow = document.createElement("div");
+    actionRow.className = "table-action-row";
+    const restoreButton = document.createElement("button");
+    restoreButton.className = "topbar-button ghost compact";
+    restoreButton.type = "button";
+    restoreButton.dataset.action = "restore-fighter";
+    restoreButton.dataset.fighterId = fighter.id;
+    restoreButton.textContent = "Restore";
+    restoreButton.disabled = writesLocked;
+    actionRow.appendChild(restoreButton);
+    actionsCell.appendChild(actionRow);
+
+    row.append(fighterCell, scoreCell, recordCell, archivedCell, actionsCell);
+    archivedFightersTableBody.appendChild(row);
+  });
+
+  const totalFighters = state.archivedFighters.length;
+  const visibleStart = totalFighters === 0 ? 0 : pageStart + 1;
+  const visibleEnd = Math.min(pageStart + state.archivedFightersPageSize, totalFighters);
+  archivedFightersTableMeta.textContent = `Showing ${visibleStart}-${visibleEnd} of ${totalFighters} archived fighters`;
+  archivedFightersPageLabel.textContent = `Page ${state.archivedFightersPage} of ${totalPages}`;
+  previousArchivedFightersPageButton.disabled = state.archivedFightersPage <= 1;
+  nextArchivedFightersPageButton.disabled = state.archivedFightersPage >= totalPages;
+}
+
+function renderScoreLogTable() {
+  scoreLogTableBody.textContent = "";
+
+  if (!state.auditLog.length) {
+    scoreLogTableBody.appendChild(createTableMessageRow("No audit activity has been recorded yet.", 4));
+    return;
+  }
+
+  state.auditLog.forEach((entry) => {
+    const row = document.createElement("tr");
+
+    const actionCell = document.createElement("td");
+    actionCell.textContent = entry.action
+      .toLowerCase()
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+
+    const detailsCell = document.createElement("td");
+    const detailsPrimary = document.createElement("div");
+    detailsPrimary.className = "table-primary";
+    const detailsSummary = document.createElement("strong");
+    detailsSummary.textContent = entry.summary;
+    const detailsSub = document.createElement("span");
+    detailsSub.textContent = entry.entityType
+      ? `${entry.entityType}${entry.entityId ? ` • ${entry.entityId}` : ""}`
+      : "Leaderboard";
+    detailsPrimary.append(detailsSummary, detailsSub);
+    detailsCell.appendChild(detailsPrimary);
+
+    const actorCell = document.createElement("td");
+    actorCell.textContent = entry.actorName || "Unknown";
 
     const whenCell = document.createElement("td");
-    whenCell.textContent = formatDateTime(entry.awardedAt);
+    whenCell.textContent = formatDateTime(entry.createdAt);
 
-    row.append(fighterCell, typeCell, changeCell, fightCell, whenCell);
+    row.append(actionCell, detailsCell, actorCell, whenCell);
     scoreLogTableBody.appendChild(row);
   });
 }
@@ -1081,11 +1256,28 @@ function renderHallOfFameTable() {
 
 function syncLeaderboardControls() {
   const showUtilityStrip = state.viewer.canManage;
+  const writesLocked = isWriteLockedForViewer();
   leaderboardUtilityGrid.classList.toggle("hidden", !showUtilityStrip);
   leaderboardScoringCard.classList.toggle("hidden", !state.viewer.canManage);
   leaderboardScoreLogCard.classList.toggle("hidden", !state.viewer.canManage);
   leaderboardAdminCard.classList.toggle("hidden", !state.viewer.canManage);
   fightCardActionsHeader.classList.toggle("hidden", !state.viewer.canManage);
+
+  [
+    openCreateFighterButton,
+    openAwardPointsButton,
+    openAwardBeltButton,
+    openEditFighterButton,
+    openScoringConfigButton,
+    openHallOfFameButton,
+    openFightCardButton
+  ].forEach((button) => {
+    if (!button) {
+      return;
+    }
+
+    button.disabled = writesLocked;
+  });
 }
 
 function syncFighterSelectOptions() {
@@ -1181,7 +1373,6 @@ function syncAwardEntryType() {
   awardPointsForm.elements.charismaPoints.disabled = isCorrection;
   awardPointsForm.elements.dominancePoints.disabled = isCorrection;
   awardPointsForm.elements.applyTitleWinBonus.disabled = isCorrection;
-  awardPointsForm.elements.applyFinishBonus.disabled = isCorrection;
   awardPointsForm.elements.correctionPoints.disabled = !isCorrection;
 }
 
@@ -1216,7 +1407,11 @@ async function loadAdminLeaderboardData({ silentUnauthorized = true } = {}) {
     state.fighterDirectory = Array.isArray(payload.fighterDirectory)
       ? payload.fighterDirectory.map((fighter, index) => normalizeFighter(fighter, index))
       : state.fighters.map((fighter, index) => normalizeFighter(fighter, index));
-    state.scoreLog = Array.isArray(payload.scoreLog) ? payload.scoreLog : [];
+    state.archivedFighters = Array.isArray(payload.archivedFighters)
+      ? payload.archivedFighters.map((fighter, index) => normalizeFighter(fighter, index))
+      : [];
+    state.securityState = normalizeSecurityState(payload.securityState);
+    state.auditLog = Array.isArray(payload.auditLog) ? payload.auditLog : [];
     state.viewer = normalizeViewer(payload.viewer);
   } catch (error) {
     clearSession();
@@ -1234,6 +1429,7 @@ async function loadAdminLeaderboardData({ silentUnauthorized = true } = {}) {
 
 function renderLeaderboardPage() {
   normalizeLeaderboardPage();
+  normalizeArchivedFightersPage();
   syncSessionButton();
   syncLeaderboardControls();
   renderChampionSpotlight();
@@ -1242,6 +1438,8 @@ function renderLeaderboardPage() {
   renderLeaderCards();
   renderFightCardTable();
   renderHallOfFameTable();
+  renderSecurityStatus();
+  renderArchivedFightersTable();
   renderScoreLogTable();
 }
 
@@ -1327,6 +1525,10 @@ openAwardBeltButton?.addEventListener("click", () => {
   openAwardBeltModal();
 });
 
+openSecurityLockButton?.addEventListener("click", () => {
+  openSecurityLockModal();
+});
+
 openScoringConfigButton?.addEventListener("click", openScoringConfigModal);
 openHallOfFameButton?.addEventListener("click", openHallOfFameModal);
 openFightCardButton?.addEventListener("click", () => {
@@ -1350,6 +1552,32 @@ fightCardTableBody?.addEventListener("click", (event) => {
   }
 });
 
+archivedFightersTableBody?.addEventListener("click", async (event) => {
+  const actionButton = event.target.closest("button[data-action]");
+
+  if (!actionButton || actionButton.dataset.action !== "restore-fighter") {
+    return;
+  }
+
+  const fighter = state.archivedFighters.find((entry) => entry.id === actionButton.dataset.fighterId);
+
+  if (!fighter) {
+    showToast("That archived fighter could not be found.", "error");
+    return;
+  }
+
+  try {
+    await apiWithOptionalSession(`/leaderboard/fighters/${fighter.id}/restore`, {
+      method: "POST"
+    });
+
+    await loadLeaderboardData();
+    showToast(`${fighter.name} restored to the live ladder.`, "success");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
 previousLeaderboardPageButton?.addEventListener("click", () => {
   if (state.leaderboardPage <= 1) {
     return;
@@ -1366,6 +1594,24 @@ nextLeaderboardPageButton?.addEventListener("click", () => {
 
   state.leaderboardPage += 1;
   renderLeaderboardTable();
+});
+
+previousArchivedFightersPageButton?.addEventListener("click", () => {
+  if (state.archivedFightersPage <= 1) {
+    return;
+  }
+
+  state.archivedFightersPage -= 1;
+  renderArchivedFightersTable();
+});
+
+nextArchivedFightersPageButton?.addEventListener("click", () => {
+  if (state.archivedFightersPage >= getArchivedFightersTotalPages()) {
+    return;
+  }
+
+  state.archivedFightersPage += 1;
+  renderArchivedFightersTable();
 });
 
 leaderboardSearchInput?.addEventListener("input", () => {
@@ -1401,6 +1647,8 @@ closeAwardButton?.addEventListener("click", closeAwardPointsModal);
 closeAwardBackdrop?.addEventListener("click", closeAwardPointsModal);
 closeAwardBeltButton?.addEventListener("click", closeAwardBeltModal);
 closeAwardBeltBackdrop?.addEventListener("click", closeAwardBeltModal);
+closeSecurityLockButton?.addEventListener("click", closeSecurityLockModal);
+closeSecurityLockBackdrop?.addEventListener("click", closeSecurityLockModal);
 closeScoringButton?.addEventListener("click", closeScoringConfigModal);
 closeScoringBackdrop?.addEventListener("click", closeScoringConfigModal);
 closeHallOfFameButton?.addEventListener("click", closeHallOfFameModal);
@@ -1437,6 +1685,11 @@ window.addEventListener("keydown", (event) => {
 
   if (!awardBeltModal.classList.contains("hidden")) {
     closeAwardBeltModal();
+    return;
+  }
+
+  if (!securityLockModal.classList.contains("hidden")) {
+    closeSecurityLockModal();
     return;
   }
 
@@ -1545,7 +1798,7 @@ confirmDeleteFighterButton?.addEventListener("click", async () => {
     return;
   }
 
-  setButtonLoadingState(confirmDeleteFighterButton, true, "Deleting", "Delete fighter");
+  setButtonLoadingState(confirmDeleteFighterButton, true, "Archiving", "Archive fighter");
 
   try {
     await apiWithOptionalSession(`/leaderboard/fighters/${fighterId}`, {
@@ -1555,9 +1808,9 @@ confirmDeleteFighterButton?.addEventListener("click", async () => {
     closeDeleteFighterModal();
     closeFighterFormModal();
     await loadLeaderboardData();
-    showToast("Fighter deleted.", "success");
+    showToast("Fighter archived.", "success");
   } catch (error) {
-    setButtonLoadingState(confirmDeleteFighterButton, false, "Deleting", "Delete fighter");
+    setButtonLoadingState(confirmDeleteFighterButton, false, "Archiving", "Archive fighter");
     showToast(error.message, "error");
   }
 });
@@ -1573,7 +1826,6 @@ awardPointsForm?.addEventListener("submit", async (event) => {
     charismaPoints: Number(awardPointsForm.elements.charismaPoints.value || 0),
     dominancePoints: Number(awardPointsForm.elements.dominancePoints.value || 0),
     applyTitleWinBonus: awardPointsForm.elements.applyTitleWinBonus.checked,
-    applyFinishBonus: awardPointsForm.elements.applyFinishBonus.checked,
     correctionPoints: Number(awardPointsForm.elements.correctionPoints.value || 0),
     fightId: awardPointsForm.elements.fightId.value || "",
     awardedAt: awardPointsForm.elements.awardedAt.value || "",
@@ -1621,6 +1873,35 @@ awardBeltForm?.addEventListener("submit", async (event) => {
     showToast(error.message, "error");
   } finally {
     setButtonLoadingState(awardBeltSubmitButton, false, "Saving", "Save belt holder");
+  }
+});
+
+securityWritesLockedInput?.addEventListener("change", syncSecurityFormState);
+
+securityLockForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setMessage(securityLockMessage, "");
+  setButtonLoadingState(securityLockSubmitButton, true, "Saving", "Save security lock");
+
+  const payload = {
+    writesLocked: securityWritesLockedInput.checked,
+    lockReason: securityLockReasonInput.value.trim()
+  };
+
+  try {
+    await apiWithOptionalSession("/leaderboard/security", {
+      method: "PATCH",
+      body: payload
+    });
+
+    closeSecurityLockModal();
+    await loadLeaderboardData({ includeAdmin: true });
+    showToast(payload.writesLocked ? "Leaderboard writes locked." : "Leaderboard writes unlocked.", "success");
+  } catch (error) {
+    setMessage(securityLockMessage, error.message);
+    showToast(error.message, "error");
+  } finally {
+    setButtonLoadingState(securityLockSubmitButton, false, "Saving", "Save security lock");
   }
 });
 
@@ -1714,7 +1995,6 @@ scoreFightForm?.addEventListener("submit", async (event) => {
     blueCharismaPoints: Number(scoreFightForm.elements.blueCharismaPoints.value || 0),
     blueDominancePoints: Number(scoreFightForm.elements.blueDominancePoints.value || 0),
     applyTitleWinBonus: scoreFightForm.elements.applyTitleWinBonus.checked,
-    applyFinishBonus: scoreFightForm.elements.applyFinishBonus.checked,
     awardedAt: scoreFightForm.elements.awardedAt.value || "",
     note: scoreFightForm.elements.note.value.trim()
   };

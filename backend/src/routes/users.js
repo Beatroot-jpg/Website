@@ -117,6 +117,10 @@ router.patch(
       throw createError(404, "User not found.");
     }
 
+    if (existingUser.owner && !req.user.owner) {
+      throw createError(403, "Only the owner can edit this account.");
+    }
+
     const nextRole = existingUser.role;
     const permissions = normalizePermissions(
       req.body.permissions ?? existingUser.permissions.map((permission) => permission.key),
@@ -178,6 +182,10 @@ router.delete(
 
     if (!existingUser || existingUser.archived) {
       throw createError(404, "User not found.");
+    }
+
+    if (existingUser.owner) {
+      throw createError(400, "The owner account cannot be deleted.");
     }
 
     await prisma.user.update({

@@ -150,6 +150,7 @@ model User {
   passwordHash           String
   name                   String
   role                   Role              @default(USER)
+  owner                  Boolean           @default(false)
   active                 Boolean           @default(true)
   archived               Boolean           @default(false)
   permissions            UserPermission[]
@@ -172,6 +173,10 @@ model User {
   correctedFactorySessions FactorySession[] @relation("FactorySessionCorrectedBy")
   createdFactorySaleEntries FactorySaleEntry[] @relation("FactorySaleEntryCreatedBy")
   factoryRoundPayouts    FactoryRoundPayout[]
+  archivedFightFighters  FightFighter[]    @relation("FightFighterArchivedBy")
+  restoredFightFighters  FightFighter[]    @relation("FightFighterRestoredBy")
+  fightAuditLogs         FightAuditLog[]   @relation("FightAuditActor")
+  updatedFightSecurityStates FightSecurityState[] @relation("FightSecurityUpdatedBy")
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 
@@ -576,14 +581,21 @@ model FightFighter {
   dominancePoints Int               @default(0)
   isChampion      Boolean           @default(false)
   active          Boolean           @default(true)
+  archived        Boolean           @default(false)
   notes           String?
   lastFightAt     DateTime?
   lastAwardedAt   DateTime?
+  archivedAt      DateTime?
+  archivedById    String?
+  restoredAt      DateTime?
+  restoredById    String?
   scoreEntries    FightScoreEntry[]
+  archivedBy      User?             @relation("FightFighterArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
+  restoredBy      User?             @relation("FightFighterRestoredBy", fields: [restoredById], references: [id], onDelete: SetNull)
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  @@index([active, points])
+  @@index([archived, active, points])
 }
 
 model FightScoringConfig {
@@ -601,6 +613,18 @@ model FightScoringConfig {
   eliminationDays        Int      @default(56)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
+}
+
+model FightSecurityState {
+  id           String    @id @default(cuid())
+  slug         String    @unique @default("default")
+  writesLocked Boolean   @default(false)
+  lockReason   String?
+  lockedAt     DateTime?
+  lockedById   String?
+  lockedBy     User?     @relation("FightSecurityUpdatedBy", fields: [lockedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 model FightScoreEntry {
@@ -623,6 +647,23 @@ model FightScoreEntry {
 
   @@index([fighterId, awardedAt])
   @@index([fightId])
+}
+
+model FightAuditLog {
+  id         String   @id @default(cuid())
+  actorId     String?
+  action      String
+  entityType  String
+  entityId    String?
+  summary     String
+  before      Json?
+  after       Json?
+  metadata    Json?
+  actor       User?    @relation("FightAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
 }
 
 model FightHallOfFameEntry {

@@ -2,7 +2,7 @@ import { Router } from "express";
 
 import { prisma } from "../db.js";
 import { asyncHandler, createError } from "../http.js";
-import { authenticateToken, authenticateTokenOptional } from "../middleware/auth.js";
+import { authenticateToken, authenticateTokenOptional, requireOwner } from "../middleware/auth.js";
 import {
   normalizeOptionalString,
   requireInt,
@@ -113,6 +113,10 @@ function requireDistinctFightParticipants(redName, blueName) {
   }
 }
 
+function serializeDateValue(value) {
+  return value instanceof Date ? value.toISOString() : value || null;
+}
+
 async function ensureScoringConfig(client = prisma) {
   const existingConfig = await client.fightScoringConfig.findUnique({
     where: { slug: "default" }
@@ -124,6 +128,151 @@ async function ensureScoringConfig(client = prisma) {
 
   return client.fightScoringConfig.create({
     data: { slug: "default" }
+  });
+}
+
+async function ensureFightSecurityState(client = prisma) {
+  const existingState = await client.fightSecurityState.findUnique({
+    where: { slug: "default" }
+  });
+
+  if (existingState) {
+    return existingState;
+  }
+
+  return client.fightSecurityState.create({
+    data: { slug: "default" }
+  });
+}
+
+async function ensureLeaderboardWriteAccess(user, client = prisma) {
+  const securityState = await ensureFightSecurityState(client);
+
+  if (securityState.writesLocked && !user?.owner) {
+    throw createError(423, "Leaderboard writes are locked. Only the owner can make changes right now.");
+  }
+
+  return securityState;
+}
+
+function buildFighterSnapshot(fighter) {
+  if (!fighter) {
+    return null;
+  }
+
+  return {
+    id: fighter.id,
+    name: fighter.name,
+    points: fighter.points,
+    wins: fighter.wins,
+    losses: fighter.losses,
+    charismaPoints: fighter.charismaPoints,
+    dominancePoints: fighter.dominancePoints,
+    isChampion: fighter.isChampion,
+    active: fighter.active,
+    archived: Boolean(fighter.archived),
+    notes: fighter.notes,
+    lastFightAt: serializeDateValue(fighter.lastFightAt),
+    lastAwardedAt: serializeDateValue(fighter.lastAwardedAt),
+    archivedAt: serializeDateValue(fighter.archivedAt),
+    restoredAt: serializeDateValue(fighter.restoredAt),
+    createdAt: serializeDateValue(fighter.createdAt),
+    updatedAt: serializeDateValue(fighter.updatedAt)
+  };
+}
+
+function buildFightSnapshot(fight) {
+  if (!fight) {
+    return null;
+  }
+
+  return {
+    id: fight.id,
+    fighterRedName: fight.fighterRedName,
+    fighterBlueName: fight.fighterBlueName,
+    scheduledAt: serializeDateValue(fight.scheduledAt),
+    venue: fight.venue,
+    notes: fight.notes,
+    status: fight.status,
+    winnerName: fight.winnerName,
+    createdAt: serializeDateValue(fight.createdAt),
+    updatedAt: serializeDateValue(fight.updatedAt)
+  };
+}
+
+function buildScoringConfigSnapshot(config) {
+  if (!config) {
+    return null;
+  }
+
+  return {
+    id: config.id,
+    slug: config.slug,
+    startingPoints: config.startingPoints,
+    winPoints: config.winPoints,
+    lossPoints: config.lossPoints,
+    charismaMax: config.charismaMax,
+    dominanceMax: config.dominanceMax,
+    titleWinBonus: config.titleWinBonus,
+    inactivityGraceDays: config.inactivityGraceDays,
+    inactivityWeeklyPenalty: config.inactivityWeeklyPenalty,
+    eliminationDays: config.eliminationDays,
+    createdAt: serializeDateValue(config.createdAt),
+    updatedAt: serializeDateValue(config.updatedAt)
+  };
+}
+
+function buildHallOfFameSnapshot(entry) {
+  if (!entry) {
+    return null;
+  }
+
+  return {
+    id: entry.id,
+    fighterName: entry.fighterName,
+    title: entry.title,
+    pointsAtTitle: entry.pointsAtTitle,
+    notes: entry.notes,
+    wonAt: serializeDateValue(entry.wonAt),
+    createdAt: serializeDateValue(entry.createdAt),
+    updatedAt: serializeDateValue(entry.updatedAt)
+  };
+}
+
+function buildSecurityStateSnapshot(securityState, actorName = null) {
+  if (!securityState) {
+    return null;
+  }
+
+  return {
+    writesLocked: Boolean(securityState.writesLocked),
+    lockReason: securityState.lockReason,
+    lockedAt: serializeDateValue(securityState.lockedAt),
+    lockedByName: actorName
+  };
+}
+
+async function createFightAuditLog(transaction, {
+  actorId = null,
+  action,
+  entityType,
+  entityId = null,
+  summary,
+  before = null,
+  after = null,
+  metadata = null
+}) {
+  return transaction.fightAuditLog.create({
+    data: {
+      actorId,
+      action,
+      entityType,
+      entityId,
+      summary,
+      before,
+      after,
+      metadata
+    }
   });
 }
 
@@ -203,9 +352,12 @@ function buildFighterViews(fighters, scoringConfig) {
       dominancePoints: fighter.dominancePoints,
       isChampion: fighter.isChampion,
       active: fighter.active,
+      archived: Boolean(fighter.archived),
       notes: fighter.notes,
       lastFightAt: fighter.lastFightAt,
       lastAwardedAt: fighter.lastAwardedAt,
+      archivedAt: fighter.archivedAt,
+      restoredAt: fighter.restoredAt,
       createdAt: fighter.createdAt,
       updatedAt: fighter.updatedAt,
       daysSinceFight: inactivity.daysSinceFight,
@@ -215,12 +367,13 @@ function buildFighterViews(fighters, scoringConfig) {
     };
   });
 
-  const publicFighters = derivedFighters.filter((fighter) => fighter.active && fighter.inactivityState !== "ELIMINATED");
+  const activeFighters = derivedFighters.filter((fighter) => !fighter.archived);
+  const publicFighters = activeFighters.filter((fighter) => fighter.active && fighter.inactivityState !== "ELIMINATED");
   const winsLeaderValue = Math.max(0, ...publicFighters.map((fighter) => fighter.wins));
   const charismaLeaderValue = Math.max(0, ...publicFighters.map((fighter) => fighter.charismaPoints));
   const dominanceLeaderValue = Math.max(0, ...publicFighters.map((fighter) => fighter.dominancePoints));
 
-  derivedFighters.forEach((fighter) => {
+  activeFighters.forEach((fighter) => {
     if (fighter.isChampion) {
       fighter.badges.push("Champion");
     }
@@ -272,8 +425,23 @@ function buildFighterViews(fighters, scoringConfig) {
   });
 
   const fighterDirectory = derivedFighters
+    .filter((fighter) => !fighter.archived)
     .slice()
     .sort((left, right) => left.name.localeCompare(right.name));
+
+  const archivedFighters = derivedFighters
+    .filter((fighter) => fighter.archived)
+    .slice()
+    .sort((left, right) => {
+      const leftTime = left.archivedAt ? new Date(left.archivedAt).getTime() : 0;
+      const rightTime = right.archivedAt ? new Date(right.archivedAt).getTime() : 0;
+
+      if (rightTime !== leftTime) {
+        return rightTime - leftTime;
+      }
+
+      return left.name.localeCompare(right.name);
+    });
 
   const leaderCards = {
     wins: rankedFighters.find((fighter) => fighter.badges.includes("Most Wins")) || null,
@@ -284,6 +452,7 @@ function buildFighterViews(fighters, scoringConfig) {
   return {
     rankedFighters,
     fighterDirectory,
+    archivedFighters,
     leaderCards
   };
 }
@@ -293,8 +462,7 @@ function buildBoutScoreData({
   result,
   charismaPoints = 0,
   dominancePoints = 0,
-  applyTitleWinBonus = false,
-  applyFinishBonus = false
+  applyTitleWinBonus = false
 }) {
   const normalizedResult = normalizeAwardResult(result);
   const safeCharismaPoints = requireBoundedInt(
@@ -314,10 +482,6 @@ function buildBoutScoreData({
 
   if (applyTitleWinBonus) {
     bonusPoints += scoringConfig.titleWinBonus;
-  }
-
-  if (applyFinishBonus) {
-    bonusPoints += scoringConfig.finishBonus;
   }
 
   return {
@@ -391,7 +555,7 @@ async function applyScoreEntry(transaction, {
 
 async function buildLeaderboardPayload(reqUser = null) {
   const scoringConfig = await ensureScoringConfig();
-  const [fighters, hallOfFame, fightCard, recentScoreEntries] = await Promise.all([
+  const [fighters, hallOfFame, fightCard, securityState, recentAuditEntries] = await Promise.all([
     prisma.fightFighter.findMany({
       orderBy: [{ isChampion: "desc" }, { points: "desc" }, { name: "asc" }]
     }),
@@ -404,60 +568,61 @@ async function buildLeaderboardPayload(reqUser = null) {
       },
       orderBy: [{ scheduledAt: "asc" }, { fighterRedName: "asc" }]
     }),
-    prisma.fightScoreEntry.findMany({
-      take: 12,
-      orderBy: [{ awardedAt: "desc" }, { createdAt: "desc" }],
+    prisma.fightSecurityState.findUnique({
+      where: { slug: "default" },
       include: {
-        fighter: {
+        lockedBy: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    }),
+    prisma.fightAuditLog.findMany({
+      take: 20,
+      orderBy: [{ createdAt: "desc" }],
+      include: {
+        actor: {
           select: {
             id: true,
             name: true
           }
         },
-        fight: {
-          select: {
-            id: true,
-            fighterRedName: true,
-            fighterBlueName: true,
-            scheduledAt: true
-          }
-        }
       }
     })
   ]);
 
   const leaderboardData = buildFighterViews(fighters, scoringConfig);
+  const resolvedSecurityState = securityState || await ensureFightSecurityState();
 
   return {
     generatedAt: new Date().toISOString(),
     scoringConfig,
     fighters: leaderboardData.rankedFighters,
     fighterDirectory: leaderboardData.fighterDirectory,
+    archivedFighters: leaderboardData.archivedFighters,
     leaderCards: leaderboardData.leaderCards,
     hallOfFame,
     fightCard,
-    scoreLog: recentScoreEntries.map((entry) => ({
+    securityState: buildSecurityStateSnapshot(
+      resolvedSecurityState,
+      securityState?.lockedBy?.name || null
+    ),
+    auditLog: recentAuditEntries.map((entry) => ({
       id: entry.id,
-      fighterId: entry.fighterId,
-      fighterName: entry.fighter.name,
-      fightId: entry.fightId,
-      fightLabel: entry.fight
-        ? `${entry.fight.fighterRedName} vs ${entry.fight.fighterBlueName}`
-        : null,
-      entryType: entry.entryType,
-      result: entry.result,
-      resultPoints: entry.resultPoints,
-      charismaPoints: entry.charismaPoints,
-      dominancePoints: entry.dominancePoints,
-      bonusPoints: entry.bonusPoints,
-      totalDelta: entry.totalDelta,
-      note: entry.note,
-      awardedAt: entry.awardedAt
+      actorName: entry.actor?.name || "Unknown",
+      action: entry.action,
+      entityType: entry.entityType,
+      entityId: entry.entityId,
+      summary: entry.summary,
+      createdAt: entry.createdAt
     })),
     viewer: {
       isLoggedIn: Boolean(reqUser),
       canManage: Boolean(reqUser),
-      canUseAdminPanel: Boolean(reqUser?.role === "ADMIN" || reqUser?.permissions?.includes("USERS"))
+      canUseAdminPanel: Boolean(reqUser?.role === "ADMIN" || reqUser?.permissions?.includes("USERS")),
+      isOwner: Boolean(reqUser?.owner)
     }
   };
 }
@@ -477,7 +642,9 @@ function toAdminLeaderboardPayload(payload) {
     generatedAt: payload.generatedAt,
     scoringConfig: payload.scoringConfig,
     fighterDirectory: payload.fighterDirectory,
-    scoreLog: payload.scoreLog,
+    archivedFighters: payload.archivedFighters,
+    securityState: payload.securityState,
+    auditLog: payload.auditLog,
     viewer: payload.viewer
   };
 }
@@ -513,20 +680,13 @@ router.post(
     const name = requireString(req.body.name, "Fighter name");
 
     const fighter = await prisma.$transaction(async (transaction) => {
+      await ensureLeaderboardWriteAccess(req.user, transaction);
       const scoringConfig = await ensureScoringConfig(transaction);
       const openingPoints = req.body.points === undefined
         ? scoringConfig.startingPoints
         : requireInt(req.body.points, "Opening points");
-      const isChampion = req.body.isChampion === true;
 
-      if (isChampion) {
-        await transaction.fightFighter.updateMany({
-          where: { isChampion: true },
-          data: { isChampion: false }
-        });
-      }
-
-      return transaction.fightFighter.create({
+      const fighter = await transaction.fightFighter.create({
         data: {
           name,
           points: openingPoints,
@@ -542,7 +702,7 @@ router.post(
           dominancePoints: req.body.dominancePoints !== undefined
             ? requireNonNegativeInt(req.body.dominancePoints, "Dominance points")
             : 0,
-          isChampion,
+          isChampion: false,
           active: typeof req.body.active === "boolean" ? req.body.active : true,
           lastFightAt: req.body.lastFightAt
             ? requireDateTime(req.body.lastFightAt, "Last fight date")
@@ -553,6 +713,17 @@ router.post(
           notes: normalizeOptionalString(req.body.notes)
         }
       });
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: "FIGHTER_CREATED",
+        entityType: "FIGHTER",
+        entityId: fighter.id,
+        summary: `${req.user.name} created fighter ${fighter.name}.`,
+        after: buildFighterSnapshot(fighter)
+      });
+
+      return fighter;
     });
 
     res.status(201).json({ fighter });
@@ -566,26 +737,14 @@ router.patch(
       where: { id: req.params.id }
     });
 
-    if (!existingFighter) {
+    if (!existingFighter || existingFighter.archived) {
       throw createError(404, "Fighter not found.");
     }
 
-    const nextChampionState = typeof req.body.isChampion === "boolean"
-      ? req.body.isChampion
-      : existingFighter.isChampion;
-
     const fighter = await prisma.$transaction(async (transaction) => {
-      if (nextChampionState) {
-        await transaction.fightFighter.updateMany({
-          where: {
-            isChampion: true,
-            NOT: { id: existingFighter.id }
-          },
-          data: { isChampion: false }
-        });
-      }
+      await ensureLeaderboardWriteAccess(req.user, transaction);
 
-      return transaction.fightFighter.update({
+      const fighter = await transaction.fightFighter.update({
         where: { id: existingFighter.id },
         data: {
           name: req.body.name !== undefined
@@ -607,7 +766,6 @@ router.patch(
             ? requireNonNegativeInt(req.body.dominancePoints, "Dominance points")
             : existingFighter.dominancePoints,
           active: typeof req.body.active === "boolean" ? req.body.active : existingFighter.active,
-          isChampion: nextChampionState,
           notes: req.body.notes !== undefined ? normalizeOptionalString(req.body.notes) : existingFighter.notes,
           lastFightAt: req.body.lastFightAt
             ? requireDateTime(req.body.lastFightAt, "Last fight date")
@@ -621,9 +779,75 @@ router.patch(
               : existingFighter.lastAwardedAt
         }
       });
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: "FIGHTER_UPDATED",
+        entityType: "FIGHTER",
+        entityId: fighter.id,
+        summary: `${req.user.name} updated fighter ${fighter.name}.`,
+        before: buildFighterSnapshot(existingFighter),
+        after: buildFighterSnapshot(fighter)
+      });
+
+      return fighter;
     });
 
     res.json({ fighter });
+  })
+);
+
+router.patch(
+  "/security",
+  requireOwner,
+  asyncHandler(async (req, res) => {
+    const writesLocked = req.body.writesLocked === true;
+    const lockReason = writesLocked ? normalizeOptionalString(req.body.lockReason) : null;
+    const changedAt = new Date();
+
+    const securityState = await prisma.$transaction(async (transaction) => {
+      const existingState = await ensureFightSecurityState(transaction);
+
+      const securityState = await transaction.fightSecurityState.update({
+        where: { id: existingState.id },
+        data: {
+          writesLocked,
+          lockReason,
+          lockedAt: writesLocked ? changedAt : null,
+          lockedById: writesLocked ? req.user.id : null
+        },
+        include: {
+          lockedBy: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: "SECURITY_LOCK_UPDATED",
+        entityType: "SECURITY_STATE",
+        entityId: securityState.id,
+        summary: writesLocked
+          ? `${req.user.name} locked leaderboard writes.`
+          : `${req.user.name} unlocked leaderboard writes.`,
+        before: buildSecurityStateSnapshot(existingState),
+        after: buildSecurityStateSnapshot(securityState, securityState.lockedBy?.name || null),
+        metadata: {
+          writesLocked,
+          lockReason
+        }
+      });
+
+      return securityState;
+    });
+
+    res.json({
+      securityState: buildSecurityStateSnapshot(securityState, securityState.lockedBy?.name || null)
+    });
   })
 );
 
@@ -636,12 +860,31 @@ router.post(
       : new Date();
 
     const champion = await prisma.$transaction(async (transaction) => {
+      await ensureLeaderboardWriteAccess(req.user, transaction);
+
+      const currentChampion = await transaction.fightFighter.findFirst({
+        where: {
+          isChampion: true,
+          archived: false
+        }
+      });
+
       await transaction.fightFighter.updateMany({
         where: { isChampion: true },
         data: { isChampion: false }
       });
 
       if (!fighterId) {
+        await createFightAuditLog(transaction, {
+          actorId: req.user.id,
+          action: "BELT_VACATED",
+          entityType: "FIGHTER",
+          entityId: currentChampion?.id || null,
+          summary: `${req.user.name} vacated the belt.`,
+          before: buildFighterSnapshot(currentChampion),
+          after: null
+        });
+
         return null;
       }
 
@@ -653,17 +896,32 @@ router.post(
         throw createError(404, "Fighter not found.");
       }
 
-      if (!existingFighter.active) {
+      if (!existingFighter.active || existingFighter.archived) {
         throw createError(400, "Only active fighters can hold the belt.");
       }
 
-      return transaction.fightFighter.update({
+      const champion = await transaction.fightFighter.update({
         where: { id: existingFighter.id },
         data: {
           isChampion: true,
           lastAwardedAt: awardedAt
         }
       });
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: "BELT_AWARDED",
+        entityType: "FIGHTER",
+        entityId: champion.id,
+        summary: `${req.user.name} awarded the belt to ${champion.name}.`,
+        before: {
+          previousChampion: buildFighterSnapshot(currentChampion),
+          nextChampion: buildFighterSnapshot(existingFighter)
+        },
+        after: buildFighterSnapshot(champion)
+      });
+
+      return champion;
     });
 
     res.json({ champion });
@@ -677,7 +935,7 @@ router.post(
       where: { id: req.params.id }
     });
 
-    if (!existingFighter) {
+    if (!existingFighter || existingFighter.archived) {
       throw createError(404, "Fighter not found.");
     }
 
@@ -717,14 +975,15 @@ router.post(
         result: req.body.result,
         charismaPoints: req.body.charismaPoints ?? 0,
         dominancePoints: req.body.dominancePoints ?? 0,
-        applyTitleWinBonus: req.body.applyTitleWinBonus === true,
-        applyFinishBonus: req.body.applyFinishBonus === true
+        applyTitleWinBonus: req.body.applyTitleWinBonus === true
       }));
     } else {
       resultPoints = requireInt(req.body.correctionPoints, "Correction points");
     }
 
     const fighter = await prisma.$transaction(async (transaction) => {
+      await ensureLeaderboardWriteAccess(req.user, transaction);
+
       const { fighter: updatedFighter } = await applyScoreEntry(transaction, {
         fighterId: existingFighter.id,
         fightId,
@@ -738,11 +997,13 @@ router.post(
         note: req.body.note
       });
 
+      let updatedFight = null;
+
       if (fight && entryType === "BOUT" && result === "WIN") {
         const validNames = [fight.fighterRedName, fight.fighterBlueName];
 
         if (validNames.includes(updatedFighter.name)) {
-          await transaction.fightCard.update({
+          updatedFight = await transaction.fightCard.update({
             where: { id: fight.id },
             data: {
               status: "COMPLETED",
@@ -751,6 +1012,29 @@ router.post(
           });
         }
       }
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: entryType === "CORRECTION" ? "FIGHTER_CORRECTED" : "FIGHTER_SCORED",
+        entityType: "FIGHTER",
+        entityId: updatedFighter.id,
+        summary: entryType === "CORRECTION"
+          ? `${req.user.name} corrected ${updatedFighter.name} by ${resultPoints} points.`
+          : `${req.user.name} recorded a ${result?.toLowerCase() || "fight"} entry for ${updatedFighter.name}.`,
+        before: buildFighterSnapshot(existingFighter),
+        after: buildFighterSnapshot(updatedFighter),
+        metadata: {
+          entryType,
+          result,
+          resultPoints,
+          charismaPoints,
+          dominancePoints,
+          bonusPoints,
+          fightId,
+          fight: updatedFight ? buildFightSnapshot(updatedFight) : buildFightSnapshot(fight),
+          note: normalizeOptionalString(req.body.note)
+        }
+      });
 
       return updatedFighter;
     });
@@ -804,21 +1088,21 @@ router.post(
       result: winnerCorner === "RED" ? "WIN" : "LOSS",
       charismaPoints: req.body.redCharismaPoints ?? 0,
       dominancePoints: req.body.redDominancePoints ?? 0,
-      applyTitleWinBonus: winnerCorner === "RED" && req.body.applyTitleWinBonus === true,
-      applyFinishBonus: winnerCorner === "RED" && req.body.applyFinishBonus === true
+      applyTitleWinBonus: winnerCorner === "RED" && req.body.applyTitleWinBonus === true
     });
     const blueScoreData = buildBoutScoreData({
       scoringConfig,
       result: winnerCorner === "BLUE" ? "WIN" : "LOSS",
       charismaPoints: req.body.blueCharismaPoints ?? 0,
       dominancePoints: req.body.blueDominancePoints ?? 0,
-      applyTitleWinBonus: winnerCorner === "BLUE" && req.body.applyTitleWinBonus === true,
-      applyFinishBonus: winnerCorner === "BLUE" && req.body.applyFinishBonus === true
+      applyTitleWinBonus: winnerCorner === "BLUE" && req.body.applyTitleWinBonus === true
     });
 
     const note = normalizeOptionalString(req.body.note);
 
     const result = await prisma.$transaction(async (transaction) => {
+      await ensureLeaderboardWriteAccess(req.user, transaction);
+
       const redResult = await applyScoreEntry(transaction, {
         fighterId: redFighter.id,
         fightId: existingFight.id,
@@ -839,6 +1123,33 @@ router.post(
         data: {
           status: "COMPLETED",
           winnerName: winnerCorner === "RED" ? redFighter.name : blueFighter.name
+        }
+      });
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: "FIGHT_SCORED",
+        entityType: "FIGHT_CARD",
+        entityId: fight.id,
+        summary: `${req.user.name} scored ${fight.fighterRedName} vs ${fight.fighterBlueName}.`,
+        before: {
+          fight: buildFightSnapshot(existingFight),
+          fighters: [
+            buildFighterSnapshot(redFighter),
+            buildFighterSnapshot(blueFighter)
+          ]
+        },
+        after: {
+          fight: buildFightSnapshot(fight),
+          fighters: [
+            buildFighterSnapshot(redResult.fighter),
+            buildFighterSnapshot(blueResult.fighter)
+          ]
+        },
+        metadata: {
+          winnerCorner,
+          awardedAt: serializeDateValue(awardedAt),
+          note
         }
       });
 
@@ -875,9 +1186,6 @@ router.patch(
       titleWinBonus: req.body.titleWinBonus !== undefined
         ? requireNonNegativeInt(req.body.titleWinBonus, "Title win bonus")
         : existingConfig.titleWinBonus,
-      finishBonus: req.body.finishBonus !== undefined
-        ? requireNonNegativeInt(req.body.finishBonus, "Finish bonus")
-        : existingConfig.finishBonus,
       inactivityGraceDays: req.body.inactivityGraceDays !== undefined
         ? requireNonNegativeInt(req.body.inactivityGraceDays, "Inactivity grace days")
         : existingConfig.inactivityGraceDays,
@@ -893,9 +1201,25 @@ router.patch(
       throw createError(400, "Elimination days must be greater than inactivity grace days.");
     }
 
-    const scoringConfig = await prisma.fightScoringConfig.update({
-      where: { id: existingConfig.id },
-      data
+    const scoringConfig = await prisma.$transaction(async (transaction) => {
+      await ensureLeaderboardWriteAccess(req.user, transaction);
+
+      const scoringConfig = await transaction.fightScoringConfig.update({
+        where: { id: existingConfig.id },
+        data
+      });
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: "SCORING_UPDATED",
+        entityType: "SCORING_CONFIG",
+        entityId: scoringConfig.id,
+        summary: `${req.user.name} updated leaderboard scoring rules.`,
+        before: buildScoringConfigSnapshot(existingConfig),
+        after: buildScoringConfigSnapshot(scoringConfig)
+      });
+
+      return scoringConfig;
     });
 
     res.json({ scoringConfig });
@@ -909,31 +1233,112 @@ router.delete(
       where: { id: req.params.id }
     });
 
-    if (!existingFighter) {
+    if (!existingFighter || existingFighter.archived) {
       throw createError(404, "Fighter not found.");
     }
 
-    await prisma.fightFighter.delete({
-      where: { id: existingFighter.id }
+    await prisma.$transaction(async (transaction) => {
+      await ensureLeaderboardWriteAccess(req.user, transaction);
+
+      const archivedFighter = await transaction.fightFighter.update({
+        where: { id: existingFighter.id },
+        data: {
+          active: false,
+          archived: true,
+          isChampion: false,
+          archivedAt: new Date(),
+          archivedById: req.user.id,
+          restoredAt: null,
+          restoredById: null
+        }
+      });
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: "FIGHTER_ARCHIVED",
+        entityType: "FIGHTER",
+        entityId: archivedFighter.id,
+        summary: `${req.user.name} archived fighter ${archivedFighter.name}.`,
+        before: buildFighterSnapshot(existingFighter),
+        after: buildFighterSnapshot(archivedFighter)
+      });
     });
 
-    res.json({ message: "Fighter deleted." });
+    res.json({ message: "Fighter archived." });
+  })
+);
+
+router.post(
+  "/fighters/:id/restore",
+  asyncHandler(async (req, res) => {
+    const existingFighter = await prisma.fightFighter.findUnique({
+      where: { id: req.params.id }
+    });
+
+    if (!existingFighter || !existingFighter.archived) {
+      throw createError(404, "Archived fighter not found.");
+    }
+
+    const fighter = await prisma.$transaction(async (transaction) => {
+      await ensureLeaderboardWriteAccess(req.user, transaction);
+
+      const fighter = await transaction.fightFighter.update({
+        where: { id: existingFighter.id },
+        data: {
+          active: true,
+          archived: false,
+          archivedAt: null,
+          archivedById: null,
+          restoredAt: new Date(),
+          restoredById: req.user.id
+        }
+      });
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: "FIGHTER_RESTORED",
+        entityType: "FIGHTER",
+        entityId: fighter.id,
+        summary: `${req.user.name} restored fighter ${fighter.name}.`,
+        before: buildFighterSnapshot(existingFighter),
+        after: buildFighterSnapshot(fighter)
+      });
+
+      return fighter;
+    });
+
+    res.json({ fighter });
   })
 );
 
 router.post(
   "/hall-of-fame",
   asyncHandler(async (req, res) => {
-    const entry = await prisma.fightHallOfFameEntry.create({
-      data: {
-        fighterName: requireString(req.body.fighterName, "Fighter name"),
-        title: req.body.title ? requireString(req.body.title, "Title") : "Champion",
-        pointsAtTitle: req.body.pointsAtTitle !== undefined && req.body.pointsAtTitle !== ""
-          ? requireInt(req.body.pointsAtTitle, "Points at title")
-          : null,
-        notes: normalizeOptionalString(req.body.notes),
-        wonAt: req.body.wonAt ? requireDateTime(req.body.wonAt, "Won at") : new Date()
-      }
+    const entry = await prisma.$transaction(async (transaction) => {
+      await ensureLeaderboardWriteAccess(req.user, transaction);
+
+      const entry = await transaction.fightHallOfFameEntry.create({
+        data: {
+          fighterName: requireString(req.body.fighterName, "Fighter name"),
+          title: req.body.title ? requireString(req.body.title, "Title") : "Champion",
+          pointsAtTitle: req.body.pointsAtTitle !== undefined && req.body.pointsAtTitle !== ""
+            ? requireInt(req.body.pointsAtTitle, "Points at title")
+            : null,
+          notes: normalizeOptionalString(req.body.notes),
+          wonAt: req.body.wonAt ? requireDateTime(req.body.wonAt, "Won at") : new Date()
+        }
+      });
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: "HALL_OF_FAME_CREATED",
+        entityType: "HALL_OF_FAME",
+        entityId: entry.id,
+        summary: `${req.user.name} added ${entry.fighterName} to the hall of fame.`,
+        after: buildHallOfFameSnapshot(entry)
+      });
+
+      return entry;
     });
 
     res.status(201).json({ entry });
@@ -951,23 +1356,39 @@ router.patch(
       throw createError(404, "Hall of fame entry not found.");
     }
 
-    const entry = await prisma.fightHallOfFameEntry.update({
-      where: { id: existingEntry.id },
-      data: {
-        fighterName: req.body.fighterName !== undefined
-          ? requireString(req.body.fighterName, "Fighter name")
-          : existingEntry.fighterName,
-        title: req.body.title !== undefined
-          ? requireString(req.body.title, "Title")
-          : existingEntry.title,
-        pointsAtTitle: req.body.pointsAtTitle !== undefined && req.body.pointsAtTitle !== ""
-          ? requireInt(req.body.pointsAtTitle, "Points at title")
-          : req.body.pointsAtTitle === ""
-            ? null
-            : existingEntry.pointsAtTitle,
-        notes: req.body.notes !== undefined ? normalizeOptionalString(req.body.notes) : existingEntry.notes,
-        wonAt: req.body.wonAt ? requireDateTime(req.body.wonAt, "Won at") : existingEntry.wonAt
-      }
+    const entry = await prisma.$transaction(async (transaction) => {
+      await ensureLeaderboardWriteAccess(req.user, transaction);
+
+      const entry = await transaction.fightHallOfFameEntry.update({
+        where: { id: existingEntry.id },
+        data: {
+          fighterName: req.body.fighterName !== undefined
+            ? requireString(req.body.fighterName, "Fighter name")
+            : existingEntry.fighterName,
+          title: req.body.title !== undefined
+            ? requireString(req.body.title, "Title")
+            : existingEntry.title,
+          pointsAtTitle: req.body.pointsAtTitle !== undefined && req.body.pointsAtTitle !== ""
+            ? requireInt(req.body.pointsAtTitle, "Points at title")
+            : req.body.pointsAtTitle === ""
+              ? null
+              : existingEntry.pointsAtTitle,
+          notes: req.body.notes !== undefined ? normalizeOptionalString(req.body.notes) : existingEntry.notes,
+          wonAt: req.body.wonAt ? requireDateTime(req.body.wonAt, "Won at") : existingEntry.wonAt
+        }
+      });
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: "HALL_OF_FAME_UPDATED",
+        entityType: "HALL_OF_FAME",
+        entityId: entry.id,
+        summary: `${req.user.name} updated hall of fame entry for ${entry.fighterName}.`,
+        before: buildHallOfFameSnapshot(existingEntry),
+        after: buildHallOfFameSnapshot(entry)
+      });
+
+      return entry;
     });
 
     res.json({ entry });
@@ -985,8 +1406,21 @@ router.delete(
       throw createError(404, "Hall of fame entry not found.");
     }
 
-    await prisma.fightHallOfFameEntry.delete({
-      where: { id: existingEntry.id }
+    await prisma.$transaction(async (transaction) => {
+      await ensureLeaderboardWriteAccess(req.user, transaction);
+
+      await transaction.fightHallOfFameEntry.delete({
+        where: { id: existingEntry.id }
+      });
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: "HALL_OF_FAME_DELETED",
+        entityType: "HALL_OF_FAME",
+        entityId: existingEntry.id,
+        summary: `${req.user.name} deleted hall of fame entry for ${existingEntry.fighterName}.`,
+        before: buildHallOfFameSnapshot(existingEntry)
+      });
     });
 
     res.json({ message: "Hall of fame entry deleted." });
@@ -1000,15 +1434,30 @@ router.post(
     const blueName = requireString(req.body.fighterBlueName, "Blue corner fighter");
     requireDistinctFightParticipants(redName, blueName);
 
-    const fight = await prisma.fightCard.create({
-      data: {
-        fighterRedName: redName,
-        fighterBlueName: blueName,
-        scheduledAt: requireDateTime(req.body.scheduledAt, "Fight time"),
-        venue: normalizeOptionalString(req.body.venue),
-        notes: normalizeOptionalString(req.body.notes),
-        status: normalizeFightStatus(req.body.status)
-      }
+    const fight = await prisma.$transaction(async (transaction) => {
+      await ensureLeaderboardWriteAccess(req.user, transaction);
+
+      const fight = await transaction.fightCard.create({
+        data: {
+          fighterRedName: redName,
+          fighterBlueName: blueName,
+          scheduledAt: requireDateTime(req.body.scheduledAt, "Fight time"),
+          venue: normalizeOptionalString(req.body.venue),
+          notes: normalizeOptionalString(req.body.notes),
+          status: normalizeFightStatus(req.body.status)
+        }
+      });
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: "FIGHT_CREATED",
+        entityType: "FIGHT_CARD",
+        entityId: fight.id,
+        summary: `${req.user.name} scheduled ${fight.fighterRedName} vs ${fight.fighterBlueName}.`,
+        after: buildFightSnapshot(fight)
+      });
+
+      return fight;
     });
 
     res.status(201).json({ fight });
@@ -1041,19 +1490,35 @@ router.patch(
 
     requireDistinctFightParticipants(fighterRedName, fighterBlueName);
 
-    const fight = await prisma.fightCard.update({
-      where: { id: existingFight.id },
-      data: {
-        fighterRedName,
-        fighterBlueName,
-        scheduledAt: req.body.scheduledAt
-          ? requireDateTime(req.body.scheduledAt, "Fight time")
-          : existingFight.scheduledAt,
-        venue: req.body.venue !== undefined ? normalizeOptionalString(req.body.venue) : existingFight.venue,
-        notes: req.body.notes !== undefined ? normalizeOptionalString(req.body.notes) : existingFight.notes,
-        status,
-        winnerName
-      }
+    const fight = await prisma.$transaction(async (transaction) => {
+      await ensureLeaderboardWriteAccess(req.user, transaction);
+
+      const fight = await transaction.fightCard.update({
+        where: { id: existingFight.id },
+        data: {
+          fighterRedName,
+          fighterBlueName,
+          scheduledAt: req.body.scheduledAt
+            ? requireDateTime(req.body.scheduledAt, "Fight time")
+            : existingFight.scheduledAt,
+          venue: req.body.venue !== undefined ? normalizeOptionalString(req.body.venue) : existingFight.venue,
+          notes: req.body.notes !== undefined ? normalizeOptionalString(req.body.notes) : existingFight.notes,
+          status,
+          winnerName
+        }
+      });
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: "FIGHT_UPDATED",
+        entityType: "FIGHT_CARD",
+        entityId: fight.id,
+        summary: `${req.user.name} updated ${fight.fighterRedName} vs ${fight.fighterBlueName}.`,
+        before: buildFightSnapshot(existingFight),
+        after: buildFightSnapshot(fight)
+      });
+
+      return fight;
     });
 
     res.json({ fight });
@@ -1071,8 +1536,21 @@ router.delete(
       throw createError(404, "Fight not found.");
     }
 
-    await prisma.fightCard.delete({
-      where: { id: existingFight.id }
+    await prisma.$transaction(async (transaction) => {
+      await ensureLeaderboardWriteAccess(req.user, transaction);
+
+      await transaction.fightCard.delete({
+        where: { id: existingFight.id }
+      });
+
+      await createFightAuditLog(transaction, {
+        actorId: req.user.id,
+        action: "FIGHT_DELETED",
+        entityType: "FIGHT_CARD",
+        entityId: existingFight.id,
+        summary: `${req.user.name} deleted ${existingFight.fighterRedName} vs ${existingFight.fighterBlueName}.`,
+        before: buildFightSnapshot(existingFight)
+      });
     });
 
     res.json({ message: "Fight deleted." });
