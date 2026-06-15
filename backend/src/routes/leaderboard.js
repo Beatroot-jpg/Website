@@ -580,7 +580,7 @@ async function buildLeaderboardPayload(reqUser = null) {
       }
     }),
     prisma.fightAuditLog.findMany({
-      take: 20,
+      take: 60,
       orderBy: [{ createdAt: "desc" }],
       include: {
         actor: {
@@ -741,6 +741,13 @@ router.patch(
       throw createError(404, "Fighter not found.");
     }
 
+    const applyStatOverride = req.body.applyStatOverride === true;
+    const nextActiveState = typeof req.body.active === "boolean" ? req.body.active : existingFighter.active;
+
+    if (existingFighter.isChampion && !nextActiveState) {
+      throw createError(400, "The current belt holder cannot be set inactive. Vacate or move the belt first.");
+    }
+
     const fighter = await prisma.$transaction(async (transaction) => {
       await ensureLeaderboardWriteAccess(req.user, transaction);
 
@@ -750,31 +757,31 @@ router.patch(
           name: req.body.name !== undefined
             ? requireString(req.body.name, "Fighter name")
             : existingFighter.name,
-          points: req.body.points !== undefined
+          points: applyStatOverride && req.body.points !== undefined
             ? requireInt(req.body.points, "Points")
             : existingFighter.points,
-          wins: req.body.wins !== undefined
+          wins: applyStatOverride && req.body.wins !== undefined
             ? requireNonNegativeInt(req.body.wins, "Wins")
             : existingFighter.wins,
-          losses: req.body.losses !== undefined
+          losses: applyStatOverride && req.body.losses !== undefined
             ? requireNonNegativeInt(req.body.losses, "Losses")
             : existingFighter.losses,
-          charismaPoints: req.body.charismaPoints !== undefined
+          charismaPoints: applyStatOverride && req.body.charismaPoints !== undefined
             ? requireNonNegativeInt(req.body.charismaPoints, "Charisma points")
             : existingFighter.charismaPoints,
-          dominancePoints: req.body.dominancePoints !== undefined
+          dominancePoints: applyStatOverride && req.body.dominancePoints !== undefined
             ? requireNonNegativeInt(req.body.dominancePoints, "Dominance points")
             : existingFighter.dominancePoints,
-          active: typeof req.body.active === "boolean" ? req.body.active : existingFighter.active,
+          active: nextActiveState,
           notes: req.body.notes !== undefined ? normalizeOptionalString(req.body.notes) : existingFighter.notes,
-          lastFightAt: req.body.lastFightAt
+          lastFightAt: applyStatOverride && req.body.lastFightAt
             ? requireDateTime(req.body.lastFightAt, "Last fight date")
-            : req.body.lastFightAt === ""
+            : applyStatOverride && req.body.lastFightAt === ""
               ? null
               : existingFighter.lastFightAt,
-          lastAwardedAt: req.body.lastAwardedAt
+          lastAwardedAt: applyStatOverride && req.body.lastAwardedAt
             ? requireDateTime(req.body.lastAwardedAt, "Last awarded date")
-            : req.body.lastAwardedAt === ""
+            : applyStatOverride && req.body.lastAwardedAt === ""
               ? null
               : existingFighter.lastAwardedAt
         }
@@ -785,9 +792,14 @@ router.patch(
         action: "FIGHTER_UPDATED",
         entityType: "FIGHTER",
         entityId: fighter.id,
-        summary: `${req.user.name} updated fighter ${fighter.name}.`,
+        summary: applyStatOverride
+          ? `${req.user.name} updated fighter ${fighter.name} with a direct stat override.`
+          : `${req.user.name} updated fighter ${fighter.name}.`,
         before: buildFighterSnapshot(existingFighter),
-        after: buildFighterSnapshot(fighter)
+        after: buildFighterSnapshot(fighter),
+        metadata: {
+          applyStatOverride
+        }
       });
 
       return fighter;

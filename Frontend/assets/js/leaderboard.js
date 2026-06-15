@@ -27,6 +27,9 @@ const archivedFightersPageLabel = document.querySelector("#archivedFightersPageL
 const previousArchivedFightersPageButton = document.querySelector("#previousArchivedFightersPageButton");
 const nextArchivedFightersPageButton = document.querySelector("#nextArchivedFightersPageButton");
 const scoreLogTableBody = document.querySelector("#scoreLogTableBody");
+const auditSearchInput = document.querySelector("#auditSearchInput");
+const auditActionFilter = document.querySelector("#auditActionFilter");
+const auditLogMeta = document.querySelector("#auditLogMeta");
 const fightCardActionsHeader = document.querySelector("#fightCardActionsHeader");
 const fightCardTableBody = document.querySelector("#fightCardTableBody");
 const hallOfFameTableBody = document.querySelector("#hallOfFameTableBody");
@@ -51,6 +54,11 @@ const fighterForm = document.querySelector("#fighterForm");
 const fighterFormKicker = document.querySelector("#fighterFormKicker");
 const fighterFormTitle = document.querySelector("#fighterFormTitle");
 const fighterSelectBlock = document.querySelector("#fighterSelectBlock");
+const fighterEditFlowNote = document.querySelector("#fighterEditFlowNote");
+const fighterOverrideToggleRow = document.querySelector("#fighterOverrideToggleRow");
+const fighterEnableOverrideToggle = document.querySelector("#fighterEnableOverrideToggle");
+const fighterOverrideWarning = document.querySelector("#fighterOverrideWarning");
+const fighterPointsField = document.querySelector("#fighterPointsField");
 const fighterAdvancedFields = document.querySelector("#fighterAdvancedFields");
 const fighterSelect = document.querySelector("#fighterSelect");
 const fighterFormSubmitButton = document.querySelector("#fighterFormSubmitButton");
@@ -73,6 +81,10 @@ const boutFields = document.querySelector("#boutFields");
 const correctionFields = document.querySelector("#correctionFields");
 const awardPointsSubmitButton = document.querySelector("#awardPointsSubmitButton");
 const awardPointsMessage = document.querySelector("#awardPointsMessage");
+const awardPreviewCurrent = document.querySelector("#awardPreviewCurrent");
+const awardPreviewDelta = document.querySelector("#awardPreviewDelta");
+const awardPreviewProjected = document.querySelector("#awardPreviewProjected");
+const awardPreviewBreakdown = document.querySelector("#awardPreviewBreakdown");
 const awardBeltModal = document.querySelector("#awardBeltModal");
 const closeAwardBeltButton = document.querySelector("#closeAwardBeltButton");
 const closeAwardBeltBackdrop = document.querySelector("#closeAwardBeltBackdrop");
@@ -80,6 +92,7 @@ const awardBeltForm = document.querySelector("#awardBeltForm");
 const beltFighterSelect = document.querySelector("#beltFighterSelect");
 const awardBeltSubmitButton = document.querySelector("#awardBeltSubmitButton");
 const awardBeltMessage = document.querySelector("#awardBeltMessage");
+const beltPreviewSummary = document.querySelector("#beltPreviewSummary");
 const securityLockModal = document.querySelector("#securityLockModal");
 const closeSecurityLockButton = document.querySelector("#closeSecurityLockButton");
 const closeSecurityLockBackdrop = document.querySelector("#closeSecurityLockBackdrop");
@@ -94,6 +107,10 @@ const closeScoringBackdrop = document.querySelector("#closeScoringBackdrop");
 const scoringConfigForm = document.querySelector("#scoringConfigForm");
 const scoringConfigSubmitButton = document.querySelector("#scoringConfigSubmitButton");
 const scoringConfigMessage = document.querySelector("#scoringConfigMessage");
+const scoringPreviewWin = document.querySelector("#scoringPreviewWin");
+const scoringPreviewLoss = document.querySelector("#scoringPreviewLoss");
+const scoringPreviewMax = document.querySelector("#scoringPreviewMax");
+const scoringPreviewSummary = document.querySelector("#scoringPreviewSummary");
 const hallOfFameModal = document.querySelector("#hallOfFameModal");
 const closeHallOfFameButton = document.querySelector("#closeHallOfFameButton");
 const closeHallOfFameBackdrop = document.querySelector("#closeHallOfFameBackdrop");
@@ -116,6 +133,10 @@ const scoreFightMatchup = document.querySelector("#scoreFightMatchup");
 const scoreFightWinnerSelect = document.querySelector("#scoreFightWinnerSelect");
 const scoreFightSubmitButton = document.querySelector("#scoreFightSubmitButton");
 const scoreFightMessage = document.querySelector("#scoreFightMessage");
+const scoreFightRedPreviewTotal = document.querySelector("#scoreFightRedPreviewTotal");
+const scoreFightRedPreviewBreakdown = document.querySelector("#scoreFightRedPreviewBreakdown");
+const scoreFightBluePreviewTotal = document.querySelector("#scoreFightBluePreviewTotal");
+const scoreFightBluePreviewBreakdown = document.querySelector("#scoreFightBluePreviewBreakdown");
 
 const state = {
   session: getSession(),
@@ -140,6 +161,8 @@ const state = {
   archivedFightersPage: 1,
   archivedFightersPageSize: 6,
   leaderboardSearchQuery: "",
+  auditSearchQuery: "",
+  auditActionFilter: "ALL",
   fighterFormMode: "create",
   pendingDeleteFighterId: null,
   pendingScoreFightId: null
@@ -154,6 +177,15 @@ function resetAdminState() {
   state.archivedFighters = [];
   state.securityState = null;
   state.auditLog = [];
+  state.archivedFightersPage = 1;
+  state.auditSearchQuery = "";
+  state.auditActionFilter = "ALL";
+  if (auditSearchInput) {
+    auditSearchInput.value = "";
+  }
+  if (auditActionFilter) {
+    auditActionFilter.value = "ALL";
+  }
 }
 
 function normalizeViewer(viewer) {
@@ -296,6 +328,21 @@ function formatDelta(value) {
   return parsed >= 0 ? `+${parsed}` : `${parsed}`;
 }
 
+function formatWholeNumber(value) {
+  return new Intl.NumberFormat("en-AU", {
+    maximumFractionDigits: 0
+  }).format(Number(value || 0));
+}
+
+function parseWholeNumber(value, fallback = 0) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) ? parsed : fallback;
+}
+
+function clampWholeNumber(value, minimum, maximum) {
+  return Math.min(Math.max(parseWholeNumber(value, minimum), minimum), maximum);
+}
+
 function formatRefreshStamp(value) {
   if (!value) {
     return "Waiting for update";
@@ -320,6 +367,51 @@ function getCurrentChampion() {
 
 function getTopContender() {
   return state.fighters.find((fighter) => fighter.rank === 2) || null;
+}
+
+function formatAuditActionLabel(action) {
+  return `${action || "UNKNOWN"}`
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function getScoringConfigValues(source = state.scoringConfig) {
+  return {
+    winPoints: parseWholeNumber(source?.winPoints, 0),
+    lossPoints: parseWholeNumber(source?.lossPoints, 0),
+    charismaMax: Math.max(0, parseWholeNumber(source?.charismaMax, 0)),
+    dominanceMax: Math.max(0, parseWholeNumber(source?.dominanceMax, 0)),
+    titleWinBonus: Math.max(0, parseWholeNumber(source?.titleWinBonus, 0)),
+    inactivityGraceDays: Math.max(0, parseWholeNumber(source?.inactivityGraceDays, 0)),
+    inactivityWeeklyPenalty: Math.max(0, parseWholeNumber(source?.inactivityWeeklyPenalty, 0)),
+    eliminationDays: Math.max(0, parseWholeNumber(source?.eliminationDays, 0))
+  };
+}
+
+function buildBoutPreviewScore({
+  config = state.scoringConfig,
+  result,
+  charismaPoints = 0,
+  dominancePoints = 0,
+  applyTitleWinBonus = false
+}) {
+  const scoringConfig = getScoringConfigValues(config);
+  const normalizedResult = result === "LOSS" ? "LOSS" : "WIN";
+  const safeCharismaPoints = clampWholeNumber(charismaPoints, 0, scoringConfig.charismaMax);
+  const safeDominancePoints = clampWholeNumber(dominancePoints, 0, scoringConfig.dominanceMax);
+  const bonusPoints = applyTitleWinBonus ? scoringConfig.titleWinBonus : 0;
+  const resultPoints = normalizedResult === "WIN" ? scoringConfig.winPoints : scoringConfig.lossPoints;
+
+  return {
+    result: normalizedResult,
+    resultPoints,
+    charismaPoints: safeCharismaPoints,
+    dominancePoints: safeDominancePoints,
+    bonusPoints,
+    totalDelta: resultPoints + safeCharismaPoints + safeDominancePoints + bonusPoints
+  };
 }
 
 function normalizeSecurityState(securityState) {
@@ -377,11 +469,8 @@ function openFighterFormModal(mode) {
   setMessage(fighterFormMessage, "");
   fighterSelectBlock.classList.toggle("hidden", mode !== "edit");
   fighterSelect.required = mode === "edit";
-  fighterAdvancedFields.classList.toggle("hidden", mode !== "edit");
-  fighterAdvancedFields.querySelectorAll("input").forEach((input) => {
-    input.disabled = mode !== "edit";
-  });
   openDeleteFighterButton.classList.toggle("hidden", mode !== "edit");
+  fighterEnableOverrideToggle.checked = false;
 
   if (mode === "create") {
     fighterFormKicker.textContent = "Create Fighter";
@@ -402,6 +491,7 @@ function openFighterFormModal(mode) {
     syncSelectedFighterIntoForm(fighterSelect.value);
   }
 
+  syncFighterOverrideState();
   toggleModal(fighterFormModal, true);
   window.requestAnimationFrame(() => {
     if (mode === "edit") {
@@ -415,6 +505,31 @@ function openFighterFormModal(mode) {
 
 function closeFighterFormModal() {
   toggleModal(fighterFormModal, false);
+}
+
+function syncFighterOverrideState() {
+  const isEditMode = state.fighterFormMode === "edit";
+  const overrideEnabled = isEditMode ? fighterEnableOverrideToggle.checked : false;
+  const showAdvancedFields = isEditMode && overrideEnabled;
+  const showPointsField = !isEditMode || overrideEnabled;
+
+  fighterEditFlowNote?.classList.toggle("hidden", !isEditMode);
+  fighterOverrideToggleRow?.classList.toggle("hidden", !isEditMode);
+  fighterOverrideWarning?.classList.toggle("hidden", !isEditMode || !overrideEnabled);
+  fighterPointsField?.classList.toggle("hidden", !showPointsField);
+  fighterAdvancedFields?.classList.toggle("hidden", !showAdvancedFields);
+
+  if (fighterForm?.elements.points) {
+    fighterForm.elements.points.disabled = isEditMode && !overrideEnabled;
+    fighterForm.elements.points.required = !isEditMode || overrideEnabled;
+  }
+
+  fighterAdvancedFields?.querySelectorAll("input").forEach((input) => {
+    input.disabled = !showAdvancedFields;
+    if (input.type !== "datetime-local") {
+      input.required = showAdvancedFields;
+    }
+  });
 }
 
 function openDeleteFighterModal(fighter) {
@@ -439,6 +554,7 @@ function openAwardPointsModal() {
   awardPointsForm.elements.correctionPoints.value = 0;
   awardPointsForm.elements.awardedAt.value = formatDateTimeLocalValue(new Date());
   syncAwardEntryType();
+  syncAwardPreview();
   toggleModal(awardPointsModal, true);
   window.requestAnimationFrame(() => {
     awardFighterSelect.focus();
@@ -447,6 +563,48 @@ function openAwardPointsModal() {
 
 function closeAwardPointsModal() {
   toggleModal(awardPointsModal, false);
+}
+
+function getSelectedAwardFighter() {
+  return state.fighterDirectory.find((fighter) => fighter.id === awardFighterSelect.value) || null;
+}
+
+function syncAwardPreview() {
+  const fighter = getSelectedAwardFighter();
+  const currentPoints = fighter?.points ?? 0;
+  const isCorrection = awardEntryTypeSelect.value === "CORRECTION";
+  const result = awardPointsForm.elements.result.value;
+  const correctionPoints = parseWholeNumber(awardPointsForm.elements.correctionPoints.value, 0);
+
+  let delta = 0;
+  let breakdown = "Select a fighter to preview the change.";
+
+  if (fighter) {
+    if (isCorrection) {
+      delta = correctionPoints;
+      breakdown = `Direct correction of ${formatDelta(correctionPoints)} points for ${fighter.name}.`;
+    } else {
+      const preview = buildBoutPreviewScore({
+        result,
+        charismaPoints: awardPointsForm.elements.charismaPoints.value,
+        dominancePoints: awardPointsForm.elements.dominancePoints.value,
+        applyTitleWinBonus: awardPointsForm.elements.applyTitleWinBonus.checked
+      });
+
+      delta = preview.totalDelta;
+      breakdown = [
+        `${preview.result === "WIN" ? "Win" : "Loss"} ${formatDelta(preview.resultPoints)}`,
+        `Charisma ${formatDelta(preview.charismaPoints)}`,
+        `Dominance ${formatDelta(preview.dominancePoints)}`,
+        preview.bonusPoints ? `Title bonus ${formatDelta(preview.bonusPoints)}` : null
+      ].filter(Boolean).join(" | ");
+    }
+  }
+
+  awardPreviewCurrent.textContent = formatWholeNumber(currentPoints);
+  awardPreviewDelta.textContent = formatDelta(delta);
+  awardPreviewProjected.textContent = formatWholeNumber(currentPoints + delta);
+  awardPreviewBreakdown.textContent = breakdown;
 }
 
 function syncBeltFighterOptions() {
@@ -474,6 +632,7 @@ function openAwardBeltModal() {
   const champion = getCurrentChampion();
   beltFighterSelect.value = champion?.id || "";
   awardBeltForm.elements.awardedAt.value = formatDateTimeLocalValue(new Date());
+  syncBeltPreview();
   toggleModal(awardBeltModal, true);
   window.requestAnimationFrame(() => {
     beltFighterSelect.focus();
@@ -482,6 +641,28 @@ function openAwardBeltModal() {
 
 function closeAwardBeltModal() {
   toggleModal(awardBeltModal, false);
+}
+
+function syncBeltPreview() {
+  const currentChampion = getCurrentChampion();
+  const nextChampion = state.fighterDirectory.find((fighter) => fighter.id === beltFighterSelect.value) || null;
+
+  if (!currentChampion && !nextChampion) {
+    beltPreviewSummary.textContent = "The belt will remain vacant and the #1 slot stays reserved.";
+    return;
+  }
+
+  if (!nextChampion) {
+    beltPreviewSummary.textContent = `${currentChampion?.name || "The current belt holder"} will lose the belt and the #1 slot will become vacant.`;
+    return;
+  }
+
+  if (currentChampion?.id === nextChampion.id) {
+    beltPreviewSummary.textContent = `${nextChampion.name} remains the belt holder and keeps the reserved #1 slot.`;
+    return;
+  }
+
+  beltPreviewSummary.textContent = `${currentChampion?.name || "Vacant belt"} -> ${nextChampion.name}. The selected fighter will become rank #1 as belt holder.`;
 }
 
 function syncSecurityFormState() {
@@ -532,6 +713,7 @@ function openScoringConfigModal() {
       scoringConfigForm.elements[key].value = value;
     }
   });
+  syncScoringPreview();
   toggleModal(scoringConfigModal, true);
   window.requestAnimationFrame(() => {
     scoringConfigForm?.elements.startingPoints?.focus();
@@ -540,6 +722,31 @@ function openScoringConfigModal() {
 
 function closeScoringConfigModal() {
   toggleModal(scoringConfigModal, false);
+}
+
+function syncScoringPreview() {
+  const scoringConfig = getScoringConfigValues({
+    winPoints: scoringConfigForm?.elements.winPoints?.value,
+    lossPoints: scoringConfigForm?.elements.lossPoints?.value,
+    charismaMax: scoringConfigForm?.elements.charismaMax?.value,
+    dominanceMax: scoringConfigForm?.elements.dominanceMax?.value,
+    titleWinBonus: scoringConfigForm?.elements.titleWinBonus?.value,
+    inactivityGraceDays: scoringConfigForm?.elements.inactivityGraceDays?.value,
+    inactivityWeeklyPenalty: scoringConfigForm?.elements.inactivityWeeklyPenalty?.value,
+    eliminationDays: scoringConfigForm?.elements.eliminationDays?.value
+  });
+  const maxBoutSwing = scoringConfig.winPoints
+    + scoringConfig.charismaMax
+    + scoringConfig.dominanceMax
+    + scoringConfig.titleWinBonus;
+
+  scoringPreviewWin.textContent = formatDelta(scoringConfig.winPoints);
+  scoringPreviewLoss.textContent = formatDelta(scoringConfig.lossPoints);
+  scoringPreviewMax.textContent = formatDelta(maxBoutSwing);
+
+  scoringPreviewSummary.textContent = scoringConfig.eliminationDays > scoringConfig.inactivityGraceDays
+    ? `Decay starts after ${scoringConfig.inactivityGraceDays} idle days at ${scoringConfig.inactivityWeeklyPenalty} points per week. Fighters flip to eliminated after ${scoringConfig.eliminationDays} idle days.`
+    : "Elimination days must stay higher than grace days or the rules will not save.";
 }
 
 function openHallOfFameModal() {
@@ -590,6 +797,7 @@ function openScoreFightModal(fightId) {
   scoreFightForm.elements.redDominancePoints.value = 0;
   scoreFightForm.elements.blueCharismaPoints.value = 0;
   scoreFightForm.elements.blueDominancePoints.value = 0;
+  syncScoreFightPreview();
   toggleModal(scoreFightModal, true);
   window.requestAnimationFrame(() => {
     scoreFightWinnerSelect.focus();
@@ -599,6 +807,64 @@ function openScoreFightModal(fightId) {
 function closeScoreFightModal() {
   state.pendingScoreFightId = null;
   toggleModal(scoreFightModal, false);
+}
+
+function getActiveFightPreviewContext() {
+  const fight = state.fightCard.find((entry) => entry.id === state.pendingScoreFightId) || null;
+
+  if (!fight) {
+    return {
+      fight: null,
+      redFighter: null,
+      blueFighter: null
+    };
+  }
+
+  return {
+    fight,
+    redFighter: state.fighterDirectory.find((fighter) => fighter.name === fight.fighterRedName) || null,
+    blueFighter: state.fighterDirectory.find((fighter) => fighter.name === fight.fighterBlueName) || null
+  };
+}
+
+function syncScoreFightPreview() {
+  const { redFighter, blueFighter } = getActiveFightPreviewContext();
+  const winnerCorner = scoreFightForm?.elements.winnerCorner?.value || "RED";
+  const redWin = winnerCorner === "RED";
+  const blueWin = winnerCorner === "BLUE";
+  const applyTitleWinBonus = Boolean(scoreFightForm?.elements.applyTitleWinBonus?.checked);
+  const redPreview = buildBoutPreviewScore({
+    result: redWin ? "WIN" : "LOSS",
+    charismaPoints: scoreFightForm?.elements.redCharismaPoints?.value,
+    dominancePoints: scoreFightForm?.elements.redDominancePoints?.value,
+    applyTitleWinBonus: redWin && applyTitleWinBonus
+  });
+  const bluePreview = buildBoutPreviewScore({
+    result: blueWin ? "WIN" : "LOSS",
+    charismaPoints: scoreFightForm?.elements.blueCharismaPoints?.value,
+    dominancePoints: scoreFightForm?.elements.blueDominancePoints?.value,
+    applyTitleWinBonus: blueWin && applyTitleWinBonus
+  });
+
+  if (redFighter) {
+    const projectedWins = redFighter.wins + (redWin ? 1 : 0);
+    const projectedLosses = redFighter.losses + (redWin ? 0 : 1);
+    scoreFightRedPreviewTotal.textContent = formatWholeNumber(redFighter.points + redPreview.totalDelta);
+    scoreFightRedPreviewBreakdown.textContent = `${formatDelta(redPreview.totalDelta)} points | projected record ${projectedWins}-${projectedLosses}`;
+  } else {
+    scoreFightRedPreviewTotal.textContent = "Missing";
+    scoreFightRedPreviewBreakdown.textContent = "Red corner fighter is not currently on the ladder.";
+  }
+
+  if (blueFighter) {
+    const projectedWins = blueFighter.wins + (blueWin ? 1 : 0);
+    const projectedLosses = blueFighter.losses + (blueWin ? 0 : 1);
+    scoreFightBluePreviewTotal.textContent = formatWholeNumber(blueFighter.points + bluePreview.totalDelta);
+    scoreFightBluePreviewBreakdown.textContent = `${formatDelta(bluePreview.totalDelta)} points | projected record ${projectedWins}-${projectedLosses}`;
+  } else {
+    scoreFightBluePreviewTotal.textContent = "Missing";
+    scoreFightBluePreviewBreakdown.textContent = "Blue corner fighter is not currently on the ladder.";
+  }
 }
 
 function syncSessionButton() {
@@ -1182,23 +1448,93 @@ function renderArchivedFightersTable() {
   nextArchivedFightersPageButton.disabled = state.archivedFightersPage >= totalPages;
 }
 
-function renderScoreLogTable() {
-  scoreLogTableBody.textContent = "";
-
-  if (!state.auditLog.length) {
-    scoreLogTableBody.appendChild(createTableMessageRow("No audit activity has been recorded yet.", 4));
+function syncAuditActionFilterOptions() {
+  if (!auditActionFilter) {
     return;
   }
 
-  state.auditLog.forEach((entry) => {
+  const availableActions = [...new Set(
+    state.auditLog
+      .map((entry) => entry.action)
+      .filter(Boolean)
+  )];
+
+  const currentValue = state.auditActionFilter;
+  auditActionFilter.textContent = "";
+
+  const allOption = document.createElement("option");
+  allOption.value = "ALL";
+  allOption.textContent = "All actions";
+  auditActionFilter.appendChild(allOption);
+
+  availableActions.forEach((action) => {
+    const option = document.createElement("option");
+    option.value = action;
+    option.textContent = formatAuditActionLabel(action);
+    auditActionFilter.appendChild(option);
+  });
+
+  const nextValue = availableActions.includes(currentValue) || currentValue === "ALL"
+    ? currentValue
+    : "ALL";
+
+  state.auditActionFilter = nextValue;
+  auditActionFilter.value = nextValue;
+}
+
+function getFilteredAuditLog() {
+  const query = state.auditSearchQuery.trim().toLowerCase();
+
+  return state.auditLog.filter((entry) => {
+    if (state.auditActionFilter !== "ALL" && entry.action !== state.auditActionFilter) {
+      return false;
+    }
+
+    if (!query) {
+      return true;
+    }
+
+    const haystack = [
+      entry.action,
+      formatAuditActionLabel(entry.action),
+      entry.summary,
+      entry.actorName,
+      entry.entityType,
+      entry.entityId
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(query);
+  });
+}
+
+function renderScoreLogTable() {
+  scoreLogTableBody.textContent = "";
+  syncAuditActionFilterOptions();
+  const filteredEntries = getFilteredAuditLog();
+
+  if (!filteredEntries.length) {
+    scoreLogTableBody.appendChild(createTableMessageRow(
+      state.auditLog.length
+        ? "No audit entries match the current filters."
+        : "No audit activity has been recorded yet.",
+      4
+    ));
+    if (auditLogMeta) {
+      auditLogMeta.textContent = state.auditLog.length
+        ? "No audit entries match the current filters."
+        : "Showing recent audit activity.";
+    }
+    return;
+  }
+
+  filteredEntries.forEach((entry) => {
     const row = document.createElement("tr");
 
     const actionCell = document.createElement("td");
-    actionCell.textContent = entry.action
-      .toLowerCase()
-      .split("_")
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" ");
+    actionCell.textContent = formatAuditActionLabel(entry.action);
 
     const detailsCell = document.createElement("td");
     const detailsPrimary = document.createElement("div");
@@ -1207,7 +1543,7 @@ function renderScoreLogTable() {
     detailsSummary.textContent = entry.summary;
     const detailsSub = document.createElement("span");
     detailsSub.textContent = entry.entityType
-      ? `${entry.entityType}${entry.entityId ? ` • ${entry.entityId}` : ""}`
+      ? `${entry.entityType}${entry.entityId ? ` | ${entry.entityId}` : ""}`
       : "Leaderboard";
     detailsPrimary.append(detailsSummary, detailsSub);
     detailsCell.appendChild(detailsPrimary);
@@ -1221,6 +1557,10 @@ function renderScoreLogTable() {
     row.append(actionCell, detailsCell, actorCell, whenCell);
     scoreLogTableBody.appendChild(row);
   });
+
+  if (auditLogMeta) {
+    auditLogMeta.textContent = `Showing ${filteredEntries.length} of ${state.auditLog.length} audit entries`;
+  }
 }
 
 function renderHallOfFameTable() {
@@ -1374,6 +1714,7 @@ function syncAwardEntryType() {
   awardPointsForm.elements.dominancePoints.disabled = isCorrection;
   awardPointsForm.elements.applyTitleWinBonus.disabled = isCorrection;
   awardPointsForm.elements.correctionPoints.disabled = !isCorrection;
+  syncAwardPreview();
 }
 
 async function loadPublicLeaderboardData() {
@@ -1620,11 +1961,26 @@ leaderboardSearchInput?.addEventListener("input", () => {
   renderLeaderboardTable();
 });
 
+auditSearchInput?.addEventListener("input", () => {
+  state.auditSearchQuery = auditSearchInput.value;
+  renderScoreLogTable();
+});
+
+auditActionFilter?.addEventListener("change", () => {
+  state.auditActionFilter = auditActionFilter.value || "ALL";
+  renderScoreLogTable();
+});
+
 fighterSelect?.addEventListener("change", () => {
   syncSelectedFighterIntoForm(fighterSelect.value);
 });
 
 awardEntryTypeSelect?.addEventListener("change", syncAwardEntryType);
+fighterEnableOverrideToggle?.addEventListener("change", syncFighterOverrideState);
+awardFighterSelect?.addEventListener("change", syncAwardPreview);
+awardFightSelect?.addEventListener("change", syncAwardPreview);
+beltFighterSelect?.addEventListener("change", syncBeltPreview);
+scoreFightWinnerSelect?.addEventListener("change", syncScoreFightPreview);
 openDeleteFighterButton?.addEventListener("click", () => {
   const fighter = state.fighterDirectory.find((entry) => entry.id === fighterSelect.value);
 
@@ -1657,6 +2013,10 @@ closeFightCardButton?.addEventListener("click", closeFightCardModal);
 closeFightCardBackdrop?.addEventListener("click", closeFightCardModal);
 closeScoreFightButton?.addEventListener("click", closeScoreFightModal);
 closeScoreFightBackdrop?.addEventListener("click", closeScoreFightModal);
+
+awardPointsForm?.addEventListener("input", syncAwardPreview);
+scoringConfigForm?.addEventListener("input", syncScoringPreview);
+scoreFightForm?.addEventListener("input", syncScoreFightPreview);
 
 window.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") {
@@ -1752,15 +2112,23 @@ fighterForm?.addEventListener("submit", async (event) => {
 
   const payload = {
     name: fighterForm.elements.name.value.trim(),
-    points: Number(fighterForm.elements.points.value),
-    wins: Number(fighterForm.elements.wins.value),
-    losses: Number(fighterForm.elements.losses.value),
-    charismaPoints: Number(fighterForm.elements.charismaPoints.value),
-    dominancePoints: Number(fighterForm.elements.dominancePoints.value),
     active: fighterForm.elements.active.checked,
-    notes: fighterForm.elements.notes.value.trim(),
-    lastFightAt: fighterForm.elements.lastFightAt.value || ""
+    notes: fighterForm.elements.notes.value.trim()
   };
+
+  if (state.fighterFormMode === "create") {
+    payload.points = Number(fighterForm.elements.points.value);
+  }
+
+  if (state.fighterFormMode === "edit" && fighterEnableOverrideToggle.checked) {
+    payload.applyStatOverride = true;
+    payload.points = Number(fighterForm.elements.points.value);
+    payload.wins = Number(fighterForm.elements.wins.value);
+    payload.losses = Number(fighterForm.elements.losses.value);
+    payload.charismaPoints = Number(fighterForm.elements.charismaPoints.value);
+    payload.dominancePoints = Number(fighterForm.elements.dominancePoints.value);
+    payload.lastFightAt = fighterForm.elements.lastFightAt.value || "";
+  }
 
   try {
     if (state.fighterFormMode === "create") {

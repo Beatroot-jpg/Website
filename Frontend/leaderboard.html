@@ -167,46 +167,88 @@
             <div class="panel-lock" id="leaderboardSecurityStatus"></div>
             <p class="helper-copy hidden" id="leaderboardSecurityOwnerNote">Only the owner account can lock or unlock leaderboard writes.</p>
 
-            <div class="admin-action-grid">
-              <button class="admin-action-button" id="openSecurityLockButton" type="button">
-                <strong>Security lock</strong>
-                <span>Owner only. Freeze leaderboard writes while you preserve or review a fight night.</span>
-              </button>
+            <div class="admin-flow-note">
+              <strong>Best flow</strong>
+              <p>Schedule and score regular fights first. Use manual scoring for corrections, and only open direct fighter overrides if the stored totals themselves are wrong.</p>
+            </div>
 
-              <button class="admin-action-button" id="openCreateFighterButton" type="button">
-                <strong>Add fighter</strong>
-                <span>Create a new ladder entry and drop them straight onto the contender board.</span>
-              </button>
+            <div class="admin-action-group is-routine">
+              <div class="admin-action-group-header">
+                <div class="admin-action-group-heading">
+                  <p class="section-kicker tone-routine">Routine</p>
+                  <span class="admin-group-count">3 actions</span>
+                </div>
+                <h3>Fight night actions</h3>
+                <p>Build the night in order: add fighters, book the bout, then place the belt where it belongs.</p>
+              </div>
 
-              <button class="admin-action-button" id="openAwardPointsButton" type="button">
-                <strong>Manual scoring</strong>
-                <span>Use this for one-off corrections or special point changes outside a scheduled fight.</span>
-              </button>
+              <div class="admin-action-grid">
+                <button class="admin-action-button is-routine" id="openCreateFighterButton" type="button">
+                  <strong>Add fighter</strong>
+                  <span>Create a new ladder entry and drop them straight onto the contender board.</span>
+                </button>
 
-              <button class="admin-action-button" id="openAwardBeltButton" type="button">
-                <strong>Award belt</strong>
-                <span>Reserve the #1 slot for the current belt holder or vacate it when needed.</span>
-              </button>
+                <button class="admin-action-button is-routine" id="openFightCardButton" type="button">
+                  <strong>Schedule fight</strong>
+                  <span>Add the next bout to the upcoming fight card table.</span>
+                </button>
 
-              <button class="admin-action-button" id="openEditFighterButton" type="button">
-                <strong>Edit fighter</strong>
-                <span>Adjust totals, activity, or notes through a focused form.</span>
-              </button>
+                <button class="admin-action-button is-routine" id="openAwardBeltButton" type="button">
+                  <strong>Award belt</strong>
+                  <span>Reserve the #1 slot for the current belt holder or vacate it when needed.</span>
+                </button>
+              </div>
+            </div>
 
-              <button class="admin-action-button" id="openScoringConfigButton" type="button">
-                <strong>Edit scoring</strong>
-                <span>Change the rules table used to calculate point awards and decay.</span>
-              </button>
+            <div class="admin-action-group is-correction">
+              <div class="admin-action-group-header">
+                <div class="admin-action-group-heading">
+                  <p class="section-kicker tone-correction">Corrections</p>
+                  <span class="admin-group-count">3 actions</span>
+                </div>
+                <h3>Controlled changes</h3>
+                <p>Use these when the recorded numbers need human correction, not for standard fight-night flow.</p>
+              </div>
 
-              <button class="admin-action-button" id="openHallOfFameButton" type="button">
-                <strong>Add hall of fame</strong>
-                <span>Record previous champions and title eras in the archive table.</span>
-              </button>
+              <div class="admin-action-grid">
+                <button class="admin-action-button is-correction" id="openAwardPointsButton" type="button">
+                  <strong>Manual scoring</strong>
+                  <span>Use this for one-off corrections or special point changes outside a scheduled fight.</span>
+                </button>
 
-              <button class="admin-action-button" id="openFightCardButton" type="button">
-                <strong>Schedule fight</strong>
-                <span>Add the next bout to the upcoming fight card table.</span>
-              </button>
+                <button class="admin-action-button is-correction" id="openEditFighterButton" type="button">
+                  <strong>Edit fighter</strong>
+                  <span>Update notes and activity first. Direct stat overrides stay hidden until you deliberately open them.</span>
+                </button>
+
+                <button class="admin-action-button is-correction" id="openHallOfFameButton" type="button">
+                  <strong>Add hall of fame</strong>
+                  <span>Record previous champions and title eras in the archive table.</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="admin-action-group is-danger">
+              <div class="admin-action-group-header">
+                <div class="admin-action-group-heading">
+                  <p class="section-kicker tone-danger">Security</p>
+                  <span class="admin-group-count">2 actions</span>
+                </div>
+                <h3>Rules and protection</h3>
+                <p>These actions change how the ladder behaves or who can write to it. Treat them like control-room switches.</p>
+              </div>
+
+              <div class="admin-action-grid">
+                <button class="admin-action-button" id="openScoringConfigButton" type="button">
+                  <strong>Edit scoring</strong>
+                  <span>Change the rules table used to calculate point awards, inactivity decay, and eliminations.</span>
+                </button>
+
+                <button class="admin-action-button is-danger" id="openSecurityLockButton" type="button">
+                  <strong>Security lock</strong>
+                  <span>Owner only. Freeze leaderboard writes while you preserve, verify, or review a fight night.</span>
+                </button>
+              </div>
             </div>
 
             <div class="panel-card-divider"></div>
@@ -252,6 +294,22 @@
                 <h2>Immutable activity log</h2>
               </div>
             </div>
+
+            <div class="dual-field-grid audit-filter-grid">
+              <label class="field-block">
+                <span>Search log</span>
+                <input id="auditSearchInput" type="search" placeholder="Search by action, fighter, or staff member">
+              </label>
+
+              <label class="field-block">
+                <span>Action type</span>
+                <select class="styled-select" id="auditActionFilter">
+                  <option value="ALL">All actions</option>
+                </select>
+              </label>
+            </div>
+
+            <p class="helper-copy" id="auditLogMeta">Showing recent audit activity.</p>
 
             <div class="table-shell">
               <div class="table-scroll">
@@ -326,7 +384,22 @@
             <input type="text" name="name" required>
           </label>
 
-          <label class="field-block">
+          <div class="panel-lock hidden" id="fighterEditFlowNote">
+            <strong>Safer editing path</strong>
+            <p>Use manual scoring for normal point changes. Only open stat overrides if the stored ladder totals themselves are wrong.</p>
+          </div>
+
+          <label class="checkbox-field hidden" id="fighterOverrideToggleRow">
+            <input type="checkbox" id="fighterEnableOverrideToggle">
+            <span>Enable direct stat override</span>
+          </label>
+
+          <div class="panel-lock hidden" id="fighterOverrideWarning">
+            <strong>Direct overrides affect live totals</strong>
+            <p>These fields overwrite the fighter's stored numbers directly. Double-check them before saving.</p>
+          </div>
+
+          <label class="field-block" id="fighterPointsField">
             <span>Total points</span>
             <input type="number" name="points" required>
           </label>
@@ -482,6 +555,25 @@
             <input type="text" name="note" placeholder="Optional note">
           </label>
 
+          <div class="form-preview-card" id="awardPreviewCard">
+            <strong>Projected change</strong>
+            <div class="preview-metric-grid">
+              <article class="preview-metric">
+                <span>Current</span>
+                <strong id="awardPreviewCurrent">0</strong>
+              </article>
+              <article class="preview-metric">
+                <span>Delta</span>
+                <strong id="awardPreviewDelta">+0</strong>
+              </article>
+              <article class="preview-metric">
+                <span>Projected</span>
+                <strong id="awardPreviewProjected">0</strong>
+              </article>
+            </div>
+            <p class="helper-copy" id="awardPreviewBreakdown">Select a fighter to preview the change.</p>
+          </div>
+
           <button class="topbar-button accent wide" id="awardPointsSubmitButton" type="submit">Submit points</button>
           <p class="form-message hidden" id="awardPointsMessage"></p>
         </form>
@@ -513,6 +605,11 @@
             <span>Awarded at</span>
             <input type="datetime-local" name="awardedAt">
           </label>
+
+          <div class="form-preview-card">
+            <strong>Title change preview</strong>
+            <p class="helper-copy" id="beltPreviewSummary">The current belt holder will be shown here before you save.</p>
+          </div>
 
           <button class="topbar-button accent wide" id="awardBeltSubmitButton" type="submit">Save belt holder</button>
           <p class="form-message hidden" id="awardBeltMessage"></p>
@@ -615,6 +712,25 @@
               <span>Elimination days</span>
               <input type="number" name="eliminationDays" min="1" required>
             </label>
+          </div>
+
+          <div class="form-preview-card">
+            <strong>Rules preview</strong>
+            <div class="preview-metric-grid">
+              <article class="preview-metric">
+                <span>Standard win</span>
+                <strong id="scoringPreviewWin">+0</strong>
+              </article>
+              <article class="preview-metric">
+                <span>Standard loss</span>
+                <strong id="scoringPreviewLoss">0</strong>
+              </article>
+              <article class="preview-metric">
+                <span>Max bout swing</span>
+                <strong id="scoringPreviewMax">0</strong>
+              </article>
+            </div>
+            <p class="helper-copy" id="scoringPreviewSummary">Update the form to see how the rules will behave.</p>
           </div>
 
           <button class="topbar-button accent wide" id="scoringConfigSubmitButton" type="submit">Save scoring</button>
@@ -773,6 +889,23 @@
             <input type="text" name="note" placeholder="Optional note">
           </label>
 
+          <div class="form-preview-card">
+            <strong>Projected result</strong>
+            <div class="preview-side-grid">
+              <article class="preview-side-card">
+                <span>Red corner</span>
+                <strong id="scoreFightRedPreviewTotal">0</strong>
+                <p class="helper-copy" id="scoreFightRedPreviewBreakdown">Waiting for scoring input.</p>
+              </article>
+
+              <article class="preview-side-card">
+                <span>Blue corner</span>
+                <strong id="scoreFightBluePreviewTotal">0</strong>
+                <p class="helper-copy" id="scoreFightBluePreviewBreakdown">Waiting for scoring input.</p>
+              </article>
+            </div>
+          </div>
+
           <button class="topbar-button accent wide" id="scoreFightSubmitButton" type="submit">Score fight</button>
           <p class="form-message hidden" id="scoreFightMessage"></p>
         </form>
@@ -780,6 +913,6 @@
     </div>
 
     <div class="toast-stack" id="toastStack"></div>
-    <script type="module" src="./assets/js/leaderboard.js?v=20260615c"></script>
+    <script type="module" src="./assets/js/leaderboard.js?v=20260615d"></script>
   </body>
 </html>
