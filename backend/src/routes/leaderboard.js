@@ -172,6 +172,22 @@ function compareRankedFighters(left, right) {
   return left.name.localeCompare(right.name);
 }
 
+function compareContenderFighters(left, right) {
+  if (right.effectivePoints !== left.effectivePoints) {
+    return right.effectivePoints - left.effectivePoints;
+  }
+
+  if (right.points !== left.points) {
+    return right.points - left.points;
+  }
+
+  if (right.wins !== left.wins) {
+    return right.wins - left.wins;
+  }
+
+  return left.name.localeCompare(right.name);
+}
+
 function buildFighterViews(fighters, scoringConfig) {
   const derivedFighters = fighters.map((fighter) => {
     const inactivity = deriveInactivityState(fighter, scoringConfig);
@@ -230,13 +246,30 @@ function buildFighterViews(fighters, scoringConfig) {
     }
   });
 
-  const rankedFighters = publicFighters
+  const champion = publicFighters
+    .filter((fighter) => fighter.isChampion)
+    .sort(compareRankedFighters)[0] || null;
+
+  const contenderPool = publicFighters
+    .filter((fighter) => !fighter.isChampion)
     .slice()
-    .sort(compareRankedFighters)
-    .map((fighter, index) => ({
+    .sort(compareContenderFighters);
+
+  const rankedFighters = [];
+
+  if (champion) {
+    rankedFighters.push({
+      ...champion,
+      rank: 1
+    });
+  }
+
+  contenderPool.forEach((fighter, index) => {
+    rankedFighters.push({
       ...fighter,
-      rank: index + 1
-    }));
+      rank: index + 2
+    });
+  });
 
   const fighterDirectory = derivedFighters
     .slice()
@@ -591,6 +624,49 @@ router.patch(
     });
 
     res.json({ fighter });
+  })
+);
+
+router.post(
+  "/champion",
+  asyncHandler(async (req, res) => {
+    const fighterId = normalizeOptionalString(req.body.fighterId);
+    const awardedAt = req.body.awardedAt
+      ? requireDateTime(req.body.awardedAt, "Awarded at")
+      : new Date();
+
+    const champion = await prisma.$transaction(async (transaction) => {
+      await transaction.fightFighter.updateMany({
+        where: { isChampion: true },
+        data: { isChampion: false }
+      });
+
+      if (!fighterId) {
+        return null;
+      }
+
+      const existingFighter = await transaction.fightFighter.findUnique({
+        where: { id: fighterId }
+      });
+
+      if (!existingFighter) {
+        throw createError(404, "Fighter not found.");
+      }
+
+      if (!existingFighter.active) {
+        throw createError(400, "Only active fighters can hold the belt.");
+      }
+
+      return transaction.fightFighter.update({
+        where: { id: existingFighter.id },
+        data: {
+          isChampion: true,
+          lastAwardedAt: awardedAt
+        }
+      });
+    });
+
+    res.json({ champion });
   })
 );
 

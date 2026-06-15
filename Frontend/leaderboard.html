@@ -193,7 +193,7 @@
             <div class="admin-action-grid">
               <button class="admin-action-button" id="openCreateFighterButton" type="button">
                 <strong>Add fighter</strong>
-                <span>Create a new ladder entry and set whether they hold the belt.</span>
+                <span>Create a new ladder entry and drop them straight onto the contender board.</span>
               </button>
 
               <button class="admin-action-button" id="openAwardPointsButton" type="button">
@@ -201,9 +201,14 @@
                 <span>Use this for one-off corrections or special point changes outside a scheduled fight.</span>
               </button>
 
+              <button class="admin-action-button" id="openAwardBeltButton" type="button">
+                <strong>Award belt</strong>
+                <span>Reserve the #1 slot for the current belt holder or vacate it when needed.</span>
+              </button>
+
               <button class="admin-action-button" id="openEditFighterButton" type="button">
                 <strong>Edit fighter</strong>
-                <span>Adjust totals, champion status, activity, or notes through a focused form.</span>
+                <span>Adjust totals, activity, or notes through a focused form.</span>
               </button>
 
               <button class="admin-action-button" id="openScoringConfigButton" type="button">
@@ -314,11 +319,6 @@
               <input type="datetime-local" name="lastFightAt">
             </label>
           </div>
-
-          <label class="checkbox-field">
-            <input type="checkbox" name="isChampion">
-            <span>Current belt holder</span>
-          </label>
 
           <label class="checkbox-field">
             <input type="checkbox" name="active" checked>
@@ -447,6 +447,38 @@
 
           <button class="topbar-button accent wide" id="awardPointsSubmitButton" type="submit">Submit points</button>
           <p class="form-message hidden" id="awardPointsMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="awardBeltModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeAwardBeltBackdrop" type="button" aria-label="Close award belt form"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="awardBeltTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Championship</p>
+            <h2 id="awardBeltTitle">Award belt</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeAwardBeltButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="awardBeltForm">
+          <p class="helper-copy">The #1 slot is reserved for the belt holder. Leave the selection empty if you want the belt to be vacant.</p>
+
+          <label class="field-block">
+            <span>Belt holder</span>
+            <select class="styled-select" name="fighterId" id="beltFighterSelect">
+              <option value="">Vacant belt slot</option>
+            </select>
+          </label>
+
+          <label class="field-block">
+            <span>Awarded at</span>
+            <input type="datetime-local" name="awardedAt">
+          </label>
+
+          <button class="topbar-button accent wide" id="awardBeltSubmitButton" type="submit">Save belt holder</button>
+          <p class="form-message hidden" id="awardBeltMessage"></p>
         </form>
       </section>
     </div>

@@ -31,6 +31,7 @@ const loginHint = document.querySelector("#loginHint");
 const loginSubmitButton = document.querySelector("#loginSubmitButton");
 const openCreateFighterButton = document.querySelector("#openCreateFighterButton");
 const openAwardPointsButton = document.querySelector("#openAwardPointsButton");
+const openAwardBeltButton = document.querySelector("#openAwardBeltButton");
 const openEditFighterButton = document.querySelector("#openEditFighterButton");
 const openScoringConfigButton = document.querySelector("#openScoringConfigButton");
 const openHallOfFameButton = document.querySelector("#openHallOfFameButton");
@@ -64,6 +65,13 @@ const boutFields = document.querySelector("#boutFields");
 const correctionFields = document.querySelector("#correctionFields");
 const awardPointsSubmitButton = document.querySelector("#awardPointsSubmitButton");
 const awardPointsMessage = document.querySelector("#awardPointsMessage");
+const awardBeltModal = document.querySelector("#awardBeltModal");
+const closeAwardBeltButton = document.querySelector("#closeAwardBeltButton");
+const closeAwardBeltBackdrop = document.querySelector("#closeAwardBeltBackdrop");
+const awardBeltForm = document.querySelector("#awardBeltForm");
+const beltFighterSelect = document.querySelector("#beltFighterSelect");
+const awardBeltSubmitButton = document.querySelector("#awardBeltSubmitButton");
+const awardBeltMessage = document.querySelector("#awardBeltMessage");
 const scoringConfigModal = document.querySelector("#scoringConfigModal");
 const closeScoringButton = document.querySelector("#closeScoringButton");
 const closeScoringBackdrop = document.querySelector("#closeScoringBackdrop");
@@ -276,6 +284,14 @@ function getDisplayBadges(fighter) {
   return fighterBadges;
 }
 
+function getCurrentChampion() {
+  return state.fighters.find((fighter) => fighter.isChampion) || null;
+}
+
+function getTopContender() {
+  return state.fighters.find((fighter) => fighter.rank === 2) || null;
+}
+
 function getSessionHeaders(headers = {}) {
   const merged = new Headers(headers);
 
@@ -334,7 +350,6 @@ function openFighterFormModal(mode) {
     fighterForm.elements.charismaPoints.value = 0;
     fighterForm.elements.dominancePoints.value = 0;
     fighterForm.elements.active.checked = true;
-    fighterForm.elements.isChampion.checked = false;
     fighterForm.elements.lastFightAt.value = "";
   } else {
     fighterFormKicker.textContent = "Edit Fighter";
@@ -389,6 +404,41 @@ function openAwardPointsModal() {
 
 function closeAwardPointsModal() {
   toggleModal(awardPointsModal, false);
+}
+
+function syncBeltFighterOptions() {
+  beltFighterSelect.textContent = "";
+
+  const vacantOption = document.createElement("option");
+  vacantOption.value = "";
+  vacantOption.textContent = "Vacant belt slot";
+  beltFighterSelect.appendChild(vacantOption);
+
+  state.fighterDirectory
+    .filter((fighter) => fighter.active)
+    .forEach((fighter) => {
+      const option = document.createElement("option");
+      option.value = fighter.id;
+      option.textContent = fighter.name;
+      beltFighterSelect.appendChild(option);
+    });
+}
+
+function openAwardBeltModal() {
+  awardBeltForm.reset();
+  setMessage(awardBeltMessage, "");
+  syncBeltFighterOptions();
+  const champion = getCurrentChampion();
+  beltFighterSelect.value = champion?.id || "";
+  awardBeltForm.elements.awardedAt.value = formatDateTimeLocalValue(new Date());
+  toggleModal(awardBeltModal, true);
+  window.requestAnimationFrame(() => {
+    beltFighterSelect.focus();
+  });
+}
+
+function closeAwardBeltModal() {
+  toggleModal(awardBeltModal, false);
 }
 
 function openScoringConfigModal() {
@@ -559,33 +609,39 @@ function renderChampionSpotlight() {
     return;
   }
 
-  const champion = state.fighters[0];
+  const champion = getCurrentChampion();
   const championCard = document.createElement("article");
   championCard.className = "champion-card";
 
   const belt = document.createElement("span");
   belt.className = "champion-belt";
-  belt.textContent = champion.isChampion ? "Current Champion" : "Top Ranked";
+  belt.textContent = champion ? "Current Champion" : "Belt Vacant";
 
   const name = document.createElement("h3");
-  name.textContent = champion.name;
+  name.textContent = champion ? champion.name : "No belt holder";
 
   const meta = document.createElement("p");
   meta.className = "champion-meta";
-  meta.textContent = `${champion.effectivePoints} ladder points | ${champion.wins} wins | ${champion.charismaPoints} charisma | ${champion.dominancePoints} dominance`;
+  meta.textContent = champion
+    ? `${champion.effectivePoints} ladder points | ${champion.wins} wins | ${champion.charismaPoints} charisma | ${champion.dominancePoints} dominance`
+    : "#1 stays reserved until an admin awards the belt to a fighter.";
 
   const badgeRow = document.createElement("div");
   badgeRow.className = "badge-row hero-badge-row";
-  const championBadges = getDisplayBadges(champion);
+  if (champion) {
+    const championBadges = getDisplayBadges(champion);
 
-  championBadges.forEach((badge) => {
-    badgeRow.appendChild(createBadge(badge, badge === "Champion" ? "accent" : "neutral"));
-  });
+    championBadges.forEach((badge) => {
+      badgeRow.appendChild(createBadge(badge, badge === "Champion" ? "accent" : "neutral"));
+    });
+  } else {
+    badgeRow.appendChild(createBadge("Reserved #1 slot", "warning"));
+  }
 
   championCard.append(belt, name, meta, badgeRow);
   championSpotlight.appendChild(championCard);
 
-  const topContender = state.fighters.find((fighter) => fighter.rank === 2) || null;
+  const topContender = getTopContender();
   const contenderCard = document.createElement("article");
   contenderCard.className = "contender-card is-top-contender";
 
@@ -597,11 +653,13 @@ function renderChampionSpotlight() {
   contenderName.textContent = topContender ? topContender.name : "Waiting";
 
   const contenderSummary = document.createElement("p");
-  const pointsBehindLeader = topContender
+  const pointsBehindLeader = champion && topContender
     ? Math.max(0, champion.effectivePoints - topContender.effectivePoints)
     : 0;
   contenderSummary.textContent = topContender
-    ? `#2 on the ladder | ${topContender.effectivePoints} pts | ${pointsBehindLeader} behind the belt`
+    ? champion
+      ? `#2 on the ladder | ${topContender.effectivePoints} pts | ${pointsBehindLeader} behind the belt`
+      : `First contender in line | ${topContender.effectivePoints} pts | Waiting on a belt holder`
     : "No one is sitting in the contender slot yet.";
 
   const contenderBadges = document.createElement("div");
@@ -664,6 +722,7 @@ function renderScoringRules() {
 function renderLeaderboardTable() {
   leaderboardTableBody.textContent = "";
   const filteredFighters = getFilteredFighters();
+  const champion = getCurrentChampion();
 
   if (!filteredFighters.length) {
     leaderboardTableBody.appendChild(
@@ -687,10 +746,54 @@ function renderLeaderboardTable() {
   const totalPages = getLeaderboardTotalPages();
   const pageStart = (state.leaderboardPage - 1) * state.leaderboardPageSize;
   const visibleFighters = filteredFighters.slice(pageStart, pageStart + state.leaderboardPageSize);
+  const shouldShowVacantChampionRow = !champion && state.leaderboardPage === 1 && !state.leaderboardSearchQuery.trim();
+
+  if (shouldShowVacantChampionRow) {
+    const row = document.createElement("tr");
+    row.className = "leaderboard-row champion";
+
+    const rankCell = document.createElement("td");
+    const rankMark = document.createElement("span");
+    rankMark.className = "leaderboard-rank-mark";
+    rankMark.textContent = "#1";
+    rankCell.appendChild(rankMark);
+
+    const fighterCell = document.createElement("td");
+    const fighterPrimary = document.createElement("div");
+    fighterPrimary.className = "table-primary";
+    const namePlate = document.createElement("div");
+    namePlate.className = "leaderboard-nameplate";
+    const name = document.createElement("strong");
+    name.textContent = "Belt Vacant";
+    const beltHolderTag = document.createElement("span");
+    beltHolderTag.className = "leaderboard-belt-inline";
+    beltHolderTag.textContent = "Reserved slot";
+    namePlate.append(name, beltHolderTag);
+    const badges = document.createElement("div");
+    badges.className = "badge-row";
+    badges.appendChild(createBadge("Awaiting champion", "warning"));
+    fighterPrimary.append(namePlate, badges);
+    fighterCell.appendChild(fighterPrimary);
+
+    const scoreCell = document.createElement("td");
+    scoreCell.textContent = "-";
+
+    const recordCell = document.createElement("td");
+    recordCell.textContent = "-";
+
+    const statusCell = document.createElement("td");
+    const statusRow = document.createElement("div");
+    statusRow.className = "badge-row";
+    statusRow.appendChild(createBadge("Open belt", "warning"));
+    statusCell.appendChild(statusRow);
+
+    row.append(rankCell, fighterCell, scoreCell, recordCell, statusCell);
+    leaderboardTableBody.appendChild(row);
+  }
 
   visibleFighters.forEach((fighter) => {
     const row = document.createElement("tr");
-    row.className = fighter.rank === 1
+    row.className = fighter.isChampion
       ? "leaderboard-row champion"
       : fighter.rank <= 4
         ? "leaderboard-row contender"
@@ -1010,7 +1113,6 @@ function syncSelectedFighterIntoForm(fighterId) {
   fighterForm.elements.charismaPoints.value = fighter.charismaPoints;
   fighterForm.elements.dominancePoints.value = fighter.dominancePoints;
   fighterForm.elements.lastFightAt.value = formatDateTimeLocalValue(fighter.lastFightAt);
-  fighterForm.elements.isChampion.checked = fighter.isChampion;
   fighterForm.elements.active.checked = fighter.active;
   fighterForm.elements.notes.value = fighter.notes || "";
 }
@@ -1221,6 +1323,10 @@ openAwardPointsButton?.addEventListener("click", () => {
   openAwardPointsModal();
 });
 
+openAwardBeltButton?.addEventListener("click", () => {
+  openAwardBeltModal();
+});
+
 openScoringConfigButton?.addEventListener("click", openScoringConfigModal);
 openHallOfFameButton?.addEventListener("click", openHallOfFameModal);
 openFightCardButton?.addEventListener("click", () => {
@@ -1293,6 +1399,8 @@ closeDeleteFighterBackdrop?.addEventListener("click", closeDeleteFighterModal);
 cancelDeleteFighterButton?.addEventListener("click", closeDeleteFighterModal);
 closeAwardButton?.addEventListener("click", closeAwardPointsModal);
 closeAwardBackdrop?.addEventListener("click", closeAwardPointsModal);
+closeAwardBeltButton?.addEventListener("click", closeAwardBeltModal);
+closeAwardBeltBackdrop?.addEventListener("click", closeAwardBeltModal);
 closeScoringButton?.addEventListener("click", closeScoringConfigModal);
 closeScoringBackdrop?.addEventListener("click", closeScoringConfigModal);
 closeHallOfFameButton?.addEventListener("click", closeHallOfFameModal);
@@ -1324,6 +1432,11 @@ window.addEventListener("keydown", (event) => {
 
   if (!hallOfFameModal.classList.contains("hidden")) {
     closeHallOfFameModal();
+    return;
+  }
+
+  if (!awardBeltModal.classList.contains("hidden")) {
+    closeAwardBeltModal();
     return;
   }
 
@@ -1391,7 +1504,6 @@ fighterForm?.addEventListener("submit", async (event) => {
     losses: Number(fighterForm.elements.losses.value),
     charismaPoints: Number(fighterForm.elements.charismaPoints.value),
     dominancePoints: Number(fighterForm.elements.dominancePoints.value),
-    isChampion: fighterForm.elements.isChampion.checked,
     active: fighterForm.elements.active.checked,
     notes: fighterForm.elements.notes.value.trim(),
     lastFightAt: fighterForm.elements.lastFightAt.value || ""
@@ -1482,6 +1594,33 @@ awardPointsForm?.addEventListener("submit", async (event) => {
     showToast(error.message, "error");
   } finally {
     setButtonLoadingState(awardPointsSubmitButton, false, "Submitting", "Submit points");
+  }
+});
+
+awardBeltForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setMessage(awardBeltMessage, "");
+  setButtonLoadingState(awardBeltSubmitButton, true, "Saving", "Save belt holder");
+
+  const payload = {
+    fighterId: beltFighterSelect.value || "",
+    awardedAt: awardBeltForm.elements.awardedAt.value || ""
+  };
+
+  try {
+    await apiWithOptionalSession("/leaderboard/champion", {
+      method: "POST",
+      body: payload
+    });
+
+    closeAwardBeltModal();
+    await loadLeaderboardData();
+    showToast(payload.fighterId ? "Belt holder updated." : "Belt slot vacated.", "success");
+  } catch (error) {
+    setMessage(awardBeltMessage, error.message);
+    showToast(error.message, "error");
+  } finally {
+    setButtonLoadingState(awardBeltSubmitButton, false, "Saving", "Save belt holder");
   }
 });
 
