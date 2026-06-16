@@ -231,6 +231,13 @@ function syncSessionButton() {
     return;
   }
 
+  if (state.session?.user?.name && state.viewer.isLoggedIn) {
+    sessionButton.textContent = "Public view";
+    sessionButton.dataset.state = "session";
+    loginHint.textContent = "This account can view the public book, but admin wager tools are hidden.";
+    return;
+  }
+
   sessionButton.textContent = "Login";
   sessionButton.dataset.state = "login";
   loginHint.textContent = "Public viewers can watch the book. Logged-in users can manage wagers.";
@@ -654,7 +661,7 @@ loadWagersData();
 startRefreshLoop();
 
 sessionButton?.addEventListener("click", () => {
-  if (state.session?.token && state.viewer.canManage) {
+  if (state.session?.token && state.viewer.isLoggedIn) {
     clearSession();
     state.session = null;
     state.viewer = {

@@ -12,6 +12,18 @@ const NORMAL_FIGHT_THRESHOLD = 1000000;
 const TITLE_FIGHT_THRESHOLD = 5000000;
 const BETTING_MULTIPLIER = 1.9;
 
+function canManageWagers(user) {
+  return Boolean(user?.role === "ADMIN" || user?.permissions?.includes("USERS"));
+}
+
+function requireWagerManager(req, _res, next) {
+  if (!canManageWagers(req.user)) {
+    throw createError(403, "Admin access is required to manage wagers.");
+  }
+
+  return next();
+}
+
 function defaultNightLabel(date = new Date()) {
   return `${new Intl.DateTimeFormat("en-AU", {
     dateStyle: "medium",
@@ -363,6 +375,7 @@ async function createWagerAuditLog(client, {
 }
 
 function buildPayload(night, reqUser, fighterDirectory = []) {
+  const canManage = canManageWagers(reqUser);
   const fights = (night?.fights || []).map(serializeFight);
   const payouts = fights
     .flatMap((fight) => fight.wagers.map((bet) => ({
@@ -390,13 +403,13 @@ function buildPayload(night, reqUser, fighterDirectory = []) {
     } : null,
     fights,
     payouts,
-    adminSummary: reqUser ? buildAdminSummary(night?.fights || []) : null,
+    adminSummary: canManage ? buildAdminSummary(night?.fights || []) : null,
     fighterDirectory,
-    auditLog: reqUser ? (night?.auditLogs || []).map(serializeAuditLog) : [],
+    auditLog: canManage ? (night?.auditLogs || []).map(serializeAuditLog) : [],
     viewer: {
       isLoggedIn: Boolean(reqUser),
-      canManage: Boolean(reqUser),
-      canUseAdminPanel: Boolean(reqUser?.role === "ADMIN" || reqUser?.permissions?.includes("USERS"))
+      canManage,
+      canUseAdminPanel: canManage
     }
   };
 }
@@ -459,9 +472,10 @@ router.get(
   authenticateTokenOptional,
   asyncHandler(async (req, res) => {
     const activeNight = await getOrCreateActiveNight();
+    const canManage = canManageWagers(req.user);
     const [night, fighterDirectory] = await Promise.all([
-      loadNightPayload(activeNight.id, Boolean(req.user)),
-      req.user
+      loadNightPayload(activeNight.id, canManage),
+      canManage
         ? prisma.fightFighter.findMany({
           where: {
             archived: false,
@@ -482,6 +496,7 @@ router.get(
 );
 
 router.use(authenticateToken);
+router.use(requireWagerManager);
 
 router.post(
   "/nights/start",
