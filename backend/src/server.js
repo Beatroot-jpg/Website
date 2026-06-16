@@ -9,6 +9,7 @@ import metaRoutes from "./routes/meta.js";
 import userRoutes from "./routes/users.js";
 import leaderboardRoutes from "./routes/leaderboard.js";
 import wagersRoutes from "./routes/wagers.js";
+import trustFundRoutes from "./routes/trust-fund.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -42,6 +43,7 @@ app.use("/api/meta", metaRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
 app.use("/api/wagers", wagersRoutes);
+app.use("/api/trust-fund", trustFundRoutes);
 
 app.use((error, _req, res, _next) => {
   console.error(error);
