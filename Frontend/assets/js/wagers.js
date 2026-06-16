@@ -456,7 +456,15 @@ function renderAuditTable() {
 }
 
 function renderAdminVisibility() {
-  wagerAdminGrid.classList.toggle("hidden", !state.viewer.canManage);
+  const showAdmin = Boolean(state.viewer.canManage);
+  wagerAdminGrid.classList.toggle("hidden", !showAdmin);
+  wagerAdminGrid.hidden = !showAdmin;
+  wagerAdminGrid.setAttribute("aria-hidden", showAdmin ? "false" : "true");
+
+  if (!showAdmin) {
+    adminSummaryGrid.textContent = "";
+    auditTableBody.textContent = "";
+  }
 }
 
 function renderPage() {
