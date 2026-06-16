@@ -13,16 +13,370 @@
       } catch (_error) {}
     </script>
     <link rel="stylesheet" href="./assets/css/styles.css">
+    <script src="./assets/js/runtime-config.js"></script>
+    <script src="./assets/js/config.js"></script>
   </head>
-  <body class="placeholder-body">
-    <main class="placeholder-shell">
-      <a class="placeholder-home-link" href="./index.html">Back home</a>
-      <img class="placeholder-logo" src="./assets/images/Main Logo.png" alt="The Shites Fight Club logo">
-      <section class="placeholder-card">
-        <p class="section-kicker">Wagers</p>
-        <h1>Wagers page scaffolded.</h1>
-        <p>This tab exists now and is ready for us to build the live bet book and fight-night tracking next.</p>
+  <body class="panel-body wagers-body">
+    <div class="panel-shell wagers-shell">
+      <header class="panel-topbar">
+        <div class="panel-title-block">
+          <a class="panel-home-link" href="./index.html">Back home</a>
+          <p class="section-kicker">Fight Night Book</p>
+          <h1>Wagers</h1>
+          <p class="panel-intro">Track open books, completed fights, and who needs to collect from the bookie.</p>
+        </div>
+
+        <div class="panel-topbar-actions">
+          <button class="topbar-button ghost" id="themeToggleButton" type="button" aria-pressed="false">Light mode</button>
+          <button class="topbar-button accent" id="sessionButton" type="button">Login</button>
+        </div>
+      </header>
+
+      <main class="panel-stack">
+        <section class="wagers-stage-card">
+          <div class="leaderboard-stage-header">
+            <div class="leaderboard-stage-copy">
+              <p class="section-kicker" id="nightLabel">Tonight</p>
+              <h2>Night book</h2>
+              <p class="helper-copy" id="nightMeta">Loading fight-night book...</p>
+            </div>
+          </div>
+
+          <div class="table-shell">
+            <div class="table-scroll">
+              <table class="data-table wagers-main-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Fight</th>
+                    <th scope="col">Books</th>
+                    <th scope="col">Bet totals</th>
+                    <th scope="col">Winner</th>
+                    <th class="hidden" id="fightActionsHeader" scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="fightTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel-card">
+          <div class="panel-card-header">
+            <div>
+              <p class="section-kicker">Bookie Window</p>
+              <h2>Collect payouts</h2>
+            </div>
+          </div>
+
+          <div class="table-shell">
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Bettor</th>
+                    <th scope="col">Fight</th>
+                    <th scope="col">Pick</th>
+                    <th scope="col">Collect</th>
+                    <th scope="col">Status</th>
+                    <th class="hidden" id="payoutActionsHeader" scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="payoutTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <div class="leaderboard-utility-grid hidden" id="wagerAdminGrid">
+          <section class="panel-card">
+            <div class="panel-card-header">
+              <div>
+                <p class="section-kicker">Admin</p>
+                <h2>Night totals</h2>
+              </div>
+            </div>
+
+            <div class="status-grid" id="adminSummaryGrid"></div>
+          </section>
+
+          <section class="panel-card">
+            <div class="panel-card-header">
+              <div>
+                <p class="section-kicker">Controls</p>
+                <h2>Book actions</h2>
+              </div>
+            </div>
+
+            <div class="admin-action-grid">
+              <button class="admin-action-button" id="openFightModalButton" type="button">
+                <strong>Open books</strong>
+                <span>Create a wager fight from existing leaderboard fighters.</span>
+              </button>
+
+              <button class="admin-action-button" id="openBetModalButton" type="button">
+                <strong>Add wager</strong>
+                <span>Log a bet and automatically deduct the 10% house cut.</span>
+              </button>
+
+              <button class="admin-action-button" id="openNightModalButton" type="button">
+                <strong>Start new night</strong>
+                <span>Archive the current night and begin a fresh book.</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="panel-card">
+            <div class="panel-card-header">
+              <div>
+                <p class="section-kicker">Audit</p>
+                <h2>Last 25 actions</h2>
+              </div>
+            </div>
+
+            <div class="table-shell">
+              <div class="table-scroll">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Action</th>
+                      <th scope="col">Summary</th>
+                      <th scope="col">When</th>
+                      <th scope="col">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="auditTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div class="modal-shell hidden" id="loginModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeLoginBackdrop" type="button" aria-label="Close login"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Members Only</p>
+            <h2 id="loginTitle">Log in to manage books</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeLoginButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="loginForm">
+          <label class="field-block">
+            <span>Username</span>
+            <input type="text" name="username" autocomplete="username" required>
+          </label>
+
+          <label class="field-block">
+            <span>Password</span>
+            <input type="password" name="password" autocomplete="current-password" required>
+          </label>
+
+          <button class="topbar-button accent wide" id="loginSubmitButton" type="submit">Enter</button>
+          <p class="form-message hidden" id="loginError"></p>
+          <p class="helper-copy" id="loginHint">Public viewers can watch the book. Logged-in users can manage wagers.</p>
+        </form>
       </section>
-    </main>
+    </div>
+
+    <div class="modal-shell hidden" id="fightModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeFightBackdrop" type="button" aria-label="Close open books form"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fightModalTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Open Books</p>
+            <h2 id="fightModalTitle">Create wager fight</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeFightButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="fightForm">
+          <label class="field-block">
+            <span>Red corner</span>
+            <select class="styled-select" name="fighterRedId" id="fightRedSelect" required></select>
+          </label>
+
+          <label class="field-block">
+            <span>Blue corner</span>
+            <select class="styled-select" name="fighterBlueId" id="fightBlueSelect" required></select>
+          </label>
+
+          <label class="field-block">
+            <span>Fight time</span>
+            <input type="datetime-local" name="scheduledAt">
+          </label>
+
+          <label class="field-block">
+            <span>Venue</span>
+            <input type="text" name="venue" placeholder="Optional">
+          </label>
+
+          <label class="checkbox-field">
+            <input type="checkbox" name="titleFight" id="titleFightToggle">
+            <span>Title fight threshold</span>
+          </label>
+
+          <label class="field-block">
+            <span>Betting threshold per fighter</span>
+            <input type="number" name="thresholdAmount" id="thresholdAmountInput" min="1" step="1" value="1000000" required>
+          </label>
+
+          <label class="field-block">
+            <span>Notes</span>
+            <input type="text" name="notes" placeholder="Optional">
+          </label>
+
+          <button class="topbar-button accent wide" id="fightSubmitButton" type="submit">Open books</button>
+          <p class="form-message hidden" id="fightFormMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="betModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeBetBackdrop" type="button" aria-label="Close add wager form"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="betModalTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Add Wager</p>
+            <h2 id="betModalTitle">Log a bet</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeBetButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="betForm">
+          <label class="field-block">
+            <span>Fight</span>
+            <select class="styled-select" name="wagerFightId" id="betFightSelect" required></select>
+          </label>
+
+          <label class="field-block">
+            <span>Bettor name</span>
+            <input type="text" name="bettorName" required>
+          </label>
+
+          <label class="field-block">
+            <span>Pick</span>
+            <select class="styled-select" name="pickedFighterName" id="betPickSelect" required></select>
+          </label>
+
+          <label class="field-block">
+            <span>Bet amount</span>
+            <input type="number" name="stake" min="1" step="1" required>
+          </label>
+
+          <div class="form-preview-card">
+            <strong>Bet preview</strong>
+            <p id="betPreviewText">Select a fight and enter a stake.</p>
+          </div>
+
+          <label class="field-block">
+            <span>Notes</span>
+            <input type="text" name="notes" placeholder="Optional">
+          </label>
+
+          <button class="topbar-button accent wide" id="betSubmitButton" type="submit">Add wager</button>
+          <p class="form-message hidden" id="betFormMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="settleModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeSettleBackdrop" type="button" aria-label="Close settle fight form"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="settleModalTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Settle Fight</p>
+            <h2 id="settleModalTitle">Mark fight done</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeSettleButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="settleForm">
+          <div class="panel-lock">
+            <strong id="settleFightName">Selected fight</strong>
+            <p>Settling a fight marks winning wagers as collectable and losing wagers as kept by the house.</p>
+          </div>
+
+          <label class="field-block">
+            <span>Result</span>
+            <select class="styled-select" name="status" id="settleStatusSelect" required>
+              <option value="COMPLETED">Completed</option>
+              <option value="CANCELLED">Cancelled or void</option>
+            </select>
+          </label>
+
+          <label class="field-block" id="winnerSelectBlock">
+            <span>Winner</span>
+            <select class="styled-select" name="winnerName" id="winnerSelect"></select>
+          </label>
+
+          <button class="topbar-button accent wide" id="settleSubmitButton" type="submit">Settle fight</button>
+          <p class="form-message hidden" id="settleFormMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="nightModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeNightBackdrop" type="button" aria-label="Close new night form"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="nightModalTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">New Night</p>
+            <h2 id="nightModalTitle">Start fresh book</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeNightButton" type="button">Close</button>
+        </div>
+
+        <form class="login-form" id="nightForm">
+          <div class="panel-lock">
+            <strong>Heads up</strong>
+            <p>This closes the current night and starts a new active wager book.</p>
+          </div>
+
+          <label class="field-block">
+            <span>Night label</span>
+            <input type="text" name="label" placeholder="Friday Fight Night">
+          </label>
+
+          <label class="field-block">
+            <span>Notes</span>
+            <input type="text" name="notes" placeholder="Optional">
+          </label>
+
+          <button class="topbar-button accent wide" id="nightSubmitButton" type="submit">Start new night</button>
+          <p class="form-message hidden" id="nightFormMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="paidModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closePaidBackdrop" type="button" aria-label="Close payout confirmation"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="paidModalTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Confirm Payout</p>
+            <h2 id="paidModalTitle">Mark as paid?</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closePaidButton" type="button">Close</button>
+        </div>
+
+        <div class="panel-lock">
+          <strong>Pay the person who placed the bet only.</strong>
+          <p>If someone else tries to collect it, tell them to contact a Shites member and collect it later.</p>
+        </div>
+
+        <p class="helper-copy" id="paidModalSummary">No payout selected.</p>
+        <div class="modal-action-row">
+          <button class="topbar-button ghost" id="cancelPaidButton" type="button">Cancel</button>
+          <button class="topbar-button accent" id="confirmPaidButton" type="button">Mark paid</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast-stack" id="toastStack"></div>
+    <script type="module" src="./assets/js/wagers.js?v=20260616a"></script>
   </body>
 </html>

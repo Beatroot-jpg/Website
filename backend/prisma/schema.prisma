@@ -125,6 +125,13 @@ enum WagerNightStatus {
   CLOSED
 }
 
+enum WagerFightStatus {
+  OPEN
+  CLOSED
+  COMPLETED
+  CANCELLED
+}
+
 enum WagerEntryStatus {
   ACTIVE
   WON_PENDING
@@ -177,6 +184,8 @@ model User {
   restoredFightFighters  FightFighter[]    @relation("FightFighterRestoredBy")
   fightAuditLogs         FightAuditLog[]   @relation("FightAuditActor")
   updatedFightSecurityStates FightSecurityState[] @relation("FightSecurityUpdatedBy")
+  wagerAuditLogs         WagerAuditLog[]   @relation("WagerAuditActor")
+  revertedWagerAuditLogs WagerAuditLog[]   @relation("WagerAuditRevertedBy")
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 
@@ -574,6 +583,7 @@ model TaxPeriod {
 model FightFighter {
   id              String            @id @default(cuid())
   name            String            @unique
+  phoneNumber     String?
   points          Int               @default(20)
   wins            Int               @default(0)
   losses          Int               @default(0)
@@ -604,6 +614,7 @@ model FightScoringConfig {
   startingPoints         Int      @default(20)
   winPoints              Int      @default(10)
   lossPoints             Int      @default(-6)
+  noShowPoints           Int      @default(-10)
   charismaMax            Int      @default(5)
   dominanceMax           Int      @default(5)
   titleWinBonus          Int      @default(2)
@@ -703,21 +714,51 @@ model WagerNight {
   notes     String?
   openedAt  DateTime         @default(now())
   closedAt  DateTime?
+  fights    WagerFight[]
   wagers    WagerEntry[]
+  auditLogs WagerAuditLog[]
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
   @@index([status, openedAt])
 }
 
+model WagerFight {
+  id              String           @id @default(cuid())
+  nightId         String
+  fighterRedId    String?
+  fighterRedName  String
+  fighterBlueId   String?
+  fighterBlueName String
+  scheduledAt     DateTime?
+  venue           String?
+  notes           String?
+  titleFight      Boolean          @default(false)
+  thresholdAmount Decimal          @default(1000000.00) @db.Decimal(12, 2)
+  status          WagerFightStatus @default(OPEN)
+  winnerName      String?
+  booksOpenedAt   DateTime         @default(now())
+  settledAt       DateTime?
+  night           WagerNight       @relation(fields: [nightId], references: [id], onDelete: Cascade)
+  wagers          WagerEntry[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([nightId, status])
+  @@index([scheduledAt])
+}
+
 model WagerEntry {
   id                String           @id @default(cuid())
   nightId           String
   fightId           String?
+  wagerFightId      String?
   bettorName        String
   pickedFighterName String
   stake             Decimal          @db.Decimal(12, 2)
   payoutMultiplier  Decimal          @db.Decimal(6, 2)
+  houseCut          Decimal          @default(0.00) @db.Decimal(12, 2)
+  netStake          Decimal          @default(0.00) @db.Decimal(12, 2)
   projectedReturn   Decimal          @db.Decimal(12, 2)
   status            WagerEntryStatus @default(ACTIVE)
   settlementNote    String?
@@ -725,9 +766,33 @@ model WagerEntry {
   settledAt         DateTime?
   night             WagerNight       @relation(fields: [nightId], references: [id], onDelete: Cascade)
   fight             FightCard?       @relation(fields: [fightId], references: [id], onDelete: SetNull)
+  wagerFight        WagerFight?      @relation(fields: [wagerFightId], references: [id], onDelete: Cascade)
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
   @@index([nightId, status])
   @@index([fightId])
+  @@index([wagerFightId])
+}
+
+model WagerAuditLog {
+  id           String      @id @default(cuid())
+  nightId      String?
+  actorId      String?
+  action       String
+  entityType   String
+  entityId     String?
+  summary      String
+  before       Json?
+  after        Json?
+  metadata     Json?
+  revertedAt   DateTime?
+  revertedById String?
+  night        WagerNight? @relation(fields: [nightId], references: [id], onDelete: SetNull)
+  actor        User?       @relation("WagerAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  revertedBy   User?       @relation("WagerAuditRevertedBy", fields: [revertedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime    @default(now())
+
+  @@index([nightId, createdAt])
+  @@index([entityType, entityId])
 }

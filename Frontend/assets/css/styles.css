@@ -721,6 +721,25 @@ html[data-theme="light"] .launcher-stage {
   color: #ffca7a;
 }
 
+.status-card strong {
+  font-family: "Russo One", "Arial Narrow", sans-serif;
+  font-size: clamp(1.3rem, 2vw, 1.85rem);
+  line-height: 1.05;
+}
+
+.status-card.accent strong,
+.status-card.good strong {
+  color: var(--accent-strong);
+}
+
+.status-card.warning strong {
+  color: #ffca7a;
+}
+
+.status-card.danger strong {
+  color: #ff8f9d;
+}
+
 .panel-note-block {
   display: grid;
   gap: 0.55rem;
@@ -1000,6 +1019,17 @@ html[data-theme="light"] .launcher-stage {
   gap: 0.75rem;
 }
 
+.inline-form-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.inline-form-row > .helper-copy {
+  margin: 0;
+}
+
 .modal-action-row {
   display: flex;
   gap: 0.75rem;
@@ -1041,7 +1071,7 @@ html[data-theme="light"] .launcher-stage {
 .preview-metric-grid,
 .preview-side-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 0.75rem;
 }
 
@@ -1076,6 +1106,46 @@ html[data-theme="light"] .launcher-stage {
 
 .preview-side-card p {
   margin: 0;
+}
+
+.contact-fight-grid {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.contact-fight-card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(25, 195, 95, 0.1), transparent 48%),
+    rgba(255, 255, 255, 0.035);
+}
+
+.contact-fight-card span {
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.contact-fight-card strong {
+  font-family: "Russo One", "Arial Narrow", sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.contact-fight-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.contact-fight-card .topbar-button {
+  justify-self: start;
 }
 
 .table-shell {
@@ -1189,6 +1259,18 @@ html[data-theme="light"] .launcher-stage {
   border-color: rgba(255, 202, 122, 0.24);
   color: #ffca7a;
   background: rgba(255, 202, 122, 0.09);
+}
+
+.status-pill.good {
+  border-color: rgba(25, 195, 95, 0.26);
+  color: var(--accent-strong);
+  background: rgba(25, 195, 95, 0.1);
+}
+
+.status-pill.danger {
+  border-color: rgba(255, 143, 157, 0.28);
+  color: #ff8f9d;
+  background: rgba(255, 143, 157, 0.1);
 }
 
 .panel-empty {
@@ -1566,6 +1648,64 @@ html[data-theme="light"] .launcher-stage {
 
 .leaderboard-utility-grid > .hidden {
   display: none;
+}
+
+.wagers-shell {
+  max-width: 1360px;
+}
+
+.wagers-stage-card {
+  position: relative;
+  display: grid;
+  gap: 1.2rem;
+  padding: clamp(1.1rem, 2vw, 1.55rem);
+  border: 1px solid rgba(25, 195, 95, 0.24);
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at 14% 0%, rgba(25, 195, 95, 0.18), transparent 0 16rem),
+    radial-gradient(circle at 90% 8%, rgba(255, 255, 255, 0.08), transparent 0 14rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    var(--surface-strong);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.wagers-stage-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(25, 195, 95, 0.75), transparent);
+}
+
+.wagers-main-table .table-primary strong {
+  font-family: "Russo One", "Arial Narrow", sans-serif;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.wager-matchup {
+  gap: 0.45rem;
+}
+
+.wager-matchup .status-pill {
+  width: max-content;
+}
+
+.wager-book-lines {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.wager-book-lines span {
+  color: var(--ink);
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.wager-book-lines small {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .panel-card-divider {

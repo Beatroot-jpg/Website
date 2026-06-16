@@ -30,6 +30,9 @@ const scoreLogTableBody = document.querySelector("#scoreLogTableBody");
 const auditSearchInput = document.querySelector("#auditSearchInput");
 const auditActionFilter = document.querySelector("#auditActionFilter");
 const auditLogMeta = document.querySelector("#auditLogMeta");
+const auditPageLabel = document.querySelector("#auditPageLabel");
+const previousAuditPageButton = document.querySelector("#previousAuditPageButton");
+const nextAuditPageButton = document.querySelector("#nextAuditPageButton");
 const fightCardActionsHeader = document.querySelector("#fightCardActionsHeader");
 const fightCardTableBody = document.querySelector("#fightCardTableBody");
 const hallOfFameTableBody = document.querySelector("#hallOfFameTableBody");
@@ -79,6 +82,7 @@ const awardEntryTypeSelect = document.querySelector("#awardEntryTypeSelect");
 const awardFightSelect = document.querySelector("#awardFightSelect");
 const boutFields = document.querySelector("#boutFields");
 const correctionFields = document.querySelector("#correctionFields");
+const applyNoShowPenaltyButton = document.querySelector("#applyNoShowPenaltyButton");
 const awardPointsSubmitButton = document.querySelector("#awardPointsSubmitButton");
 const awardPointsMessage = document.querySelector("#awardPointsMessage");
 const awardPreviewCurrent = document.querySelector("#awardPreviewCurrent");
@@ -109,6 +113,7 @@ const scoringConfigSubmitButton = document.querySelector("#scoringConfigSubmitBu
 const scoringConfigMessage = document.querySelector("#scoringConfigMessage");
 const scoringPreviewWin = document.querySelector("#scoringPreviewWin");
 const scoringPreviewLoss = document.querySelector("#scoringPreviewLoss");
+const scoringPreviewNoShow = document.querySelector("#scoringPreviewNoShow");
 const scoringPreviewMax = document.querySelector("#scoringPreviewMax");
 const scoringPreviewSummary = document.querySelector("#scoringPreviewSummary");
 const hallOfFameModal = document.querySelector("#hallOfFameModal");
@@ -125,6 +130,11 @@ const fightCardRedSelect = document.querySelector("#fightCardRedSelect");
 const fightCardBlueSelect = document.querySelector("#fightCardBlueSelect");
 const fightCardSubmitButton = document.querySelector("#fightCardSubmitButton");
 const fightCardMessage = document.querySelector("#fightCardMessage");
+const contactFightModal = document.querySelector("#contactFightModal");
+const closeContactFightButton = document.querySelector("#closeContactFightButton");
+const closeContactFightBackdrop = document.querySelector("#closeContactFightBackdrop");
+const contactFightMatchup = document.querySelector("#contactFightMatchup");
+const contactFightList = document.querySelector("#contactFightList");
 const scoreFightModal = document.querySelector("#scoreFightModal");
 const closeScoreFightButton = document.querySelector("#closeScoreFightButton");
 const closeScoreFightBackdrop = document.querySelector("#closeScoreFightBackdrop");
@@ -155,21 +165,45 @@ const state = {
   hallOfFame: [],
   fightCard: [],
   auditLog: [],
+  auditTotalCount: 0,
   lastPublicRefreshAt: null,
   leaderboardPage: 1,
   leaderboardPageSize: 25,
   archivedFightersPage: 1,
   archivedFightersPageSize: 6,
   leaderboardSearchQuery: "",
+  auditPage: 1,
+  auditPageSize: 25,
   auditSearchQuery: "",
   auditActionFilter: "ALL",
   fighterFormMode: "create",
   pendingDeleteFighterId: null,
+  pendingContactFightId: null,
   pendingScoreFightId: null
 };
 
 const leaderboardRefreshIntervalMs = 30000;
 let leaderboardRefreshHandle = null;
+let auditSearchDebounceHandle = null;
+const AUDIT_ACTION_OPTIONS = [
+  "BELT_AWARDED",
+  "BELT_VACATED",
+  "FIGHT_CREATED",
+  "FIGHT_DELETED",
+  "FIGHT_SCORED",
+  "FIGHT_UPDATED",
+  "FIGHTER_ARCHIVED",
+  "FIGHTER_CORRECTED",
+  "FIGHTER_CREATED",
+  "FIGHTER_RESTORED",
+  "FIGHTER_SCORED",
+  "FIGHTER_UPDATED",
+  "HALL_OF_FAME_CREATED",
+  "HALL_OF_FAME_DELETED",
+  "HALL_OF_FAME_UPDATED",
+  "SCORING_UPDATED",
+  "SECURITY_LOCK_UPDATED"
+];
 
 function resetAdminState() {
   state.scoringConfig = null;
@@ -177,6 +211,8 @@ function resetAdminState() {
   state.archivedFighters = [];
   state.securityState = null;
   state.auditLog = [];
+  state.auditTotalCount = 0;
+  state.auditPage = 1;
   state.archivedFightersPage = 1;
   state.auditSearchQuery = "";
   state.auditActionFilter = "ALL";
@@ -248,6 +284,7 @@ function normalizeFighter(fighter, index = 0) {
     daysSinceFight: Number.isFinite(Number(fighter?.daysSinceFight)) ? Number(fighter.daysSinceFight) : 0,
     active: fighter?.active !== false,
     archived: Boolean(fighter?.archived),
+    phoneNumber: typeof fighter?.phoneNumber === "string" ? fighter.phoneNumber : "",
     archivedAt: fighter?.archivedAt || null,
     restoredAt: fighter?.restoredAt || null,
     isChampion: Boolean(fighter?.isChampion),
@@ -334,6 +371,10 @@ function formatWholeNumber(value) {
   }).format(Number(value || 0));
 }
 
+function formatPhoneLink(value) {
+  return String(value || "").replace(/[^\d+]/g, "");
+}
+
 function parseWholeNumber(value, fallback = 0) {
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) ? parsed : fallback;
@@ -381,6 +422,7 @@ function getScoringConfigValues(source = state.scoringConfig) {
   return {
     winPoints: parseWholeNumber(source?.winPoints, 0),
     lossPoints: parseWholeNumber(source?.lossPoints, 0),
+    noShowPoints: parseWholeNumber(source?.noShowPoints, -10),
     charismaMax: Math.max(0, parseWholeNumber(source?.charismaMax, 0)),
     dominanceMax: Math.max(0, parseWholeNumber(source?.dominanceMax, 0)),
     titleWinBonus: Math.max(0, parseWholeNumber(source?.titleWinBonus, 0)),
@@ -482,6 +524,7 @@ function openFighterFormModal(mode) {
     fighterForm.elements.charismaPoints.value = 0;
     fighterForm.elements.dominancePoints.value = 0;
     fighterForm.elements.active.checked = true;
+    fighterForm.elements.phoneNumber.value = "";
     fighterForm.elements.lastFightAt.value = "";
   } else {
     fighterFormKicker.textContent = "Edit Fighter";
@@ -728,6 +771,7 @@ function syncScoringPreview() {
   const scoringConfig = getScoringConfigValues({
     winPoints: scoringConfigForm?.elements.winPoints?.value,
     lossPoints: scoringConfigForm?.elements.lossPoints?.value,
+    noShowPoints: scoringConfigForm?.elements.noShowPoints?.value,
     charismaMax: scoringConfigForm?.elements.charismaMax?.value,
     dominanceMax: scoringConfigForm?.elements.dominanceMax?.value,
     titleWinBonus: scoringConfigForm?.elements.titleWinBonus?.value,
@@ -742,6 +786,7 @@ function syncScoringPreview() {
 
   scoringPreviewWin.textContent = formatDelta(scoringConfig.winPoints);
   scoringPreviewLoss.textContent = formatDelta(scoringConfig.lossPoints);
+  scoringPreviewNoShow.textContent = formatDelta(scoringConfig.noShowPoints);
   scoringPreviewMax.textContent = formatDelta(maxBoutSwing);
 
   scoringPreviewSummary.textContent = scoringConfig.eliminationDays > scoringConfig.inactivityGraceDays
@@ -775,6 +820,64 @@ function openFightCardModal() {
 
 function closeFightCardModal() {
   toggleModal(fightCardModal, false);
+}
+
+function getFighterContactByName(name) {
+  return state.fighterDirectory.find((fighter) => fighter.name === name) || null;
+}
+
+function createContactFightCard(label, fighter) {
+  const card = document.createElement("article");
+  card.className = "contact-fight-card";
+
+  const labelElement = document.createElement("span");
+  labelElement.textContent = label;
+
+  const nameElement = document.createElement("strong");
+  nameElement.textContent = fighter?.name || "Unknown fighter";
+
+  const phone = fighter?.phoneNumber || "";
+  const phoneElement = document.createElement("p");
+  phoneElement.textContent = phone || "No phone number saved.";
+
+  card.append(labelElement, nameElement, phoneElement);
+
+  if (phone) {
+    const callButton = document.createElement("a");
+    callButton.className = "topbar-button accent compact";
+    callButton.href = `tel:${formatPhoneLink(phone)}`;
+    callButton.textContent = "Call fighter";
+    card.appendChild(callButton);
+  }
+
+  return card;
+}
+
+function openContactFightModal(fightId) {
+  const fight = state.fightCard.find((entry) => entry.id === fightId);
+
+  if (!fight) {
+    showToast("That fight could not be found.", "error");
+    return;
+  }
+
+  state.pendingContactFightId = fight.id;
+  contactFightList.textContent = "";
+  contactFightMatchup.textContent = `${fight.fighterRedName} vs ${fight.fighterBlueName}`;
+  contactFightList.append(
+    createContactFightCard("Red corner", getFighterContactByName(fight.fighterRedName)),
+    createContactFightCard("Blue corner", getFighterContactByName(fight.fighterBlueName))
+  );
+
+  toggleModal(contactFightModal, true);
+  window.requestAnimationFrame(() => {
+    closeContactFightButton?.focus();
+  });
+}
+
+function closeContactFightModal() {
+  state.pendingContactFightId = null;
+  toggleModal(contactFightModal, false);
 }
 
 function openScoreFightModal(fightId) {
@@ -1059,6 +1162,7 @@ function renderScoringRules() {
     createRuleCard("Start", `${config.startingPoints} pts`, "accent"),
     createRuleCard("Win", `${config.winPoints} pts`, "accent"),
     createRuleCard("Loss", `${config.lossPoints} pts`, "warning"),
+    createRuleCard("No Show", `${config.noShowPoints} pts`, "warning"),
     createRuleCard("Charisma", `0-${config.charismaMax}`),
     createRuleCard("Dominance", `0-${config.dominanceMax}`),
     createRuleCard("Decay", `${config.inactivityWeeklyPenalty} per week`)
@@ -1334,6 +1438,14 @@ function renderFightCardTable() {
       const actionRow = document.createElement("div");
       actionRow.className = "table-action-row";
 
+      const contactButton = document.createElement("button");
+      contactButton.className = "topbar-button ghost compact";
+      contactButton.type = "button";
+      contactButton.dataset.action = "contact-fight";
+      contactButton.dataset.fightId = fight.id;
+      contactButton.textContent = "Contact";
+      actionRow.appendChild(contactButton);
+
       const scoreButton = document.createElement("button");
       scoreButton.className = "topbar-button ghost compact";
       scoreButton.type = "button";
@@ -1453,12 +1565,6 @@ function syncAuditActionFilterOptions() {
     return;
   }
 
-  const availableActions = [...new Set(
-    state.auditLog
-      .map((entry) => entry.action)
-      .filter(Boolean)
-  )];
-
   const currentValue = state.auditActionFilter;
   auditActionFilter.textContent = "";
 
@@ -1467,14 +1573,14 @@ function syncAuditActionFilterOptions() {
   allOption.textContent = "All actions";
   auditActionFilter.appendChild(allOption);
 
-  availableActions.forEach((action) => {
+  AUDIT_ACTION_OPTIONS.forEach((action) => {
     const option = document.createElement("option");
     option.value = action;
     option.textContent = formatAuditActionLabel(action);
     auditActionFilter.appendChild(option);
   });
 
-  const nextValue = availableActions.includes(currentValue) || currentValue === "ALL"
+  const nextValue = AUDIT_ACTION_OPTIONS.includes(currentValue) || currentValue === "ALL"
     ? currentValue
     : "ALL";
 
@@ -1482,55 +1588,43 @@ function syncAuditActionFilterOptions() {
   auditActionFilter.value = nextValue;
 }
 
-function getFilteredAuditLog() {
-  const query = state.auditSearchQuery.trim().toLowerCase();
-
-  return state.auditLog.filter((entry) => {
-    if (state.auditActionFilter !== "ALL" && entry.action !== state.auditActionFilter) {
-      return false;
-    }
-
-    if (!query) {
-      return true;
-    }
-
-    const haystack = [
-      entry.action,
-      formatAuditActionLabel(entry.action),
-      entry.summary,
-      entry.actorName,
-      entry.entityType,
-      entry.entityId
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-
-    return haystack.includes(query);
-  });
+function getAuditTotalPages() {
+  return Math.max(1, Math.ceil(state.auditTotalCount / state.auditPageSize));
 }
 
 function renderScoreLogTable() {
   scoreLogTableBody.textContent = "";
   syncAuditActionFilterOptions();
-  const filteredEntries = getFilteredAuditLog();
+  const entries = Array.isArray(state.auditLog) ? state.auditLog : [];
+  const totalPages = getAuditTotalPages();
+  const visibleStart = state.auditTotalCount === 0 ? 0 : ((state.auditPage - 1) * state.auditPageSize) + 1;
+  const visibleEnd = Math.min(state.auditPage * state.auditPageSize, state.auditTotalCount);
 
-  if (!filteredEntries.length) {
+  if (!entries.length) {
     scoreLogTableBody.appendChild(createTableMessageRow(
-      state.auditLog.length
+      state.auditTotalCount
         ? "No audit entries match the current filters."
         : "No audit activity has been recorded yet.",
       4
     ));
     if (auditLogMeta) {
-      auditLogMeta.textContent = state.auditLog.length
+      auditLogMeta.textContent = state.auditTotalCount
         ? "No audit entries match the current filters."
         : "Showing recent audit activity.";
+    }
+    if (auditPageLabel) {
+      auditPageLabel.textContent = "Page 1 of 1";
+    }
+    if (previousAuditPageButton) {
+      previousAuditPageButton.disabled = true;
+    }
+    if (nextAuditPageButton) {
+      nextAuditPageButton.disabled = true;
     }
     return;
   }
 
-  filteredEntries.forEach((entry) => {
+  entries.forEach((entry) => {
     const row = document.createElement("tr");
 
     const actionCell = document.createElement("td");
@@ -1559,7 +1653,19 @@ function renderScoreLogTable() {
   });
 
   if (auditLogMeta) {
-    auditLogMeta.textContent = `Showing ${filteredEntries.length} of ${state.auditLog.length} audit entries`;
+    auditLogMeta.textContent = `Showing ${visibleStart}-${visibleEnd} of ${state.auditTotalCount} audit actions`;
+  }
+
+  if (auditPageLabel) {
+    auditPageLabel.textContent = `Page ${state.auditPage} of ${totalPages}`;
+  }
+
+  if (previousAuditPageButton) {
+    previousAuditPageButton.disabled = state.auditPage <= 1;
+  }
+
+  if (nextAuditPageButton) {
+    nextAuditPageButton.disabled = state.auditPage >= totalPages;
   }
 }
 
@@ -1639,6 +1745,7 @@ function syncSelectedFighterIntoForm(fighterId) {
   }
 
   fighterForm.elements.name.value = fighter.name;
+  fighterForm.elements.phoneNumber.value = fighter.phoneNumber || "";
   fighterForm.elements.points.value = fighter.points;
   fighterForm.elements.wins.value = fighter.wins;
   fighterForm.elements.losses.value = fighter.losses;
@@ -1717,6 +1824,29 @@ function syncAwardEntryType() {
   syncAwardPreview();
 }
 
+function applyNoShowPenaltyToCorrection() {
+  awardEntryTypeSelect.value = "CORRECTION";
+  awardPointsForm.elements.correctionPoints.value = getScoringConfigValues().noShowPoints;
+  syncAwardEntryType();
+  syncAwardPreview();
+}
+
+function buildAdminAuditQueryString() {
+  const params = new URLSearchParams();
+  params.set("auditPage", String(state.auditPage));
+  params.set("auditPageSize", String(state.auditPageSize));
+
+  if (state.auditSearchQuery.trim()) {
+    params.set("auditSearch", state.auditSearchQuery.trim());
+  }
+
+  if (state.auditActionFilter !== "ALL") {
+    params.set("auditAction", state.auditActionFilter);
+  }
+
+  return params.toString();
+}
+
 async function loadPublicLeaderboardData() {
   const payload = await api("/leaderboard/public");
   state.lastPublicRefreshAt = payload.generatedAt || new Date().toISOString();
@@ -1741,7 +1871,8 @@ async function loadAdminLeaderboardData({ silentUnauthorized = true } = {}) {
   }
 
   try {
-    const payload = await api("/leaderboard/admin", {
+    const queryString = buildAdminAuditQueryString();
+    const payload = await api(`/leaderboard/admin${queryString ? `?${queryString}` : ""}`, {
       headers: getSessionHeaders()
     });
     state.scoringConfig = payload.scoringConfig || null;
@@ -1752,18 +1883,43 @@ async function loadAdminLeaderboardData({ silentUnauthorized = true } = {}) {
       ? payload.archivedFighters.map((fighter, index) => normalizeFighter(fighter, index))
       : [];
     state.securityState = normalizeSecurityState(payload.securityState);
-    state.auditLog = Array.isArray(payload.auditLog) ? payload.auditLog : [];
+    state.auditLog = Array.isArray(payload.auditLog?.entries) ? payload.auditLog.entries : [];
+    state.auditPage = Number.isFinite(Number(payload.auditLog?.page))
+      ? Number(payload.auditLog.page)
+      : state.auditPage;
+    state.auditPageSize = Number.isFinite(Number(payload.auditLog?.pageSize))
+      ? Number(payload.auditLog.pageSize)
+      : state.auditPageSize;
+    state.auditTotalCount = Number.isFinite(Number(payload.auditLog?.totalCount))
+      ? Number(payload.auditLog.totalCount)
+      : state.auditLog.length;
+    state.auditSearchQuery = typeof payload.auditLog?.searchQuery === "string"
+      ? payload.auditLog.searchQuery
+      : state.auditSearchQuery;
+    state.auditActionFilter = typeof payload.auditLog?.actionFilter === "string"
+      ? payload.auditLog.actionFilter
+      : state.auditActionFilter;
+    if (auditSearchInput && auditSearchInput.value !== state.auditSearchQuery) {
+      auditSearchInput.value = state.auditSearchQuery;
+    }
     state.viewer = normalizeViewer(payload.viewer);
   } catch (error) {
-    clearSession();
-    state.session = null;
-    state.viewer = getSignedOutViewer();
+    if (error.status === 401) {
+      clearSession();
+      state.session = null;
+      state.viewer = getSignedOutViewer();
+      resetAdminState();
 
-    resetAdminState();
+      if (!silentUnauthorized) {
+        showToast("Session expired. Please log in again.", "info");
+        openLoginModal();
+      }
+
+      return;
+    }
 
     if (!silentUnauthorized) {
-      showToast("Session expired. Please log in again.", "info");
-      openLoginModal();
+      showToast(error.message, "error");
     }
   }
 }
@@ -1782,6 +1938,11 @@ function renderLeaderboardPage() {
   renderSecurityStatus();
   renderArchivedFightersTable();
   renderScoreLogTable();
+}
+
+async function refreshAdminLeaderboardPanels({ silentUnauthorized = true } = {}) {
+  await loadAdminLeaderboardData({ silentUnauthorized });
+  renderLeaderboardPage();
 }
 
 async function loadLeaderboardData({ silent = false, includeAdmin = state.viewer.canManage } = {}) {
@@ -1890,6 +2051,11 @@ fightCardTableBody?.addEventListener("click", (event) => {
 
   if (actionButton.dataset.action === "score-fight") {
     openScoreFightModal(actionButton.dataset.fightId);
+    return;
+  }
+
+  if (actionButton.dataset.action === "contact-fight") {
+    openContactFightModal(actionButton.dataset.fightId);
   }
 });
 
@@ -1963,12 +2129,37 @@ leaderboardSearchInput?.addEventListener("input", () => {
 
 auditSearchInput?.addEventListener("input", () => {
   state.auditSearchQuery = auditSearchInput.value;
-  renderScoreLogTable();
+  state.auditPage = 1;
+  if (auditSearchDebounceHandle) {
+    window.clearTimeout(auditSearchDebounceHandle);
+  }
+  auditSearchDebounceHandle = window.setTimeout(() => {
+    refreshAdminLeaderboardPanels();
+  }, 220);
 });
 
 auditActionFilter?.addEventListener("change", () => {
   state.auditActionFilter = auditActionFilter.value || "ALL";
-  renderScoreLogTable();
+  state.auditPage = 1;
+  refreshAdminLeaderboardPanels();
+});
+
+previousAuditPageButton?.addEventListener("click", () => {
+  if (state.auditPage <= 1) {
+    return;
+  }
+
+  state.auditPage -= 1;
+  refreshAdminLeaderboardPanels();
+});
+
+nextAuditPageButton?.addEventListener("click", () => {
+  if (state.auditPage >= getAuditTotalPages()) {
+    return;
+  }
+
+  state.auditPage += 1;
+  refreshAdminLeaderboardPanels();
 });
 
 fighterSelect?.addEventListener("change", () => {
@@ -1981,6 +2172,7 @@ awardFighterSelect?.addEventListener("change", syncAwardPreview);
 awardFightSelect?.addEventListener("change", syncAwardPreview);
 beltFighterSelect?.addEventListener("change", syncBeltPreview);
 scoreFightWinnerSelect?.addEventListener("change", syncScoreFightPreview);
+applyNoShowPenaltyButton?.addEventListener("click", applyNoShowPenaltyToCorrection);
 openDeleteFighterButton?.addEventListener("click", () => {
   const fighter = state.fighterDirectory.find((entry) => entry.id === fighterSelect.value);
 
@@ -2011,6 +2203,8 @@ closeHallOfFameButton?.addEventListener("click", closeHallOfFameModal);
 closeHallOfFameBackdrop?.addEventListener("click", closeHallOfFameModal);
 closeFightCardButton?.addEventListener("click", closeFightCardModal);
 closeFightCardBackdrop?.addEventListener("click", closeFightCardModal);
+closeContactFightButton?.addEventListener("click", closeContactFightModal);
+closeContactFightBackdrop?.addEventListener("click", closeContactFightModal);
 closeScoreFightButton?.addEventListener("click", closeScoreFightModal);
 closeScoreFightBackdrop?.addEventListener("click", closeScoreFightModal);
 
@@ -2030,6 +2224,11 @@ window.addEventListener("keydown", (event) => {
 
   if (!scoreFightModal.classList.contains("hidden")) {
     closeScoreFightModal();
+    return;
+  }
+
+  if (!contactFightModal.classList.contains("hidden")) {
+    closeContactFightModal();
     return;
   }
 
@@ -2112,6 +2311,7 @@ fighterForm?.addEventListener("submit", async (event) => {
 
   const payload = {
     name: fighterForm.elements.name.value.trim(),
+    phoneNumber: fighterForm.elements.phoneNumber.value.trim(),
     active: fighterForm.elements.active.checked,
     notes: fighterForm.elements.notes.value.trim()
   };

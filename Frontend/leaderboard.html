@@ -309,8 +309,6 @@
               </label>
             </div>
 
-            <p class="helper-copy" id="auditLogMeta">Showing recent audit activity.</p>
-
             <div class="table-shell">
               <div class="table-scroll">
                 <table class="data-table">
@@ -324,6 +322,15 @@
                   </thead>
                   <tbody id="scoreLogTableBody"></tbody>
                 </table>
+              </div>
+
+              <div class="table-footer">
+                <p class="helper-copy" id="auditLogMeta">Showing recent audit activity.</p>
+                <div class="pagination-controls">
+                  <button class="topbar-button ghost compact" id="previousAuditPageButton" type="button">Previous</button>
+                  <span class="pagination-label" id="auditPageLabel">Page 1 of 1</span>
+                  <button class="topbar-button ghost compact" id="nextAuditPageButton" type="button">Next</button>
+                </div>
               </div>
             </div>
           </section>
@@ -382,6 +389,11 @@
           <label class="field-block">
             <span>Name</span>
             <input type="text" name="name" required>
+          </label>
+
+          <label class="field-block">
+            <span>Phone number</span>
+            <input type="tel" name="phoneNumber" placeholder="Admin-only contact number">
           </label>
 
           <div class="panel-lock hidden" id="fighterEditFlowNote">
@@ -536,6 +548,11 @@
               <span>Correction points</span>
               <input type="number" name="correctionPoints" value="0">
             </label>
+
+            <div class="inline-form-row">
+              <button class="topbar-button ghost compact" id="applyNoShowPenaltyButton" type="button">Apply no show penalty</button>
+              <p class="helper-copy">Quick-fill the no-show penalty from the scoring table.</p>
+            </div>
           </div>
 
           <label class="field-block">
@@ -678,17 +695,24 @@
             </label>
 
             <label class="field-block">
-              <span>Charisma max</span>
-              <input type="number" name="charismaMax" min="0" required>
+              <span>No show points</span>
+              <input type="number" name="noShowPoints" required>
             </label>
           </div>
 
           <div class="dual-field-grid">
             <label class="field-block">
+              <span>Charisma max</span>
+              <input type="number" name="charismaMax" min="0" required>
+            </label>
+
+            <label class="field-block">
               <span>Dominance max</span>
               <input type="number" name="dominanceMax" min="0" required>
             </label>
+          </div>
 
+          <div class="dual-field-grid">
             <label class="field-block">
               <span>Title win bonus</span>
               <input type="number" name="titleWinBonus" min="0" required>
@@ -724,6 +748,10 @@
               <article class="preview-metric">
                 <span>Standard loss</span>
                 <strong id="scoringPreviewLoss">0</strong>
+              </article>
+              <article class="preview-metric">
+                <span>No show</span>
+                <strong id="scoringPreviewNoShow">0</strong>
               </article>
               <article class="preview-metric">
                 <span>Max bout swing</span>
@@ -825,6 +853,26 @@
       </section>
     </div>
 
+    <div class="modal-shell hidden" id="contactFightModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeContactFightBackdrop" type="button" aria-label="Close fight contact details"></button>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="contactFightTitle">
+        <div class="modal-header">
+          <div>
+            <p class="section-kicker">Admin Contacts</p>
+            <h2 id="contactFightTitle">Fight contacts</h2>
+          </div>
+          <button class="topbar-button ghost compact" id="closeContactFightButton" type="button">Close</button>
+        </div>
+
+        <div class="panel-lock">
+          <strong id="contactFightMatchup">Selected fight</strong>
+          <p>These phone numbers are only loaded for logged-in admins and never shown on the public ladder.</p>
+        </div>
+
+        <div class="contact-fight-grid" id="contactFightList"></div>
+      </section>
+    </div>
+
     <div class="modal-shell hidden" id="scoreFightModal" aria-hidden="true">
       <button class="modal-backdrop" id="closeScoreFightBackdrop" type="button" aria-label="Close fight scoring form"></button>
       <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="scoreFightTitle">
@@ -913,6 +961,6 @@
     </div>
 
     <div class="toast-stack" id="toastStack"></div>
-    <script type="module" src="./assets/js/leaderboard.js?v=20260615d"></script>
+    <script type="module" src="./assets/js/leaderboard.js?v=20260616b"></script>
   </body>
 </html>

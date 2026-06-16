@@ -87,6 +87,27 @@ function normalizeAwardType(value, fallback = "BOUT") {
   return normalized;
 }
 
+function normalizeAuditActionFilter(value) {
+  const normalized = `${value ?? ""}`.trim().toUpperCase();
+
+  if (!normalized || normalized === "ALL") {
+    return "ALL";
+  }
+
+  return normalized;
+}
+
+function requirePositiveQueryInt(value, fallback) {
+  const normalized = `${value ?? ""}`.trim();
+
+  if (!normalized) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(normalized, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function normalizeAwardResult(value) {
   const normalized = `${value ?? ""}`.trim().toUpperCase();
 
@@ -211,6 +232,7 @@ function buildScoringConfigSnapshot(config) {
     startingPoints: config.startingPoints,
     winPoints: config.winPoints,
     lossPoints: config.lossPoints,
+    noShowPoints: config.noShowPoints,
     charismaMax: config.charismaMax,
     dominanceMax: config.dominanceMax,
     titleWinBonus: config.titleWinBonus,
@@ -276,6 +298,54 @@ async function createFightAuditLog(transaction, {
   });
 }
 
+function buildAuditWhereClause({
+  searchQuery = "",
+  actionFilter = "ALL"
+} = {}) {
+  const where = {};
+  const normalizedSearch = `${searchQuery ?? ""}`.trim();
+  const normalizedActionFilter = normalizeAuditActionFilter(actionFilter);
+
+  if (normalizedActionFilter !== "ALL") {
+    where.action = normalizedActionFilter;
+  }
+
+  if (normalizedSearch) {
+    where.OR = [
+      {
+        summary: {
+          contains: normalizedSearch,
+          mode: "insensitive"
+        }
+      },
+      {
+        action: {
+          contains: normalizedSearch,
+          mode: "insensitive"
+        }
+      },
+      {
+        entityType: {
+          contains: normalizedSearch,
+          mode: "insensitive"
+        }
+      },
+      {
+        actor: {
+          is: {
+            name: {
+              contains: normalizedSearch,
+              mode: "insensitive"
+            }
+          }
+        }
+      }
+    ];
+  }
+
+  return where;
+}
+
 function deriveInactivityState(fighter, scoringConfig, now = new Date()) {
   const referenceDate = fighter.lastFightAt ?? fighter.lastAwardedAt ?? fighter.createdAt;
   const elapsedMs = now.getTime() - referenceDate.getTime();
@@ -338,6 +408,9 @@ function compareContenderFighters(left, right) {
 }
 
 function buildFighterViews(fighters, scoringConfig) {
+  const fighterContactById = new Map(
+    fighters.map((fighter) => [fighter.id, normalizeOptionalString(fighter.phoneNumber)])
+  );
   const derivedFighters = fighters.map((fighter) => {
     const inactivity = deriveInactivityState(fighter, scoringConfig);
 
@@ -426,11 +499,19 @@ function buildFighterViews(fighters, scoringConfig) {
 
   const fighterDirectory = derivedFighters
     .filter((fighter) => !fighter.archived)
+    .map((fighter) => ({
+      ...fighter,
+      phoneNumber: fighterContactById.get(fighter.id) || null
+    }))
     .slice()
     .sort((left, right) => left.name.localeCompare(right.name));
 
   const archivedFighters = derivedFighters
     .filter((fighter) => fighter.archived)
+    .map((fighter) => ({
+      ...fighter,
+      phoneNumber: fighterContactById.get(fighter.id) || null
+    }))
     .slice()
     .sort((left, right) => {
       const leftTime = left.archivedAt ? new Date(left.archivedAt).getTime() : 0;
@@ -553,9 +634,31 @@ async function applyScoreEntry(transaction, {
   };
 }
 
-async function buildLeaderboardPayload(reqUser = null) {
+async function buildLeaderboardPayload(reqUser = null, {
+  auditPage = 1,
+  auditPageSize = 25,
+  auditSearch = "",
+  auditAction = "ALL"
+} = {}) {
   const scoringConfig = await ensureScoringConfig();
-  const [fighters, hallOfFame, fightCard, securityState, recentAuditEntries] = await Promise.all([
+  const normalizedAuditPage = requirePositiveQueryInt(auditPage, 1);
+  const normalizedAuditPageSize = Math.min(100, requirePositiveQueryInt(auditPageSize, 25));
+  const normalizedAuditSearch = `${auditSearch ?? ""}`.trim();
+  const normalizedAuditAction = normalizeAuditActionFilter(auditAction);
+  const auditWhere = buildAuditWhereClause({
+    searchQuery: normalizedAuditSearch,
+    actionFilter: normalizedAuditAction
+  });
+  const shouldLoadAudit = Boolean(reqUser);
+
+  const [
+    fighters,
+    hallOfFame,
+    fightCard,
+    securityState,
+    auditLogTotalCount,
+    recentAuditEntries
+  ] = await Promise.all([
     prisma.fightFighter.findMany({
       orderBy: [{ isChampion: "desc" }, { points: "desc" }, { name: "asc" }]
     }),
@@ -579,18 +682,27 @@ async function buildLeaderboardPayload(reqUser = null) {
         }
       }
     }),
-    prisma.fightAuditLog.findMany({
-      take: 60,
-      orderBy: [{ createdAt: "desc" }],
-      include: {
-        actor: {
-          select: {
-            id: true,
-            name: true
+    shouldLoadAudit
+      ? prisma.fightAuditLog.count({
+        where: auditWhere
+      })
+      : Promise.resolve(0),
+    shouldLoadAudit
+      ? prisma.fightAuditLog.findMany({
+        where: auditWhere,
+        skip: (normalizedAuditPage - 1) * normalizedAuditPageSize,
+        take: normalizedAuditPageSize,
+        orderBy: [{ createdAt: "desc" }],
+        include: {
+          actor: {
+            select: {
+              id: true,
+              name: true
+            }
           }
-        },
-      }
-    })
+        }
+      })
+      : Promise.resolve([])
   ]);
 
   const leaderboardData = buildFighterViews(fighters, scoringConfig);
@@ -609,15 +721,22 @@ async function buildLeaderboardPayload(reqUser = null) {
       resolvedSecurityState,
       securityState?.lockedBy?.name || null
     ),
-    auditLog: recentAuditEntries.map((entry) => ({
-      id: entry.id,
-      actorName: entry.actor?.name || "Unknown",
-      action: entry.action,
-      entityType: entry.entityType,
-      entityId: entry.entityId,
-      summary: entry.summary,
-      createdAt: entry.createdAt
-    })),
+    auditLog: {
+      entries: recentAuditEntries.map((entry) => ({
+        id: entry.id,
+        actorName: entry.actor?.name || "Unknown",
+        action: entry.action,
+        entityType: entry.entityType,
+        entityId: entry.entityId,
+        summary: entry.summary,
+        createdAt: entry.createdAt
+      })),
+      page: normalizedAuditPage,
+      pageSize: normalizedAuditPageSize,
+      totalCount: auditLogTotalCount,
+      searchQuery: normalizedAuditSearch,
+      actionFilter: normalizedAuditAction
+    },
     viewer: {
       isLoggedIn: Boolean(reqUser),
       canManage: Boolean(reqUser),
@@ -660,7 +779,12 @@ router.get(
   "/admin",
   authenticateToken,
   asyncHandler(async (req, res) => {
-    res.json(toAdminLeaderboardPayload(await buildLeaderboardPayload(req.user)));
+    res.json(toAdminLeaderboardPayload(await buildLeaderboardPayload(req.user, {
+      auditPage: req.query.auditPage,
+      auditPageSize: req.query.auditPageSize,
+      auditSearch: req.query.auditSearch,
+      auditAction: req.query.auditAction
+    })));
   })
 );
 
@@ -704,6 +828,7 @@ router.post(
             : 0,
           isChampion: false,
           active: typeof req.body.active === "boolean" ? req.body.active : true,
+          phoneNumber: normalizeOptionalString(req.body.phoneNumber),
           lastFightAt: req.body.lastFightAt
             ? requireDateTime(req.body.lastFightAt, "Last fight date")
             : null,
@@ -773,6 +898,9 @@ router.patch(
             ? requireNonNegativeInt(req.body.dominancePoints, "Dominance points")
             : existingFighter.dominancePoints,
           active: nextActiveState,
+          phoneNumber: req.body.phoneNumber !== undefined
+            ? normalizeOptionalString(req.body.phoneNumber)
+            : existingFighter.phoneNumber,
           notes: req.body.notes !== undefined ? normalizeOptionalString(req.body.notes) : existingFighter.notes,
           lastFightAt: applyStatOverride && req.body.lastFightAt
             ? requireDateTime(req.body.lastFightAt, "Last fight date")
@@ -1189,6 +1317,9 @@ router.patch(
       lossPoints: req.body.lossPoints !== undefined
         ? requireNegativeOrZeroInt(req.body.lossPoints, "Loss points")
         : existingConfig.lossPoints,
+      noShowPoints: req.body.noShowPoints !== undefined
+        ? requireNegativeOrZeroInt(req.body.noShowPoints, "No show points")
+        : existingConfig.noShowPoints,
       charismaMax: req.body.charismaMax !== undefined
         ? requireNonNegativeInt(req.body.charismaMax, "Charisma max")
         : existingConfig.charismaMax,
