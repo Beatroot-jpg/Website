@@ -156,11 +156,12 @@ function toggleModal(modal, visible) {
 }
 
 function formatMoney(value) {
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: "USD",
+  const amount = Number(value || 0);
+  const formattedAmount = new Intl.NumberFormat("en-AU", {
     maximumFractionDigits: 0
-  }).format(Number(value || 0));
+  }).format(Math.abs(amount));
+
+  return `${amount < 0 ? "-" : ""}$${formattedAmount}`;
 }
 
 function formatDateTime(value) {
