@@ -132,14 +132,15 @@ function getSessionHeaders(headers = {}) {
 }
 
 function normalizeViewer(viewer = {}) {
-  const sessionIsAdmin = state.session?.user?.role === "ADMIN";
-  const isAdmin = Boolean(viewer?.isAdmin && sessionIsAdmin);
+  const sessionCanManageWagers = state.session?.user?.role === "ADMIN"
+    || state.session?.user?.permissions?.includes("WAGERS");
+  const canManage = Boolean(viewer?.canManage && sessionCanManageWagers);
 
   return {
     isLoggedIn: Boolean(viewer?.isLoggedIn || state.session?.token),
-    isAdmin,
-    canManage: Boolean(viewer?.canManage && isAdmin),
-    canUseAdminPanel: Boolean(viewer?.canUseAdminPanel && isAdmin)
+    isAdmin: Boolean(viewer?.isAdmin && sessionCanManageWagers),
+    canManage,
+    canUseAdminPanel: Boolean(viewer?.canUseAdminPanel && canManage)
   };
 }
 

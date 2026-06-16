@@ -1,5 +1,6 @@
 export const APP_PERMISSIONS = [
-  "USERS"
+  "USERS",
+  "WAGERS"
 ];
 
 export const DEFAULT_USER_PERMISSIONS = [];

@@ -23,6 +23,7 @@ enum PermissionKey {
   TAX
   DISTRIBUTION
   USERS
+  WAGERS
 }
 
 enum TaxEmploymentType {

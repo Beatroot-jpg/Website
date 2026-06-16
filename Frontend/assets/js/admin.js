@@ -120,6 +120,24 @@ function canManageAdminPanel(user = state.currentUser) {
   return Boolean(user && (user.role === "ADMIN" || user.permissions?.includes("USERS")));
 }
 
+function canManageWagers(user = state.currentUser) {
+  return Boolean(user && (user.role === "ADMIN" || user.permissions?.includes("WAGERS")));
+}
+
+function buildPermissionPayload({ adminPanelAccess = false, wagerAccess = false } = {}) {
+  const permissions = [];
+
+  if (adminPanelAccess) {
+    permissions.push("USERS");
+  }
+
+  if (wagerAccess) {
+    permissions.push("WAGERS");
+  }
+
+  return permissions;
+}
+
 function getAuthorizationHeaders(headers = {}) {
   const merged = new Headers(headers);
 
@@ -184,7 +202,9 @@ function openEditUserModal(user) {
   editUserForm.elements.password.value = "";
   editUserForm.elements.active.checked = user.active !== false;
   editUserForm.elements.adminPanelAccess.checked = canManageAdminPanel(user);
+  editUserForm.elements.wagerAccess.checked = canManageWagers(user);
   editUserForm.elements.adminPanelAccess.disabled = user.role === "ADMIN";
+  editUserForm.elements.wagerAccess.disabled = user.role === "ADMIN";
   editUserForm.elements.active.disabled = state.currentUser?.id === user.id;
   editUserRoleNote.classList.toggle("hidden", user.role !== "ADMIN");
   editCurrentUserNote.classList.toggle("hidden", state.currentUser?.id !== user.id);
@@ -248,7 +268,7 @@ function createStatusItem(label, value, tone = "neutral") {
 function renderAccessSummary() {
   accessSummary.replaceChildren(
     createStatusItem("Current user", state.currentUser?.name || "Guest"),
-    createStatusItem("Leaderboard and wagers", state.currentUser ? "Manage enabled" : "Public view only", state.currentUser ? "accent" : "neutral"),
+    createStatusItem("Wager controls", canManageWagers() ? "Enabled" : state.currentUser ? "Locked" : "Public view only", canManageWagers() ? "accent" : "neutral"),
     createStatusItem("Admin panel tools", canManageAdminPanel() ? "Enabled" : state.currentUser ? "Locked" : "Login required", canManageAdminPanel() ? "accent" : "warning")
   );
 }
@@ -371,9 +391,11 @@ function renderUsersTable() {
     usernameCell.textContent = `@${user.username}`;
 
     const accessCell = document.createElement("td");
-    accessCell.appendChild(
-      createBadge(canManageAdminPanel(user) ? "Admin panel" : "Fight-night only", canManageAdminPanel(user) ? "accent" : "neutral")
-    );
+    const accessRow = document.createElement("div");
+    accessRow.className = "table-action-row";
+    accessRow.appendChild(createBadge(canManageAdminPanel(user) ? "Admin panel" : "No admin panel", canManageAdminPanel(user) ? "accent" : "neutral"));
+    accessRow.appendChild(createBadge(canManageWagers(user) ? "Wagers" : "No wagers", canManageWagers(user) ? "good" : "neutral"));
+    accessCell.appendChild(accessRow);
 
     const statusCell = document.createElement("td");
     statusCell.appendChild(
@@ -642,7 +664,10 @@ createUserForm?.addEventListener("submit", async (event) => {
     name: `${formData.get("name") || ""}`.trim(),
     username: `${formData.get("username") || ""}`.trim(),
     password: `${formData.get("password") || ""}`.trim(),
-    permissions: formData.get("adminPanelAccess") ? ["USERS"] : []
+    permissions: buildPermissionPayload({
+      adminPanelAccess: Boolean(formData.get("adminPanelAccess")),
+      wagerAccess: Boolean(formData.get("wagerAccess"))
+    })
   };
 
   try {
@@ -701,7 +726,10 @@ editUserForm?.addEventListener("submit", async (event) => {
     name: `${formData.get("name") || ""}`.trim(),
     username: `${formData.get("username") || ""}`.trim(),
     active: editUserForm.elements.active.checked,
-    permissions: editUserForm.elements.adminPanelAccess.checked ? ["USERS"] : []
+    permissions: buildPermissionPayload({
+      adminPanelAccess: editUserForm.elements.adminPanelAccess.checked,
+      wagerAccess: editUserForm.elements.wagerAccess.checked
+    })
   };
   const password = `${formData.get("password") || ""}`.trim();
 

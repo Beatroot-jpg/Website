@@ -13,7 +13,7 @@ const TITLE_FIGHT_THRESHOLD = 5000000;
 const BETTING_MULTIPLIER = 1.9;
 
 function canManageWagers(user) {
-  return Boolean(user?.role === "ADMIN");
+  return Boolean(user?.role === "ADMIN" || user?.permissions?.includes("WAGERS"));
 }
 
 function requireWagerManager(req, _res, next) {

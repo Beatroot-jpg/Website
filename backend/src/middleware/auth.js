@@ -110,7 +110,8 @@ export function requireOwner(req, res, next) {
 
 export function listPermissionMetadata() {
   const labels = {
-    USERS: "Admin Panel Access"
+    USERS: "Admin Panel Access",
+    WAGERS: "Wager Controls"
   };
 
   return APP_PERMISSIONS.map((key) => ({
