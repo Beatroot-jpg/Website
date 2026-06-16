@@ -13,7 +13,7 @@ const TITLE_FIGHT_THRESHOLD = 5000000;
 const BETTING_MULTIPLIER = 1.9;
 
 function canManageWagers(user) {
-  return Boolean(user?.role === "ADMIN" || user?.permissions?.includes("USERS"));
+  return Boolean(user?.role === "ADMIN");
 }
 
 function requireWagerManager(req, _res, next) {
@@ -408,6 +408,7 @@ function buildPayload(night, reqUser, fighterDirectory = []) {
     auditLog: canManage ? (night?.auditLogs || []).map(serializeAuditLog) : [],
     viewer: {
       isLoggedIn: Boolean(reqUser),
+      isAdmin: canManage,
       canManage,
       canUseAdminPanel: canManage
     }

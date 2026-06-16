@@ -69,6 +69,7 @@ const state = {
   session: getSession(),
   viewer: {
     isLoggedIn: false,
+    isAdmin: false,
     canManage: false,
     canUseAdminPanel: false
   },
@@ -128,6 +129,18 @@ function getSessionHeaders(headers = {}) {
   }
 
   return merged;
+}
+
+function normalizeViewer(viewer = {}) {
+  const sessionIsAdmin = state.session?.user?.role === "ADMIN";
+  const isAdmin = Boolean(viewer?.isAdmin && sessionIsAdmin);
+
+  return {
+    isLoggedIn: Boolean(viewer?.isLoggedIn || state.session?.token),
+    isAdmin,
+    canManage: Boolean(viewer?.canManage && isAdmin),
+    canUseAdminPanel: Boolean(viewer?.canUseAdminPanel && isAdmin)
+  };
 }
 
 async function apiWithOptionalSession(path, options = {}) {
@@ -636,7 +649,7 @@ async function loadWagersData({ silent = false } = {}) {
     state.adminSummary = payload.adminSummary || null;
     state.fighterDirectory = Array.isArray(payload.fighterDirectory) ? payload.fighterDirectory : [];
     state.auditLog = Array.isArray(payload.auditLog) ? payload.auditLog : [];
-    state.viewer = payload.viewer || state.viewer;
+    state.viewer = normalizeViewer(payload.viewer);
     renderPage();
   } catch (error) {
     if (!silent) {
@@ -666,6 +679,7 @@ sessionButton?.addEventListener("click", () => {
     state.session = null;
     state.viewer = {
       isLoggedIn: false,
+      isAdmin: false,
       canManage: false,
       canUseAdminPanel: false
     };
