@@ -1,4 +1,4 @@
-# The Shites Control
+# Los Santos Fight Club Control
 
 Inventory management starter with:
 

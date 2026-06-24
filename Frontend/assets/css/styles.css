@@ -1743,8 +1743,8 @@ html[data-theme="light"] .launcher-stage {
 
 .trust-fund-hero-grid {
   display: grid;
-  grid-template-columns: 1.4fr repeat(2, minmax(0, 1fr));
-  gap: 0.95rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1rem, 2vw, 1.35rem);
 }
 
 .trust-summary-card {
@@ -1761,6 +1761,8 @@ html[data-theme="light"] .launcher-stage {
 }
 
 .trust-summary-card:first-child {
+  grid-column: 1 / -1;
+  min-height: clamp(10rem, 20vw, 15rem);
   border-color: rgba(25, 195, 95, 0.3);
   background:
     radial-gradient(circle at top right, rgba(25, 195, 95, 0.22), transparent 0 12rem),
@@ -1781,6 +1783,11 @@ html[data-theme="light"] .launcher-stage {
   font-size: clamp(1.85rem, 4vw, 4rem);
   line-height: 0.95;
   letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
+}
+
+.trust-summary-card:first-child strong {
+  font-size: clamp(2.5rem, 6vw, 5.6rem);
 }
 
 .trust-summary-card.accent strong,

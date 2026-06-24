@@ -1,4 +1,4 @@
-# The Shites Fight Club Leaderboard Reference
+# Los Santos Fight Club Leaderboard Reference
 
 ## Purpose
 Use this file as the carry-forward reference when rebuilding other panels so we keep the same level of clarity, hierarchy, and control that the leaderboard now has.

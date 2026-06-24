@@ -1,4 +1,4 @@
-# The Shites Workspace Reset Reference
+# Los Santos Fight Club Workspace Reset Reference
 
 ## Purpose
 Rebuild the site away from the old gang-business operations model and into a cleaner personal/group workspace for GTA5 FiveM RP tracking.
@@ -17,14 +17,14 @@ The new direction is:
 - No horizontal overflow.
 - Dark mode and light mode must both feel intentional.
 - The homepage should feel like a launcher, not an admin dashboard.
-- The brand should feel premium, glowing, cinematic, and unmistakably "The Shites".
+- The brand should feel premium, glowing, cinematic, and unmistakably "Los Santos Fight Club".
 - Every page should do one job clearly instead of mixing unrelated workflows.
 
 ## Current Reset Plan
 Start with the homepage first, then work through the rest of the system in focused passes.
 
 ### New Homepage Direction
-- Shites logo near the top
+- Los Santos Fight Club logo near the top
 - strong hero copy
 - large launcher buttons/cards for each page
 - light/dark mode toggle

@@ -2,7 +2,7 @@ import { api } from "./api.js";
 import { clearSession, getSession, saveSession } from "./session.js";
 import { initThemeToggle } from "./theme.js";
 
-const FLASH_MESSAGE_KEY = "the-shites-flash-message";
+const FLASH_MESSAGE_KEY = "los-santos-fight-club-flash-message";
 const themeToggleButton = document.querySelector("#themeToggleButton");
 const sessionButton = document.querySelector("#sessionButton");
 const accessSummary = document.querySelector("#accessSummary");

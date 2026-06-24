@@ -1,4 +1,4 @@
-const STORAGE_KEY = "the-shites-session";
+const STORAGE_KEY = "los-santos-fight-club-session";
 
 export function getSession() {
   try {

@@ -1,4 +1,4 @@
-const STORAGE_KEY = "the-shites-theme";
+const STORAGE_KEY = "los-santos-fight-club-theme";
 
 export function getTheme() {
   try {

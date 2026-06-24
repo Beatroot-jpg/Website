@@ -2,7 +2,7 @@ import { api } from "./api.js";
 import { clearSession, getSession, saveSession } from "./session.js";
 import { initThemeToggle } from "./theme.js";
 
-const FLASH_MESSAGE_KEY = "the-shites-flash-message";
+const FLASH_MESSAGE_KEY = "los-santos-fight-club-flash-message";
 const themeToggleButton = document.querySelector("#themeToggleButton");
 const loginButton = document.querySelector("#loginButton");
 const loginModal = document.querySelector("#loginModal");
@@ -86,7 +86,7 @@ function syncLoginButton() {
     loginButton.dataset.state = "session";
   } else {
     loginButton.textContent = "Login";
-    loginHint.textContent = "Private access for trusted members of The Shites Fight Club.";
+    loginHint.textContent = "Private access for trusted members of Los Santos Fight Club.";
     loginButton.dataset.state = "login";
   }
 }
