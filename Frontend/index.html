@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Los Santos Fight Club</title>
+    <title>Dashboard</title>
     <script>
       try {
         const savedTheme = window.localStorage.getItem("los-santos-fight-club-theme");
@@ -13,89 +13,84 @@
       } catch (_error) {}
     </script>
     <link rel="stylesheet" href="./assets/css/styles.css">
+    <link rel="stylesheet" href="./assets/css/dashboard.css">
     <script src="./assets/js/runtime-config.js"></script>
     <script src="./assets/js/config.js"></script>
   </head>
-  <body class="landing-body is-loading">
-    <div class="landing-shell">
-      <header class="landing-topbar">
-        <div class="landing-topbar-actions">
-          <button class="topbar-button ghost" id="themeToggleButton" type="button" aria-pressed="false">Light mode</button>
-          <button class="topbar-button accent" id="loginButton" type="button">Login</button>
+  <body class="dashboard-body is-loading">
+    <div class="dashboard-shell">
+      <header class="dashboard-topbar">
+        <span class="dashboard-wordmark">The Shites</span>
+        <div class="dashboard-topbar-actions">
+          <button class="dashboard-button ghost" id="themeToggleButton" type="button" aria-pressed="false">Light mode</button>
+          <button class="dashboard-button gold" id="loginButton" type="button">Login</button>
         </div>
       </header>
 
-      <main class="landing-main">
-        <section class="hero-stage">
-          <div class="hero-stage-glow" aria-hidden="true"></div>
-          <img
-            class="hero-logo"
-            src="./assets/images/Main Logo.png"
-            alt="Los Santos Fight Club logo"
-          >
+      <main>
+        <section class="dashboard-hero" aria-labelledby="dashboardTitle">
+          <div class="dashboard-hero-glow" aria-hidden="true"></div>
+          <div class="dashboard-logo-gallery">
+            <img class="dashboard-logo" src="./assets/images/Main Logo.png" alt="The Shites logo">
+          </div>
+          <div class="dashboard-title-block">
+            <p class="dashboard-kicker">Private workspace</p>
+            <h1 id="dashboardTitle">Dashboard</h1>
+          </div>
         </section>
 
-        <section class="launcher-stage" aria-label="Site sections">
-          <div class="launcher-stage-fade" aria-hidden="true"></div>
-          <div class="launcher-grid">
-            <a class="launcher-card" href="./leaderboard.html">
-              <strong>Leaderboard</strong>
-              <p>Track the live ladder, champions, and who is sitting at the top of the club.</p>
-            </a>
+        <section class="available-pages" id="availablePages" aria-labelledby="availablePagesTitle">
+          <header class="available-pages-header">
+            <p class="dashboard-kicker">Navigation</p>
+            <h2 id="availablePagesTitle">Available pages</h2>
+          </header>
 
-            <a class="launcher-card" href="./wagers.html">
-              <strong>Wagers</strong>
-              <p>Watch the night book, active bets, and what the house is projected to walk with.</p>
+          <nav class="available-page-list" aria-label="Available pages">
+            <a class="available-page-card" href="./inventory.html">
+              <span>
+                <strong>Inventory</strong>
+                <small>Stock levels, dirty money, pricing, and protected history.</small>
+              </span>
+              <span class="available-page-arrow" aria-hidden="true">Open</span>
             </a>
-
-            <a class="launcher-card is-locked" id="adminLauncherCard">
-              <strong>Admin</strong>
-              <p>Run the back room, manage access, and keep the club tight when the real work starts.</p>
-              <span class="launcher-card-state" id="adminLauncherState">Login required</span>
-            </a>
-          </div>
+          </nav>
         </section>
       </main>
     </div>
 
-    <button class="scroll-cue" id="scrollCue" type="button" aria-label="Scroll down to site sections">
-      <span class="scroll-cue-copy">Scroll</span>
-      <span class="scroll-cue-arrows" aria-hidden="true">
-        <span></span>
-        <span></span>
-      </span>
+    <button class="dashboard-scroll-cue" id="scrollCue" type="button" aria-label="Scroll to available pages">
+      <span>Scroll</span>
+      <i aria-hidden="true"></i>
+      <i aria-hidden="true"></i>
     </button>
 
     <div class="modal-shell hidden" id="loginModal" aria-hidden="true">
       <button class="modal-backdrop" id="closeLoginBackdrop" type="button" aria-label="Close login"></button>
-      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
-        <div class="modal-header">
+      <section class="modal-card dashboard-modal-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+        <header class="dashboard-modal-header">
           <div>
-            <p class="section-kicker">Members Only</p>
-            <h2 id="loginTitle">Log in to the club</h2>
+            <p class="dashboard-kicker">Member access</p>
+            <h2 id="loginTitle">Log in</h2>
           </div>
-          <button class="topbar-button ghost compact" id="closeLoginButton" type="button">Close</button>
-        </div>
+          <button class="dashboard-button ghost compact" id="closeLoginButton" type="button">Close</button>
+        </header>
 
-        <form class="login-form" id="loginForm">
-          <label class="field-block">
+        <form class="dashboard-form" id="loginForm">
+          <label class="dashboard-field">
             <span>Username</span>
-            <input type="text" name="username" placeholder="operator" autocomplete="username" required>
+            <input type="text" name="username" autocomplete="username" required>
           </label>
-
-          <label class="field-block">
+          <label class="dashboard-field">
             <span>Password</span>
-            <input type="password" name="password" placeholder="********" autocomplete="current-password" required>
+            <input type="password" name="password" autocomplete="current-password" required>
           </label>
-
-          <button class="topbar-button accent wide" id="loginSubmitButton" type="submit">Enter</button>
-          <p class="form-message hidden" id="loginError"></p>
-          <p class="helper-copy" id="loginHint">Private access for trusted members of Los Santos Fight Club.</p>
+          <button class="dashboard-button gold full" id="loginSubmitButton" type="submit">Enter</button>
+          <p class="dashboard-form-message hidden" id="loginError"></p>
         </form>
       </section>
     </div>
 
-    <div class="toast-stack" id="toastStack"></div>
+    <div class="toast-stack dashboard-toast-stack" id="toastStack"></div>
     <script type="module" src="./assets/js/home.js"></script>
   </body>
 </html>
