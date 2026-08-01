@@ -4,8 +4,8 @@ import { prisma } from "../db.js";
 import { asyncHandler, createError } from "../http.js";
 import {
   authenticateToken,
-  requireAdmin,
-  requirePermission
+  authenticateTokenOptional,
+  requireAdmin
 } from "../middleware/auth.js";
 import { normalizeOptionalString, requireString } from "../validators.js";
 
@@ -121,7 +121,7 @@ function serializeRestorePoint(point) {
 }
 
 function canManageInventory(user) {
-  return Boolean(user && (user.role === "ADMIN" || user.permissions.includes("INVENTORY")));
+  return Boolean(user?.role === "ADMIN");
 }
 
 function canUseAdminTools(user) {
@@ -230,16 +230,8 @@ function getAuditMovementSnapshots(value, fieldName) {
 }
 
 async function permanentlyDeleteInventoryItem(database, itemId) {
-  const [distributionCount, runnerDistributionCount] = await Promise.all([
-    database.distribution.count({ where: { itemId } }),
-    database.runnerDistribution.count({ where: { itemId } })
-  ]);
-
-  if (distributionCount || runnerDistributionCount) {
-    throw createError(409, "This item is linked to legacy distribution history and cannot be permanently deleted from Inventory.");
-  }
-
-  // Deleting the item also removes its stock-movement rows through the existing cascade relation.
+  // Retired distribution history is detached by the database relation, keeping history
+  // readable while allowing a deliberate hard delete from the current stock register.
   await database.inventoryItem.delete({ where: { id: itemId } });
 }
 
@@ -292,7 +284,7 @@ async function assertAuditActionCanBeReverted(database, entry) {
 
 router.get(
   "/",
-  authenticateToken,
+  authenticateTokenOptional,
   asyncHandler(async (req, res) => {
     const [account, items] = await Promise.all([
       findDirtyMoneyAccount(),
@@ -302,8 +294,10 @@ router.get(
       })
     ]);
 
+    const isAdmin = canManageInventory(req.user);
+
     res.json({
-      dirtyMoney: account?.amount?.toString() || "0.00",
+      dirtyMoney: isAdmin ? account?.amount?.toString() || "0.00" : null,
       items: items.map(serializeItem),
       viewer: {
         isLoggedIn: Boolean(req.user),
@@ -317,7 +311,7 @@ router.get(
 router.post(
   "/dirty-money",
   authenticateToken,
-  requirePermission("INVENTORY"),
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const operation = normalizeMoneyOperation(req.body.operation);
     const value = Number(requireMoneyValue(req.body.value, "Value"));
@@ -361,7 +355,7 @@ router.post(
 router.post(
   "/items",
   authenticateToken,
-  requirePermission("INVENTORY"),
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const name = requireString(req.body.name, "Item name");
     const duplicate = await prisma.inventoryItem.findFirst({
@@ -418,7 +412,7 @@ router.post(
 router.patch(
   "/items/:id",
   authenticateToken,
-  requirePermission("INVENTORY"),
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const existingItem = await prisma.inventoryItem.findFirst({
       where: { id: req.params.id, archived: false }
@@ -506,7 +500,7 @@ router.patch(
 router.delete(
   "/items/:id",
   authenticateToken,
-  requirePermission("INVENTORY"),
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const deletedItem = await prisma.$transaction(async (transaction) => {
       const existingItem = await transaction.inventoryItem.findFirst({

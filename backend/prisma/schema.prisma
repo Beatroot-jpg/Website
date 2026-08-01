@@ -26,6 +26,23 @@ enum PermissionKey {
   WAGERS
 }
 
+enum DispatchSaleType {
+  PAID_UPFRONT
+  ON_CREDIT
+}
+
+enum DispatchRecordStatus {
+  ACTIVE
+  PARTIAL
+  PAID
+  VOIDED
+}
+
+enum DispatchPaymentStatus {
+  PENDING_DEPOSIT
+  DEPOSITED
+  VOIDED
+}
 enum TaxEmploymentType {
   FREELANCER
   ORGANIZATION
@@ -280,6 +297,98 @@ model InventoryRestorePoint {
   @@index([createdAt])
 }
 
+model DispatchContact {
+  id          String   @id @default(cuid())
+  name        String
+  phoneNumber String   @unique
+  active      Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active, name])
+}
+
+model DispatchRecord {
+  id              String               @id @default(cuid())
+  contactId       String
+  contactName     String
+  contactPhone    String
+  inventoryItemId String?
+  itemName        String
+  unit            String               @default("unit")
+  quantity        Int
+  unitPrice       Decimal              @db.Decimal(14, 2)
+  totalOwed       Decimal              @db.Decimal(14, 2)
+  totalPaid       Decimal              @default(0) @db.Decimal(14, 2)
+  saleType        DispatchSaleType
+  status          DispatchRecordStatus @default(ACTIVE)
+  dueDate         DateTime?
+  notes           String?
+  createdById     String?
+  createdByName   String?
+  payments        DispatchPayment[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([status, dueDate])
+  @@index([contactId, createdAt])
+}
+
+model DispatchPayment {
+  id             String                @id @default(cuid())
+  dispatchId     String
+  amount         Decimal               @db.Decimal(14, 2)
+  note           String?
+  status         DispatchPaymentStatus @default(PENDING_DEPOSIT)
+  depositId      String?
+  depositedAt    DateTime?
+  recordedById   String?
+  recordedByName String?
+  dispatch       DispatchRecord        @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  deposit        DispatchDeposit?      @relation(fields: [depositId], references: [id], onDelete: SetNull)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([dispatchId, createdAt])
+  @@index([status, createdAt])
+}
+
+model DispatchDeposit {
+  id                  String    @id @default(cuid())
+  amount              Decimal   @db.Decimal(14, 2)
+  paymentCount        Int
+  inventoryAuditLogId String?
+  depositedById       String?
+  depositedByName     String?
+  revertedAt          DateTime?
+  revertedById        String?
+  revertedByName      String?
+  payments            DispatchPayment[]
+  createdAt           DateTime  @default(now())
+
+  @@index([createdAt])
+}
+
+model DispatchAuditLog {
+  id             String   @id @default(cuid())
+  actorId        String?
+  actorName      String?
+  action         String
+  entityType     String
+  entityId       String?
+  summary        String
+  before         Json?
+  after          Json?
+  revertedAt     DateTime?
+  revertedById   String?
+  revertedByName String?
+  reversalAuditId String?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}
 model PriceListItem {
   id        String   @id @default(cuid())
   name      String   @unique
@@ -396,7 +505,7 @@ model BankTransaction {
 
 model Distribution {
   id              String             @id @default(cuid())
-  itemId          String
+  itemId          String?
   assignedToId    String
   createdById     String
   quantity        Int
@@ -404,7 +513,7 @@ model Distribution {
   amountCollected Decimal?           @db.Decimal(12, 2)
   status          DistributionStatus @default(ASSIGNED)
   notes           String?
-  item            InventoryItem      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  item            InventoryItem?     @relation(fields: [itemId], references: [id], onDelete: SetNull)
   assignedTo      User               @relation("DistributionAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
   createdBy       User               @relation("DistributionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   bankTransaction BankTransaction?
@@ -429,7 +538,7 @@ model Distributor {
 model RunnerDistribution {
   id             String                   @id @default(cuid())
   distributorId  String
-  itemId         String
+  itemId         String?
   createdById    String
   quantity       Int
   unitValue      Decimal                  @db.Decimal(12, 2)
@@ -438,7 +547,7 @@ model RunnerDistribution {
   status         RunnerDistributionStatus @default(ACTIVE)
   notes          String?
   distributor    Distributor              @relation(fields: [distributorId], references: [id], onDelete: Restrict)
-  item           InventoryItem            @relation("RunnerDistributionItem", fields: [itemId], references: [id], onDelete: Restrict)
+  item           InventoryItem?           @relation("RunnerDistributionItem", fields: [itemId], references: [id], onDelete: SetNull)
   createdBy      User                     @relation("RunnerDistributionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   collections    DistributionCollection[]
   createdAt      DateTime                 @default(now())

@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dispatch</title>
+    <script>
+      try {
+        const savedTheme = window.localStorage.getItem("los-santos-fight-club-theme");
+        if (savedTheme === "light" || savedTheme === "dark") document.documentElement.dataset.theme = savedTheme;
+      } catch (_error) {}
+    </script>
+    <link rel="stylesheet" href="./assets/css/styles.css">
+    <link rel="stylesheet" href="./assets/css/dispatch.css">
+    <script src="./assets/js/runtime-config.js"></script>
+    <script src="./assets/js/config.js"></script>
+  </head>
+  <body class="dispatch-body">
+    <div class="dispatch-shell">
+      <header class="dispatch-topbar">
+        <a class="dispatch-home-link" href="./index.html">Home</a>
+        <div class="dispatch-topbar-actions">
+          <button class="dispatch-button ghost" id="themeToggleButton" type="button" aria-pressed="false">Light mode</button>
+          <button class="dispatch-button gold" id="sessionButton" type="button">Login</button>
+        </div>
+      </header>
+
+      <main class="dispatch-stack">
+        <section class="dispatch-overview-card" aria-labelledby="dispatchTitle">
+          <header class="dispatch-card-heading">
+            <div>
+              <p class="dispatch-kicker">Stock Out</p>
+              <h1 id="dispatchTitle">Dispatch</h1>
+            </div>
+            <div class="dispatch-register-actions">
+              <p class="dispatch-status" id="dispatchAccessStatus">Login required</p>
+              <button class="dispatch-button ghost" id="openPhonebookButton" type="button" hidden>Phonebook</button>
+              <button class="dispatch-button gold" id="openDispatchModalButton" type="button" hidden>New dispatch</button>
+            </div>
+          </header>
+
+          <div class="dispatch-filter-row">
+            <label class="dispatch-field dispatch-search-field">
+              <span>Find a person or item</span>
+              <input id="dispatchSearchInput" type="search" placeholder="Search dispatches">
+            </label>
+            <label class="dispatch-field dispatch-filter-field">
+              <span>Show</span>
+              <select id="dispatchScopeSelect">
+                <option value="OPEN">Open dispatches</option>
+                <option value="OVERDUE">Overdue only</option>
+                <option value="PAID">Paid</option>
+                <option value="VOIDED">Voided</option>
+                <option value="ALL">All records</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="dispatch-table-scroll">
+            <table class="dispatch-table">
+              <thead>
+                <tr>
+                  <th scope="col">Person</th>
+                  <th scope="col">Stock released</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Due</th>
+                  <th scope="col">Status</th>
+                  <th class="dispatch-admin-column" scope="col" hidden>Balance</th>
+                  <th class="dispatch-admin-column" scope="col" hidden>Action</th>
+                </tr>
+              </thead>
+              <tbody id="dispatchTableBody"></tbody>
+            </table>
+          </div>
+
+          <footer class="dispatch-card-footer">
+            <p id="dispatchTableMeta">Loading Dispatch...</p>
+            <div class="dispatch-pagination">
+              <button class="dispatch-button ghost compact" id="previousDispatchPageButton" type="button">Previous</button>
+              <span id="dispatchPageLabel">Page 1 of 1</span>
+              <button class="dispatch-button ghost compact" id="nextDispatchPageButton" type="button">Next</button>
+            </div>
+          </footer>
+        </section>
+
+        <section class="dispatch-admin-card hidden" id="dispatchAdminSection" hidden aria-labelledby="dispatchAdminTitle">
+          <header class="dispatch-card-heading">
+            <div>
+              <p class="dispatch-kicker">Protected Operations</p>
+              <h2 id="dispatchAdminTitle">Collections and admin</h2>
+            </div>
+          </header>
+
+          <section class="dispatch-admin-block" aria-labelledby="collectionLedgerTitle">
+            <header class="dispatch-subheading">
+              <div>
+                <p class="dispatch-kicker">Pending cash</p>
+                <h3 id="collectionLedgerTitle">Collection ledger</h3>
+              </div>
+              <button class="dispatch-button gold" id="depositCollectionsButton" type="button">Deposit selected</button>
+            </header>
+            <div class="dispatch-table-scroll">
+              <table class="dispatch-table">
+                <thead>
+                  <tr>
+                    <th scope="col"><span class="sr-only">Select</span></th>
+                    <th scope="col">Person</th>
+                    <th scope="col">Item</th>
+                    <th scope="col">Collected</th>
+                    <th scope="col">By</th>
+                    <th scope="col">When</th>
+                  </tr>
+                </thead>
+                <tbody id="collectionTableBody"></tbody>
+              </table>
+            </div>
+            <footer class="dispatch-card-footer">
+              <p id="collectionTableMeta">Loading pending collections...</p>
+              <div class="dispatch-pagination">
+                <button class="dispatch-button ghost compact" id="previousCollectionPageButton" type="button">Previous</button>
+                <span id="collectionPageLabel">Page 1 of 1</span>
+                <button class="dispatch-button ghost compact" id="nextCollectionPageButton" type="button">Next</button>
+              </div>
+            </footer>
+          </section>
+
+          <section class="dispatch-admin-block" aria-labelledby="dispatchAuditTitle">
+            <header class="dispatch-subheading">
+              <div>
+                <p class="dispatch-kicker">Protected history</p>
+                <h3 id="dispatchAuditTitle">Audit</h3>
+              </div>
+            </header>
+            <div class="dispatch-table-scroll">
+              <table class="dispatch-table dispatch-audit-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Action</th>
+                    <th scope="col">Detail</th>
+                    <th scope="col">By</th>
+                    <th scope="col">When</th>
+                    <th scope="col">Control</th>
+                  </tr>
+                </thead>
+                <tbody id="dispatchAuditTableBody"></tbody>
+              </table>
+            </div>
+            <footer class="dispatch-card-footer">
+              <p id="dispatchAuditTableMeta">Loading Dispatch history...</p>
+              <div class="dispatch-pagination">
+                <button class="dispatch-button ghost compact" id="previousAuditPageButton" type="button">Previous</button>
+                <span id="dispatchAuditPageLabel">Page 1 of 1</span>
+                <button class="dispatch-button ghost compact" id="nextAuditPageButton" type="button">Next</button>
+              </div>
+            </footer>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-shell hidden" id="loginModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeLoginBackdrop" type="button" aria-label="Close login"></button>
+      <section class="modal-card dispatch-modal-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+        <header class="dispatch-modal-header">
+          <div><p class="dispatch-kicker">Private access</p><h2 id="loginTitle">Log in</h2></div>
+          <button class="dispatch-button ghost compact" id="closeLoginButton" type="button">Close</button>
+        </header>
+        <form class="dispatch-form" id="loginForm">
+          <label class="dispatch-field"><span>Username</span><input name="username" autocomplete="username" required></label>
+          <label class="dispatch-field"><span>Password</span><input type="password" name="password" autocomplete="current-password" required></label>
+          <button class="dispatch-button gold full" id="loginSubmitButton" type="submit">Enter</button>
+          <p class="dispatch-form-message hidden" id="loginError"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="dispatchModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeDispatchBackdrop" type="button" aria-label="Close dispatch form"></button>
+      <section class="modal-card dispatch-modal-card" role="dialog" aria-modal="true" aria-labelledby="dispatchModalTitle">
+        <header class="dispatch-modal-header">
+          <div><p class="dispatch-kicker">Stock release</p><h2 id="dispatchModalTitle">New dispatch</h2></div>
+          <button class="dispatch-button ghost compact" id="closeDispatchButton" type="button">Close</button>
+        </header>
+        <form class="dispatch-form" id="dispatchForm">
+          <label class="dispatch-field"><span>Person</span><select name="contactId" id="dispatchContactSelect" required></select></label>
+          <label class="dispatch-field"><span>Inventory listing</span><select name="inventoryItemId" id="dispatchInventorySelect" required></select></label>
+          <div class="dispatch-form-grid">
+            <label class="dispatch-field"><span>Quantity</span><input type="number" name="quantity" min="1" step="1" inputmode="numeric" required></label>
+            <label class="dispatch-field"><span>Price per item</span><input type="number" name="unitPrice" min="0" step="0.01" inputmode="decimal" required></label>
+          </div>
+          <label class="dispatch-field"><span>Payment type</span><select name="saleType" id="dispatchSaleTypeSelect"><option value="PAID_UPFRONT">Paid upfront</option><option value="ON_CREDIT">On credit</option></select></label>
+          <label class="dispatch-field hidden" id="dispatchDueDateField"><span>Repayment due</span><input type="date" name="dueDate" id="dispatchDueDateInput"></label>
+          <p class="dispatch-total-preview">Dispatch total <strong id="dispatchTotalPreview">$0</strong></p>
+          <label class="dispatch-field"><span>Notes</span><textarea name="notes" rows="3" maxlength="500" placeholder="Optional context"></textarea></label>
+          <button class="dispatch-button gold full" id="dispatchSubmitButton" type="submit">Release stock</button>
+          <p class="dispatch-form-message hidden" id="dispatchFormMessage"></p>
+        </form>
+      </section>
+    </div>
+    <div class="modal-shell hidden" id="phonebookModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closePhonebookBackdrop" type="button" aria-label="Close phonebook"></button>
+      <section class="modal-card dispatch-modal-card dispatch-phonebook-card" role="dialog" aria-modal="true" aria-labelledby="phonebookTitle">
+        <header class="dispatch-modal-header">
+          <div><p class="dispatch-kicker">Active contacts</p><h2 id="phonebookTitle">Phonebook</h2></div>
+          <div class="dispatch-modal-header-actions"><button class="dispatch-button gold compact" id="openContactModalButton" type="button">Add person</button><button class="dispatch-button ghost compact" id="closePhonebookButton" type="button">Close</button></div>
+        </header>
+          <label class="dispatch-check-field"><input id="phonebookIncludeInactive" type="checkbox"><span>Show inactive people</span></label>
+        <div class="dispatch-table-scroll">
+          <table class="dispatch-table">
+            <thead><tr><th scope="col">Person</th><th scope="col">Phone</th><th scope="col">Open</th><th scope="col">Outstanding</th><th scope="col">Action</th></tr></thead>
+            <tbody id="phonebookTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="contactModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeContactBackdrop" type="button" aria-label="Close contact form"></button>
+      <section class="modal-card dispatch-modal-card" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
+        <header class="dispatch-modal-header">
+          <div><p class="dispatch-kicker">Phonebook</p><h2 id="contactModalTitle">Add person</h2></div>
+          <button class="dispatch-button ghost compact" id="closeContactButton" type="button">Close</button>
+        </header>
+        <form class="dispatch-form" id="contactForm">
+          <label class="dispatch-field"><span>Name</span><input name="name" maxlength="100" required></label>
+          <label class="dispatch-field"><span>Phone number</span><input name="phoneNumber" maxlength="64" required></label>
+          <label class="dispatch-field"><span>Notes</span><textarea name="notes" rows="3" maxlength="500" placeholder="Optional context"></textarea></label>
+          <label class="dispatch-check-field" id="contactActiveField" hidden><input type="checkbox" name="active"><span>Active in Phonebook</span></label>
+          <button class="dispatch-button gold full" id="contactSubmitButton" type="submit">Add person</button>
+          <p class="dispatch-form-message hidden" id="contactFormMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="paymentModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closePaymentBackdrop" type="button" aria-label="Close payment form"></button>
+      <section class="modal-card dispatch-modal-card" role="dialog" aria-modal="true" aria-labelledby="paymentModalTitle">
+        <header class="dispatch-modal-header">
+          <div><p class="dispatch-kicker">Collection</p><h2 id="paymentModalTitle">Record payment</h2></div>
+          <button class="dispatch-button ghost compact" id="closePaymentButton" type="button">Close</button>
+        </header>
+        <p class="dispatch-record-context" id="paymentRecordContext"></p>
+        <form class="dispatch-form" id="paymentForm">
+          <label class="dispatch-field"><span>Amount returned</span><input type="number" name="amount" min="0.01" step="0.01" inputmode="decimal" required></label>
+          <label class="dispatch-field"><span>Collection note</span><textarea name="note" rows="3" maxlength="500" placeholder="Optional context"></textarea></label>
+          <button class="dispatch-button gold full" id="paymentSubmitButton" type="submit">Record payment</button>
+          <p class="dispatch-form-message hidden" id="paymentFormMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="editRecordModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeEditRecordBackdrop" type="button" aria-label="Close dispatch editor"></button>
+      <section class="modal-card dispatch-modal-card" role="dialog" aria-modal="true" aria-labelledby="editRecordTitle">
+        <header class="dispatch-modal-header">
+          <div><p class="dispatch-kicker">Dispatch correction</p><h2 id="editRecordTitle">Edit dispatch</h2></div>
+          <button class="dispatch-button ghost compact" id="closeEditRecordButton" type="button">Close</button>
+        </header>
+        <form class="dispatch-form" id="editRecordForm">
+          <label class="dispatch-field"><span>Price per item</span><input type="number" name="unitPrice" min="0" step="0.01" inputmode="decimal" required></label>
+          <label class="dispatch-field" id="editRecordDueDateField"><span>Repayment due</span><input type="date" name="dueDate"></label>
+          <label class="dispatch-field"><span>Notes</span><textarea name="notes" rows="3" maxlength="500"></textarea></label>
+          <button class="dispatch-button gold full" id="editRecordSubmitButton" type="submit">Save correction</button>
+          <p class="dispatch-form-message hidden" id="editRecordFormMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="voidModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeVoidBackdrop" type="button" aria-label="Close void form"></button>
+      <section class="modal-card dispatch-modal-card" role="dialog" aria-modal="true" aria-labelledby="voidTitle">
+        <header class="dispatch-modal-header">
+          <div><p class="dispatch-kicker">Cancel dispatch</p><h2 id="voidTitle">Void dispatch?</h2></div>
+          <button class="dispatch-button ghost compact" id="closeVoidButton" type="button">Close</button>
+        </header>
+        <p class="dispatch-record-context" id="voidRecordContext"></p>
+        <form class="dispatch-form" id="voidForm">
+          <label class="dispatch-check-field"><input type="checkbox" name="returnStock"><span>Return the released stock to Inventory.</span></label>
+          <label class="dispatch-field"><span>Reason</span><textarea name="note" rows="3" maxlength="500" placeholder="Optional context"></textarea></label>
+          <button class="dispatch-button danger full" id="voidSubmitButton" type="submit">Void dispatch</button>
+          <p class="dispatch-form-message hidden" id="voidFormMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="revertModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeRevertBackdrop" type="button" aria-label="Close revert confirmation"></button>
+      <section class="modal-card dispatch-modal-card" role="dialog" aria-modal="true" aria-labelledby="revertTitle">
+        <header class="dispatch-modal-header">
+          <div><p class="dispatch-kicker">Audit revert</p><h2 id="revertTitle">Revert action?</h2></div>
+          <button class="dispatch-button ghost compact" id="closeRevertButton" type="button">Close</button>
+        </header>
+        <div class="dispatch-warning-note"><strong id="revertSummary">Selected action</strong><span>The saved state immediately before this action will be restored and the revert will be recorded.</span></div>
+        <div class="dispatch-modal-actions"><button class="dispatch-button ghost" id="cancelRevertButton" type="button">Cancel</button><button class="dispatch-button gold" id="confirmRevertButton" type="button">Revert action</button></div>
+      </section>
+    </div>
+
+    <div class="toast-stack dispatch-toast-stack" id="toastStack"></div>
+    <script type="module" src="./assets/js/dispatch.js"></script>
+  </body>
+</html>

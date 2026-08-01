@@ -80,7 +80,6 @@ const state = {
   dirtyMoney: "0.00",
   items: [],
   inventoryLoading: true,
-  requiresLogin: false,
   inventoryMode: "create",
   auditPage: 1,
   auditTotalPages: 1,
@@ -189,12 +188,7 @@ function canUseAdminTools() {
 }
 
 function promptForManagement() {
-  if (!state.currentUser) {
-    openLoginModal();
-    return;
-  }
-
-  showToast("This account does not have Inventory access.", "error");
+  showToast(state.currentUser ? "Admin access is required." : "Log in as an admin to manage Inventory.", "error");
 }
 
 function syncSessionButton() {
@@ -212,17 +206,13 @@ function syncAccess() {
   const canManage = canManageInventory();
   const canUseAdmin = canUseAdminTools();
 
-  inventoryAccessStatus.textContent = canManage
-    ? "Editing enabled"
-    : state.currentUser
-      ? "View only"
-      : "Login required";
+  inventoryAccessStatus.textContent = canManage ? "Admin controls enabled" : "Public view";
   inventoryAccessStatus.classList.toggle("is-live", canManage);
   quickEditHint.textContent = canManage
     ? "Double-click any value to make a quick edit. Press Enter to save."
-    : state.currentUser
-      ? "This account can view the register but needs Inventory access to edit it."
-      : "Log in to view the register and make inventory edits.";
+    : "Read-only register. Admin login is required to make changes.";
+  openMoneyModalButton.hidden = !canManage;
+  openInventoryModalButton.hidden = !canManage;
   adminSection.hidden = !canUseAdmin;
   adminSection.classList.toggle("hidden", !canUseAdmin);
 
@@ -264,7 +254,7 @@ function createEditableCell(item, field, value, displayValue, className = "") {
   cell.dataset.editField = field;
   cell.dataset.itemId = item.id;
   cell.dataset.rawValue = `${value ?? ""}`;
-  cell.title = canManageInventory() ? "Double-click to edit" : "Inventory access is required to edit";
+  cell.title = canManageInventory() ? "Double-click to edit" : "Read-only register";
   return cell;
 }
 
@@ -274,7 +264,7 @@ function createStockCell(item) {
   cell.dataset.editField = "quantity";
   cell.dataset.itemId = item.id;
   cell.dataset.rawValue = `${item.quantity}`;
-  cell.title = canManageInventory() ? "Double-click to edit" : "Inventory access is required to edit";
+  cell.title = canManageInventory() ? "Double-click to edit" : "Read-only register";
 
   const value = document.createElement("span");
   value.className = `inventory-stock-value ${tone.tone}`;
@@ -304,14 +294,9 @@ function renderInventoryTable() {
     return;
   }
 
-  if (state.requiresLogin) {
-    inventoryTableBody.appendChild(createInventoryMessageRow("Log in to view the inventory register."));
-    inventoryTableMeta.textContent = "Login required";
-    return;
-  }
 
   if (!state.items.length) {
-    inventoryTableBody.appendChild(createInventoryMessageRow("No stock listings yet. Use Update inventory to add the first item."));
+    inventoryTableBody.appendChild(createInventoryMessageRow("No stock listings yet."));
     inventoryTableMeta.textContent = "0 active listings";
     return;
   }
@@ -469,34 +454,28 @@ function populateRestorePoints() {
 }
 
 async function loadInventory() {
-  if (!state.session?.token) {
-    state.inventoryLoading = false;
-    state.requiresLogin = true;
-    state.items = [];
-    dirtyMoneyValue.textContent = "--";
-    syncAccess();
-    renderInventoryTable();
-    return;
-  }
-
   state.inventoryLoading = true;
-  state.requiresLogin = false;
   renderInventoryTable();
 
   try {
-    const response = await apiWithSession("/inventory");
-    state.requiresLogin = false;
-    state.dirtyMoney = response.dirtyMoney || "0.00";
+    const request = state.session?.token ? apiWithSession : api;
+    const response = await request("/inventory");
+    state.dirtyMoney = response.dirtyMoney;
     state.items = response.items || [];
     state.viewer = response.viewer || state.viewer;
-    dirtyMoneyValue.textContent = formatMoney(state.dirtyMoney);
+
+    if (!state.viewer.isLoggedIn && state.session?.token) {
+      clearSession();
+      state.session = null;
+      state.currentUser = null;
+      syncSessionButton();
+    }
+
+    dirtyMoneyValue.textContent = state.dirtyMoney === null ? "Admin only" : formatMoney(state.dirtyMoney);
   } catch (error) {
     state.items = [];
-    state.requiresLogin = true;
     dirtyMoneyValue.textContent = "--";
-    if (error.message !== "Authentication required.") {
-      showToast(error.message, "error");
-    }
+    showToast(error.message, "error");
   } finally {
     state.inventoryLoading = false;
     syncAccess();
@@ -583,7 +562,6 @@ function normalizeInlineValue(field, value) {
 
 function openInlineEditor(cell) {
   if (!canManageInventory()) {
-    promptForManagement();
     return;
   }
 
@@ -782,24 +760,10 @@ function closeRestoreModal() {
   toggleModal(restoreModal, false);
 }
 
-async function hydrateSession() {
-  state.currentUser = null;
-
-  if (!state.session?.token) {
-    syncSessionButton();
-    return;
-  }
-
-  try {
-    const response = await apiWithSession("/auth/me");
-    state.currentUser = response.user;
-    state.session = { ...state.session, user: response.user };
-    saveSession(state.session);
-  } catch (_error) {
-    clearSession();
-    state.session = null;
-  }
-
+function hydrateSession() {
+  // Inventory is public. The optional Inventory request below validates any saved token
+  // without producing a separate 401 request for an expired browser session.
+  state.currentUser = state.session?.token ? state.session.user || null : null;
   syncSessionButton();
 }
 
@@ -1096,6 +1060,6 @@ syncSessionButton();
 syncAccess();
 renderInventoryTable();
 
-await hydrateSession();
+hydrateSession();
 await loadInventory();
 await refreshAdminData();

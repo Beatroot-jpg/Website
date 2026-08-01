@@ -10,6 +10,7 @@ import userRoutes from "./routes/users.js";
 import leaderboardRoutes from "./routes/leaderboard.js";
 import wagersRoutes from "./routes/wagers.js";
 import inventoryRoutes from "./routes/inventory.js";
+import dispatchRoutes from "./routes/dispatch.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -44,6 +45,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
 app.use("/api/wagers", wagersRoutes);
 app.use("/api/inventory", inventoryRoutes);
+app.use("/api/dispatch", dispatchRoutes);
 
 app.use((error, _req, res, _next) => {
   console.error(error);
