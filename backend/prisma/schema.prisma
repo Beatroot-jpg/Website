@@ -250,16 +250,20 @@ model InventoryDirtyMoneyAccount {
 }
 
 model InventoryAuditLog {
-  id        String   @id @default(cuid())
-  actorId   String?
-  actorName String?
-  action    String
-  entityType String
-  entityId  String?
-  summary   String
-  before    Json?
-  after     Json?
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  actorId        String?
+  actorName      String?
+  action         String
+  entityType     String
+  entityId       String?
+  summary        String
+  before         Json?
+  after          Json?
+  revertedAt     DateTime?
+  revertedById   String?
+  revertedByName String?
+  reversalAuditId String?
+  createdAt      DateTime @default(now())
 
   @@index([createdAt])
   @@index([entityType, entityId])

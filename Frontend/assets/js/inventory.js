@@ -47,6 +47,20 @@ const inventoryItemSelect = document.querySelector("#inventoryItemSelect");
 const inventorySubmitButton = document.querySelector("#inventorySubmitButton");
 const inventoryFormMessage = document.querySelector("#inventoryFormMessage");
 
+const deleteInventoryItemButton = document.querySelector("#deleteInventoryItemButton");
+const deleteInventoryModal = document.querySelector("#deleteInventoryModal");
+const closeDeleteInventoryButton = document.querySelector("#closeDeleteInventoryButton");
+const closeDeleteInventoryBackdrop = document.querySelector("#closeDeleteInventoryBackdrop");
+const cancelDeleteInventoryButton = document.querySelector("#cancelDeleteInventoryButton");
+const confirmDeleteInventoryButton = document.querySelector("#confirmDeleteInventoryButton");
+const deleteInventoryName = document.querySelector("#deleteInventoryName");
+
+const revertAuditModal = document.querySelector("#revertAuditModal");
+const closeRevertAuditButton = document.querySelector("#closeRevertAuditButton");
+const closeRevertAuditBackdrop = document.querySelector("#closeRevertAuditBackdrop");
+const cancelRevertAuditButton = document.querySelector("#cancelRevertAuditButton");
+const confirmRevertAuditButton = document.querySelector("#confirmRevertAuditButton");
+const revertAuditSummary = document.querySelector("#revertAuditSummary");
 const restoreModal = document.querySelector("#restoreModal");
 const closeRestoreButton = document.querySelector("#closeRestoreButton");
 const closeRestoreBackdrop = document.querySelector("#closeRestoreBackdrop");
@@ -72,7 +86,10 @@ const state = {
   auditTotalPages: 1,
   auditTotal: 0,
   auditLoading: false,
-  restorePoints: []
+  auditEntries: [],
+  restorePoints: [],
+  pendingDeleteItemId: null,
+  pendingRevertAuditId: null
 };
 
 function showToast(message, tone = "success") {
@@ -325,26 +342,47 @@ function renderAuditTable() {
   if (state.auditLoading) {
     const row = document.createElement("tr");
     const cell = createCell("Loading action history...", "inventory-table-message");
-    cell.colSpan = 4;
+    cell.colSpan = 5;
     row.appendChild(cell);
     auditTableBody.appendChild(row);
     return;
   }
 
-  if (!state.auditEntries?.length) {
+  if (!state.auditEntries.length) {
     const row = document.createElement("tr");
     const cell = createCell("No inventory actions have been recorded yet.", "inventory-table-message");
-    cell.colSpan = 4;
+    cell.colSpan = 5;
     row.appendChild(cell);
     auditTableBody.appendChild(row);
   } else {
     state.auditEntries.forEach((entry) => {
       const row = document.createElement("tr");
+      const actionCell = document.createElement("td");
+      const actionRow = document.createElement("div");
+      actionRow.className = "inventory-audit-actions";
+
+      if (entry.canRevert) {
+        const revertButton = document.createElement("button");
+        revertButton.className = "inventory-button ghost compact";
+        revertButton.type = "button";
+        revertButton.dataset.auditAction = "revert";
+        revertButton.dataset.auditId = entry.id;
+        revertButton.textContent = "Revert";
+        actionRow.appendChild(revertButton);
+      } else {
+        const stateLabel = document.createElement("span");
+        stateLabel.className = "inventory-audit-state";
+        stateLabel.textContent = entry.revertedAt ? "Reverted" : "Recorded";
+        actionRow.appendChild(stateLabel);
+      }
+
+      actionCell.appendChild(actionRow);
       row.append(
         createCell(humanize(entry.action), "inventory-item-name"),
         createCell(entry.summary),
         createCell(entry.actorName || "System"),
-        createCell(formatDateTime(entry.createdAt), "inventory-updated-cell")
+        createCell(formatDateTime(entry.createdAt), "inventory-updated-cell"),
+        actionCell
       );
       auditTableBody.appendChild(row);
     });
@@ -393,6 +431,7 @@ function syncInventoryFormMode(mode = state.inventoryMode) {
   });
 
   itemSelectField.classList.toggle("hidden", !isEditing);
+  deleteInventoryItemButton.classList.toggle("hidden", !isEditing);
   inventorySubmitButton.textContent = isEditing ? "Save listing" : "Add listing";
 
   if (!isEditing) {
@@ -685,6 +724,47 @@ function closeInventoryModal() {
   toggleModal(inventoryModal, false);
 }
 
+function openDeleteInventoryModal() {
+  if (!canManageInventory()) {
+    promptForManagement();
+    return;
+  }
+
+  const item = state.items.find((entry) => entry.id === inventoryItemSelect.value);
+
+  if (!item) {
+    showToast("Choose a listing to delete.", "error");
+    return;
+  }
+
+  state.pendingDeleteItemId = item.id;
+  deleteInventoryName.textContent = item.name;
+  toggleModal(deleteInventoryModal, true);
+}
+
+function closeDeleteInventoryModal() {
+  state.pendingDeleteItemId = null;
+  toggleModal(deleteInventoryModal, false);
+  setButtonLoading(confirmDeleteInventoryButton, false, "Deleting", "Delete listing");
+}
+
+function openRevertAuditModal(entry) {
+  if (!entry?.canRevert) {
+    showToast("This action cannot be reverted.", "error");
+    return;
+  }
+
+  state.pendingRevertAuditId = entry.id;
+  revertAuditSummary.textContent = entry.summary;
+  toggleModal(revertAuditModal, true);
+}
+
+function closeRevertAuditModal() {
+  state.pendingRevertAuditId = null;
+  toggleModal(revertAuditModal, false);
+  setButtonLoading(confirmRevertAuditButton, false, "Reverting", "Revert action");
+}
+
 async function openRestoreModal() {
   if (!canUseAdminTools()) {
     promptForManagement();
@@ -795,6 +875,12 @@ closeInventoryButton.addEventListener("click", closeInventoryModal);
 closeInventoryBackdrop.addEventListener("click", closeInventoryModal);
 closeRestoreButton.addEventListener("click", closeRestoreModal);
 closeRestoreBackdrop.addEventListener("click", closeRestoreModal);
+closeDeleteInventoryButton.addEventListener("click", closeDeleteInventoryModal);
+closeDeleteInventoryBackdrop.addEventListener("click", closeDeleteInventoryModal);
+cancelDeleteInventoryButton.addEventListener("click", closeDeleteInventoryModal);
+closeRevertAuditButton.addEventListener("click", closeRevertAuditModal);
+closeRevertAuditBackdrop.addEventListener("click", closeRevertAuditModal);
+cancelRevertAuditButton.addEventListener("click", closeRevertAuditModal);
 
 moneyOperationSelect.addEventListener("change", syncMoneyOperationCopy);
 
@@ -811,6 +897,65 @@ inventoryModeTabs.forEach((tab) => {
 
 inventoryItemSelect.addEventListener("change", () => {
   fillInventoryForm(state.items.find((item) => item.id === inventoryItemSelect.value));
+});
+
+deleteInventoryItemButton.addEventListener("click", openDeleteInventoryModal);
+
+auditTableBody.addEventListener("click", (event) => {
+  const actionButton = event.target.closest("button[data-audit-action]");
+
+  if (!actionButton || actionButton.dataset.auditAction !== "revert") {
+    return;
+  }
+
+  const entry = state.auditEntries.find((auditEntry) => auditEntry.id === actionButton.dataset.auditId);
+  openRevertAuditModal(entry);
+});
+
+confirmDeleteInventoryButton.addEventListener("click", async () => {
+  const itemId = state.pendingDeleteItemId;
+
+  if (!itemId) {
+    return;
+  }
+
+  setButtonLoading(confirmDeleteInventoryButton, true, "Deleting", "Delete listing");
+  try {
+    const response = await apiWithSession(`/inventory/items/${itemId}`, { method: "DELETE" });
+    state.items = state.items.filter((item) => item.id !== itemId);
+    populateInventorySelect();
+    renderInventoryTable();
+    closeDeleteInventoryModal();
+    closeInventoryModal();
+    showToast(response.message || "Inventory listing deleted.", "success");
+    await refreshAdminData();
+  } catch (error) {
+    showToast(error.message, "error");
+    setButtonLoading(confirmDeleteInventoryButton, false, "Deleting", "Delete listing");
+  }
+});
+
+confirmRevertAuditButton.addEventListener("click", async () => {
+  const auditId = state.pendingRevertAuditId;
+
+  if (!auditId) {
+    return;
+  }
+
+  setButtonLoading(confirmRevertAuditButton, true, "Reverting", "Revert action");
+  try {
+    const response = await apiWithSession(`/inventory/audit/${auditId}/revert`, {
+      method: "POST",
+      body: {}
+    });
+    closeRevertAuditModal();
+    showToast(response.message || "Action reverted.", "success");
+    await loadInventory();
+    await refreshAdminData();
+  } catch (error) {
+    showToast(error.message, "error");
+    setButtonLoading(confirmRevertAuditButton, false, "Reverting", "Revert action");
+  }
 });
 
 loginForm.addEventListener("submit", async (event) => {
@@ -937,7 +1082,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
-  [restoreModal, inventoryModal, moneyModal, loginModal].some((modal) => {
+  [revertAuditModal, deleteInventoryModal, restoreModal, inventoryModal, moneyModal, loginModal].some((modal) => {
     if (!modal.classList.contains("hidden")) {
       toggleModal(modal, false);
       return true;

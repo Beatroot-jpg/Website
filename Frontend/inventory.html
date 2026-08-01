@@ -94,6 +94,7 @@
                   <th scope="col">Detail</th>
                   <th scope="col">By</th>
                   <th scope="col">When</th>
+                  <th scope="col">Control</th>
                 </tr>
               </thead>
               <tbody id="auditTableBody"></tbody>
@@ -110,8 +111,8 @@
           </footer>
 
           <div class="inventory-reserved-tools">
-            <strong>Reserved space</strong>
-            <span>Additional administration tools will be placed here as the system grows.</span>
+            <strong>Recovery rules</strong>
+            <span>Use Revert for the latest change to a listing or balance. Use restore points to reinstate a full inventory snapshot.</span>
           </div>
         </section>
       </main>
@@ -222,6 +223,7 @@
             <input type="text" name="unit" maxlength="32" value="unit">
           </label>
           <button class="inventory-button gold full" id="inventorySubmitButton" type="submit">Add listing</button>
+          <button class="inventory-button danger full hidden" id="deleteInventoryItemButton" type="button">Delete listing</button>
           <p class="inventory-form-message hidden" id="inventoryFormMessage"></p>
         </form>
       </section>
@@ -253,6 +255,48 @@
           <button class="inventory-button gold full" id="restoreSubmitButton" type="submit">Reinstate backup</button>
           <p class="inventory-form-message hidden" id="restoreFormMessage"></p>
         </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="deleteInventoryModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeDeleteInventoryBackdrop" type="button" aria-label="Close delete listing confirmation"></button>
+      <section class="modal-card inventory-modal-card" role="dialog" aria-modal="true" aria-labelledby="deleteInventoryTitle">
+        <header class="inventory-modal-header">
+          <div>
+            <p class="inventory-kicker">Permanent Delete</p>
+            <h2 id="deleteInventoryTitle">Remove listing?</h2>
+          </div>
+          <button class="inventory-button ghost compact" id="closeDeleteInventoryButton" type="button">Close</button>
+        </header>
+        <div class="inventory-warning-note">
+          <strong id="deleteInventoryName">Selected listing</strong>
+          <span>This removes the listing and its stock-movement history from Inventory. The audit keeps a restorable record of the listing itself.</span>
+        </div>
+        <div class="inventory-modal-actions">
+          <button class="inventory-button ghost" id="cancelDeleteInventoryButton" type="button">Cancel</button>
+          <button class="inventory-button danger" id="confirmDeleteInventoryButton" type="button">Delete listing</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="revertAuditModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeRevertAuditBackdrop" type="button" aria-label="Close revert action confirmation"></button>
+      <section class="modal-card inventory-modal-card" role="dialog" aria-modal="true" aria-labelledby="revertAuditTitle">
+        <header class="inventory-modal-header">
+          <div>
+            <p class="inventory-kicker">Audit Revert</p>
+            <h2 id="revertAuditTitle">Revert action?</h2>
+          </div>
+          <button class="inventory-button ghost compact" id="closeRevertAuditButton" type="button">Close</button>
+        </header>
+        <div class="inventory-warning-note">
+          <strong id="revertAuditSummary">Selected action</strong>
+          <span>The saved state from immediately before this action will be restored. A new audit entry records the revert.</span>
+        </div>
+        <div class="inventory-modal-actions">
+          <button class="inventory-button ghost" id="cancelRevertAuditButton" type="button">Cancel</button>
+          <button class="inventory-button gold" id="confirmRevertAuditButton" type="button">Revert action</button>
+        </div>
       </section>
     </div>
 

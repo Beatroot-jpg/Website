@@ -643,3 +643,43 @@ html[data-theme="light"] .inventory-body select option {
     grid-template-columns: 1fr;
   }
 }
+.inventory-button.danger {
+  color: #fff6f5;
+  border-color: rgba(255, 110, 102, 0.72);
+  background: linear-gradient(180deg, #c43d36, #7d1e1b);
+}
+
+.inventory-modal-actions,
+.inventory-audit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.inventory-modal-actions {
+  margin-top: 18px;
+}
+
+.inventory-modal-actions > .inventory-button {
+  flex: 1 1 0;
+}
+
+.inventory-audit-actions {
+  justify-content: flex-start;
+}
+
+.inventory-audit-state {
+  color: var(--inventory-soft);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  .inventory-modal-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

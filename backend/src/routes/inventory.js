@@ -12,6 +12,14 @@ import { normalizeOptionalString, requireString } from "../validators.js";
 const router = Router();
 const DIRTY_MONEY_ID = "dirty-money";
 const PAGE_SIZE = 10;
+const REVERSIBLE_AUDIT_ACTIONS = new Set([
+  "DIRTY_MONEY_SET",
+  "DIRTY_MONEY_ADD",
+  "DIRTY_MONEY_SUBTRACT",
+  "ITEM_CREATED",
+  "ITEM_UPDATED",
+  "ITEM_DELETED"
+]);
 
 function requireNonNegativeInteger(value, fieldName) {
   const parsed = Number(value);
@@ -74,6 +82,20 @@ function snapshotItem(item) {
   };
 }
 
+function snapshotMovement(movement) {
+  return {
+    id: movement.id,
+    quantityDelta: movement.quantityDelta,
+    type: movement.type,
+    reason: movement.reason,
+    createdAt: movement.createdAt.toISOString()
+  };
+}
+
+function canRevertAuditLog(entry) {
+  return Boolean(REVERSIBLE_AUDIT_ACTIONS.has(entry.action) && !entry.revertedAt);
+}
+
 function serializeAuditLog(entry) {
   return {
     id: entry.id,
@@ -82,7 +104,10 @@ function serializeAuditLog(entry) {
     entityType: entry.entityType,
     entityId: entry.entityId,
     summary: entry.summary,
-    createdAt: entry.createdAt
+    createdAt: entry.createdAt,
+    revertedAt: entry.revertedAt,
+    revertedByName: entry.revertedByName,
+    canRevert: canRevertAuditLog(entry)
   };
 }
 
@@ -167,6 +192,102 @@ function getRestoreItems(snapshot) {
     internalPrice: requireMoneyValue(item?.internalPrice, "Restore internal price"),
     externalPrice: requireMoneyValue(item?.externalPrice, "Restore external price")
   }));
+}
+
+function getAuditItemSnapshot(value, fieldName) {
+  try {
+    return getRestoreItems({ items: [value?.item || value] })[0];
+  } catch (_error) {
+    throw createError(400, `${fieldName} cannot be reverted because its saved item data is invalid.`);
+  }
+}
+
+function getAuditMovementSnapshots(value, fieldName) {
+  if (value?.movements === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value.movements)) {
+    throw createError(400, `${fieldName} cannot be reverted because its saved movement data is invalid.`);
+  }
+
+  return value.movements.map((movement) => {
+    const quantityDelta = Number(movement?.quantityDelta);
+    const createdAt = new Date(movement?.createdAt);
+
+    if (!Number.isInteger(quantityDelta) || Number.isNaN(createdAt.getTime())) {
+      throw createError(400, `${fieldName} cannot be reverted because its saved movement data is invalid.`);
+    }
+
+    return {
+      id: requireString(movement?.id, "Saved movement ID"),
+      quantityDelta,
+      type: requireString(movement?.type, "Saved movement type"),
+      reason: normalizeOptionalString(movement?.reason),
+      createdAt
+    };
+  });
+}
+
+async function permanentlyDeleteInventoryItem(database, itemId) {
+  const [distributionCount, runnerDistributionCount] = await Promise.all([
+    database.distribution.count({ where: { itemId } }),
+    database.runnerDistribution.count({ where: { itemId } })
+  ]);
+
+  if (distributionCount || runnerDistributionCount) {
+    throw createError(409, "This item is linked to legacy distribution history and cannot be permanently deleted from Inventory.");
+  }
+
+  // Deleting the item also removes its stock-movement rows through the existing cascade relation.
+  await database.inventoryItem.delete({ where: { id: itemId } });
+}
+
+async function restoreInventoryItem(database, snapshot) {
+  const item = getAuditItemSnapshot(snapshot, "Inventory action");
+
+  return database.inventoryItem.upsert({
+    where: { id: item.id },
+    update: {
+      name: item.name,
+      unit: item.unit,
+      quantity: item.quantity,
+      reorderLevel: item.reorderLevel,
+      internalPrice: item.internalPrice,
+      externalPrice: item.externalPrice,
+      archived: false
+    },
+    create: {
+      id: item.id,
+      name: item.name,
+      unit: item.unit,
+      quantity: item.quantity,
+      reorderLevel: item.reorderLevel,
+      internalPrice: item.internalPrice,
+      externalPrice: item.externalPrice,
+      archived: false
+    }
+  });
+}
+
+async function assertAuditActionCanBeReverted(database, entry) {
+  if (!canRevertAuditLog(entry)) {
+    throw createError(409, "This action cannot be reverted.");
+  }
+
+  const newerAction = await database.inventoryAuditLog.findFirst({
+    where: {
+      entityType: entry.entityType,
+      entityId: entry.entityId,
+      createdAt: { gt: entry.createdAt },
+      revertedAt: null
+    },
+    orderBy: { createdAt: "desc" }
+  });
+
+  if (newerAction) {
+    throw createError(409, "This action has a newer change. Revert the newer change first.");
+  }
 }
 
 router.get(
@@ -382,6 +503,41 @@ router.patch(
   })
 );
 
+router.delete(
+  "/items/:id",
+  authenticateToken,
+  requirePermission("INVENTORY"),
+  asyncHandler(async (req, res) => {
+    const deletedItem = await prisma.$transaction(async (transaction) => {
+      const existingItem = await transaction.inventoryItem.findFirst({
+        where: { id: req.params.id, archived: false },
+        include: { movements: { orderBy: { createdAt: "asc" } } }
+      });
+
+      if (!existingItem) {
+        throw createError(404, "Inventory item not found.");
+      }
+
+      await permanentlyDeleteInventoryItem(transaction, existingItem.id);
+      await createInventoryAuditLog(transaction, {
+        actor: req.user,
+        action: "ITEM_DELETED",
+        entityType: "INVENTORY_ITEM",
+        entityId: existingItem.id,
+        summary: `${req.user.name} permanently deleted ${existingItem.name} from inventory.`,
+        before: {
+          item: snapshotItem(existingItem),
+          movements: existingItem.movements.map(snapshotMovement)
+        }
+      });
+
+      return existingItem;
+    });
+
+    res.json({ message: `${deletedItem.name} was permanently deleted.` });
+  })
+);
+
 router.get(
   "/audit",
   authenticateToken,
@@ -404,6 +560,119 @@ router.get(
       total,
       totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE))
     });
+  })
+);
+
+router.post(
+  "/audit/:id/revert",
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const result = await prisma.$transaction(async (transaction) => {
+      const entry = await transaction.inventoryAuditLog.findUnique({
+        where: { id: req.params.id }
+      });
+
+      if (!entry) {
+        throw createError(404, "Audit action not found.");
+      }
+
+      await assertAuditActionCanBeReverted(transaction, entry);
+      let reversalAction;
+      let reversalBefore = null;
+      let reversalAfter = null;
+
+      if (entry.action.startsWith("DIRTY_MONEY_")) {
+        const targetAmount = requireMoneyValue(entry.before?.amount, "Saved dirty-money balance");
+        const currentAccount = await ensureDirtyMoneyAccount(transaction);
+        const updatedAccount = await transaction.inventoryDirtyMoneyAccount.update({
+          where: { id: DIRTY_MONEY_ID },
+          data: { amount: targetAmount }
+        });
+        reversalAction = "DIRTY_MONEY_REVERTED";
+        reversalBefore = { amount: currentAccount.amount.toString() };
+        reversalAfter = { amount: updatedAccount.amount.toString(), revertedAuditId: entry.id };
+      } else if (entry.action === "ITEM_CREATED") {
+        const currentItem = await transaction.inventoryItem.findFirst({
+          where: { id: entry.entityId, archived: false }
+        });
+
+        if (!currentItem) {
+          throw createError(409, "This item no longer exists and cannot be reverted this way.");
+        }
+
+        reversalBefore = snapshotItem(currentItem);
+        await permanentlyDeleteInventoryItem(transaction, currentItem.id);
+        reversalAction = "ITEM_CREATION_REVERTED";
+      } else if (entry.action === "ITEM_UPDATED") {
+        const currentItem = await transaction.inventoryItem.findFirst({
+          where: { id: entry.entityId, archived: false }
+        });
+
+        if (!currentItem) {
+          throw createError(409, "This item no longer exists and cannot be reverted this way.");
+        }
+
+        const restoredItem = await restoreInventoryItem(transaction, entry.before);
+        if (currentItem.quantity !== restoredItem.quantity) {
+          await transaction.inventoryMovement.create({
+            data: {
+              itemId: restoredItem.id,
+              quantityDelta: restoredItem.quantity - currentItem.quantity,
+              type: "CORRECTION",
+              reason: "Audit action reverted"
+            }
+          });
+        }
+        reversalAction = "ITEM_UPDATE_REVERTED";
+        reversalBefore = snapshotItem(currentItem);
+        reversalAfter = snapshotItem(restoredItem);
+      } else if (entry.action === "ITEM_DELETED") {
+        const restoredItem = await restoreInventoryItem(transaction, entry.before);
+        const savedMovements = getAuditMovementSnapshots(entry.before, "Inventory deletion");
+
+        if (savedMovements.length) {
+          await transaction.inventoryMovement.createMany({
+            data: savedMovements.map((movement) => ({
+              ...movement,
+              itemId: restoredItem.id
+            }))
+          });
+        }
+
+        reversalAction = "ITEM_DELETION_REVERTED";
+        reversalAfter = {
+          item: snapshotItem(restoredItem),
+          restoredMovementCount: savedMovements.length
+        };
+      } else {
+        throw createError(409, "This action cannot be reverted.");
+      }
+
+      const reversal = await createInventoryAuditLog(transaction, {
+        actor: req.user,
+        action: reversalAction,
+        entityType: entry.entityType,
+        entityId: entry.entityId,
+        summary: `${req.user.name} reverted: ${entry.summary}`,
+        before: reversalBefore,
+        after: reversalAfter
+      });
+
+      await transaction.inventoryAuditLog.update({
+        where: { id: entry.id },
+        data: {
+          revertedAt: new Date(),
+          revertedById: req.user.id,
+          revertedByName: req.user.name,
+          reversalAuditId: reversal.id
+        }
+      });
+
+      return { action: entry, reversal };
+    });
+
+    res.json({ message: "Action reverted.", auditId: result.action.id });
   })
 );
 
