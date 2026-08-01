@@ -124,7 +124,11 @@ function canManageWagers(user = state.currentUser) {
   return Boolean(user && (user.role === "ADMIN" || user.permissions?.includes("WAGERS")));
 }
 
-function buildPermissionPayload({ adminPanelAccess = false, wagerAccess = false } = {}) {
+function canManageInventory(user = state.currentUser) {
+  return Boolean(user && (user.role === "ADMIN" || user.permissions?.includes("INVENTORY")));
+}
+
+function buildPermissionPayload({ adminPanelAccess = false, wagerAccess = false, inventoryAccess = false } = {}) {
   const permissions = [];
 
   if (adminPanelAccess) {
@@ -133,6 +137,10 @@ function buildPermissionPayload({ adminPanelAccess = false, wagerAccess = false 
 
   if (wagerAccess) {
     permissions.push("WAGERS");
+  }
+
+  if (inventoryAccess) {
+    permissions.push("INVENTORY");
   }
 
   return permissions;
@@ -203,8 +211,10 @@ function openEditUserModal(user) {
   editUserForm.elements.active.checked = user.active !== false;
   editUserForm.elements.adminPanelAccess.checked = canManageAdminPanel(user);
   editUserForm.elements.wagerAccess.checked = canManageWagers(user);
+  editUserForm.elements.inventoryAccess.checked = canManageInventory(user);
   editUserForm.elements.adminPanelAccess.disabled = user.role === "ADMIN";
   editUserForm.elements.wagerAccess.disabled = user.role === "ADMIN";
+  editUserForm.elements.inventoryAccess.disabled = user.role === "ADMIN";
   editUserForm.elements.active.disabled = state.currentUser?.id === user.id;
   editUserRoleNote.classList.toggle("hidden", user.role !== "ADMIN");
   editCurrentUserNote.classList.toggle("hidden", state.currentUser?.id !== user.id);
@@ -395,6 +405,7 @@ function renderUsersTable() {
     accessRow.className = "table-action-row";
     accessRow.appendChild(createBadge(canManageAdminPanel(user) ? "Admin panel" : "No admin panel", canManageAdminPanel(user) ? "accent" : "neutral"));
     accessRow.appendChild(createBadge(canManageWagers(user) ? "Wagers" : "No wagers", canManageWagers(user) ? "good" : "neutral"));
+    accessRow.appendChild(createBadge(canManageInventory(user) ? "Inventory" : "No inventory", canManageInventory(user) ? "accent" : "neutral"));
     accessCell.appendChild(accessRow);
 
     const statusCell = document.createElement("td");
@@ -666,7 +677,8 @@ createUserForm?.addEventListener("submit", async (event) => {
     password: `${formData.get("password") || ""}`.trim(),
     permissions: buildPermissionPayload({
       adminPanelAccess: Boolean(formData.get("adminPanelAccess")),
-      wagerAccess: Boolean(formData.get("wagerAccess"))
+      wagerAccess: Boolean(formData.get("wagerAccess")),
+      inventoryAccess: Boolean(formData.get("inventoryAccess"))
     })
   };
 
@@ -728,7 +740,8 @@ editUserForm?.addEventListener("submit", async (event) => {
     active: editUserForm.elements.active.checked,
     permissions: buildPermissionPayload({
       adminPanelAccess: editUserForm.elements.adminPanelAccess.checked,
-      wagerAccess: editUserForm.elements.wagerAccess.checked
+      wagerAccess: editUserForm.elements.wagerAccess.checked,
+      inventoryAccess: editUserForm.elements.inventoryAccess.checked
     })
   };
   const password = `${formData.get("password") || ""}`.trim();

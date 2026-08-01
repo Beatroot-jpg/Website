@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory</title>
+    <script>
+      try {
+        const savedTheme = window.localStorage.getItem("los-santos-fight-club-theme");
+        if (savedTheme === "light" || savedTheme === "dark") {
+          document.documentElement.dataset.theme = savedTheme;
+        }
+      } catch (_error) {}
+    </script>
+    <link rel="stylesheet" href="./assets/css/styles.css">
+    <link rel="stylesheet" href="./assets/css/inventory.css">
+    <script src="./assets/js/runtime-config.js"></script>
+    <script src="./assets/js/config.js"></script>
+  </head>
+  <body class="inventory-body">
+    <div class="inventory-shell">
+      <header class="inventory-topbar">
+        <a class="inventory-home-link" href="./index.html">Home</a>
+        <div class="inventory-topbar-actions">
+          <button class="inventory-button ghost" id="themeToggleButton" type="button" aria-pressed="false">Light mode</button>
+          <button class="inventory-button gold" id="sessionButton" type="button">Login</button>
+        </div>
+      </header>
+
+      <main class="inventory-stack">
+        <section class="inventory-overview-card" aria-labelledby="inventoryTitle">
+          <header class="inventory-card-heading">
+            <div>
+              <p class="inventory-kicker">Main Register</p>
+              <h1 id="inventoryTitle">Inventory</h1>
+            </div>
+            <p class="inventory-status" id="inventoryAccessStatus">Read-only view</p>
+          </header>
+
+          <section class="dirty-money-overview" aria-labelledby="dirtyMoneyTitle">
+            <div>
+              <p class="inventory-label" id="dirtyMoneyTitle">Dirty money</p>
+              <strong id="dirtyMoneyValue">$0</strong>
+            </div>
+            <button class="inventory-button gold" id="openMoneyModalButton" type="button">Update</button>
+          </section>
+
+          <div class="inventory-table-heading">
+            <div>
+              <h2>Stock on hand</h2>
+              <p id="quickEditHint">Double-click any value to make a quick edit.</p>
+            </div>
+          </div>
+
+          <div class="inventory-table-scroll">
+            <table class="inventory-table">
+              <thead>
+                <tr>
+                  <th scope="col">Item</th>
+                  <th scope="col">On hand</th>
+                  <th scope="col">Low point</th>
+                  <th scope="col">Internal</th>
+                  <th scope="col">External</th>
+                  <th scope="col">Updated</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryTableBody"></tbody>
+            </table>
+          </div>
+
+          <footer class="inventory-card-footer">
+            <p id="inventoryTableMeta">Loading inventory...</p>
+            <button class="inventory-button gold" id="openInventoryModalButton" type="button">Update inventory</button>
+          </footer>
+        </section>
+
+        <section class="inventory-admin-card hidden" id="adminSection" hidden aria-labelledby="adminTitle">
+          <header class="inventory-card-heading">
+            <div>
+              <p class="inventory-kicker">Protected History</p>
+              <h2 id="adminTitle">Admin</h2>
+            </div>
+            <div class="inventory-admin-actions">
+              <button class="inventory-button ghost" id="createRestorePointButton" type="button">Create restore point</button>
+              <button class="inventory-button gold" id="openRestoreModalButton" type="button">Reinstate backup</button>
+            </div>
+          </header>
+
+          <div class="inventory-table-scroll">
+            <table class="inventory-table inventory-audit-table">
+              <thead>
+                <tr>
+                  <th scope="col">Action</th>
+                  <th scope="col">Detail</th>
+                  <th scope="col">By</th>
+                  <th scope="col">When</th>
+                </tr>
+              </thead>
+              <tbody id="auditTableBody"></tbody>
+            </table>
+          </div>
+
+          <footer class="inventory-card-footer inventory-admin-footer">
+            <p id="auditTableMeta">Loading recent actions...</p>
+            <div class="inventory-pagination">
+              <button class="inventory-button ghost compact" id="previousAuditPageButton" type="button">Previous</button>
+              <span id="auditPageLabel">Page 1 of 1</span>
+              <button class="inventory-button ghost compact" id="nextAuditPageButton" type="button">Next</button>
+            </div>
+          </footer>
+
+          <div class="inventory-reserved-tools">
+            <strong>Reserved space</strong>
+            <span>Additional administration tools will be placed here as the system grows.</span>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-shell hidden" id="loginModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeLoginBackdrop" type="button" aria-label="Close login"></button>
+      <section class="modal-card inventory-modal-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+        <header class="inventory-modal-header">
+          <div>
+            <p class="inventory-kicker">Private Access</p>
+            <h2 id="loginTitle">Log in</h2>
+          </div>
+          <button class="inventory-button ghost compact" id="closeLoginButton" type="button">Close</button>
+        </header>
+        <form class="inventory-form" id="loginForm">
+          <label class="inventory-field">
+            <span>Username</span>
+            <input type="text" name="username" autocomplete="username" required>
+          </label>
+          <label class="inventory-field">
+            <span>Password</span>
+            <input type="password" name="password" autocomplete="current-password" required>
+          </label>
+          <button class="inventory-button gold full" id="loginSubmitButton" type="submit">Enter</button>
+          <p class="inventory-form-message hidden" id="loginError"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="moneyModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeMoneyBackdrop" type="button" aria-label="Close dirty money update"></button>
+      <section class="modal-card inventory-modal-card" role="dialog" aria-modal="true" aria-labelledby="moneyModalTitle">
+        <header class="inventory-modal-header">
+          <div>
+            <p class="inventory-kicker">Dirty Money</p>
+            <h2 id="moneyModalTitle">Update balance</h2>
+          </div>
+          <button class="inventory-button ghost compact" id="closeMoneyButton" type="button">Close</button>
+        </header>
+        <form class="inventory-form" id="moneyForm">
+          <label class="inventory-field">
+            <span>Action</span>
+            <select name="operation" id="moneyOperationSelect" required>
+              <option value="SET">Set value</option>
+              <option value="ADD">Add</option>
+              <option value="SUBTRACT">Subtract</option>
+            </select>
+          </label>
+          <label class="inventory-field">
+            <span id="moneyValueLabel">New balance</span>
+            <input type="number" name="value" min="0" step="0.01" inputmode="decimal" required>
+          </label>
+          <p class="inventory-form-note" id="moneyOperationHint">Set replaces the current dirty-money balance.</p>
+          <button class="inventory-button gold full" id="moneySubmitButton" type="submit">Save balance</button>
+          <p class="inventory-form-message hidden" id="moneyFormMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="inventoryModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeInventoryBackdrop" type="button" aria-label="Close inventory update"></button>
+      <section class="modal-card inventory-modal-card" role="dialog" aria-modal="true" aria-labelledby="inventoryModalTitle">
+        <header class="inventory-modal-header">
+          <div>
+            <p class="inventory-kicker">Inventory Update</p>
+            <h2 id="inventoryModalTitle">Manage listings</h2>
+          </div>
+          <button class="inventory-button ghost compact" id="closeInventoryButton" type="button">Close</button>
+        </header>
+
+        <div class="inventory-modal-tabs" role="tablist" aria-label="Inventory update type">
+          <button class="inventory-tab is-active" data-inventory-mode="create" type="button" role="tab" aria-selected="true">Add listing</button>
+          <button class="inventory-tab" data-inventory-mode="edit" type="button" role="tab" aria-selected="false">Edit list</button>
+        </div>
+
+        <form class="inventory-form" id="inventoryForm">
+          <label class="inventory-field hidden" id="itemSelectField">
+            <span>Listing</span>
+            <select name="itemId" id="inventoryItemSelect"></select>
+          </label>
+          <label class="inventory-field">
+            <span>Item name</span>
+            <input type="text" name="name" maxlength="100" required>
+          </label>
+          <div class="inventory-form-grid">
+            <label class="inventory-field">
+              <span>Stock on hand</span>
+              <input type="number" name="quantity" min="0" step="1" inputmode="numeric" required>
+            </label>
+            <label class="inventory-field">
+              <span>Low point</span>
+              <input type="number" name="reorderLevel" min="0" step="1" inputmode="numeric" required>
+            </label>
+          </div>
+          <div class="inventory-form-grid">
+            <label class="inventory-field">
+              <span>Internal price</span>
+              <input type="number" name="internalPrice" min="0" step="0.01" inputmode="decimal" required>
+            </label>
+            <label class="inventory-field">
+              <span>External price</span>
+              <input type="number" name="externalPrice" min="0" step="0.01" inputmode="decimal" required>
+            </label>
+          </div>
+          <label class="inventory-field">
+            <span>Unit label</span>
+            <input type="text" name="unit" maxlength="32" value="unit">
+          </label>
+          <button class="inventory-button gold full" id="inventorySubmitButton" type="submit">Add listing</button>
+          <p class="inventory-form-message hidden" id="inventoryFormMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="restoreModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeRestoreBackdrop" type="button" aria-label="Close restore point form"></button>
+      <section class="modal-card inventory-modal-card" role="dialog" aria-modal="true" aria-labelledby="restoreModalTitle">
+        <header class="inventory-modal-header">
+          <div>
+            <p class="inventory-kicker">Recovery</p>
+            <h2 id="restoreModalTitle">Reinstate backup</h2>
+          </div>
+          <button class="inventory-button ghost compact" id="closeRestoreButton" type="button">Close</button>
+        </header>
+        <form class="inventory-form" id="restoreForm">
+          <label class="inventory-field">
+            <span>Restore point</span>
+            <select name="restorePointId" id="restorePointSelect" required></select>
+          </label>
+          <div class="inventory-warning-note">
+            <strong>Inventory state will be replaced.</strong>
+            <span>Current items not in the selected backup will be archived. The action itself is logged.</span>
+          </div>
+          <label class="inventory-check-field">
+            <input type="checkbox" name="confirmed" required>
+            <span>I understand this restores the selected inventory state.</span>
+          </label>
+          <button class="inventory-button gold full" id="restoreSubmitButton" type="submit">Reinstate backup</button>
+          <p class="inventory-form-message hidden" id="restoreFormMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="toast-stack inventory-toast-stack" id="toastStack"></div>
+    <script type="module" src="./assets/js/inventory.js"></script>
+  </body>
+</html>

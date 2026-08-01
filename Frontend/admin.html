@@ -170,6 +170,11 @@
             <span>Give this account wager controls</span>
           </label>
 
+          <label class="checkbox-field">
+            <input type="checkbox" name="inventoryAccess">
+            <span>Give this account Inventory access</span>
+          </label>
+
           <button class="topbar-button accent wide" id="createUserSubmitButton" type="submit">Create user</button>
           <p class="form-message hidden" id="createUserMessage"></p>
         </form>
@@ -220,7 +225,12 @@
             <span>Can use wager controls</span>
           </label>
 
-          <p class="helper-copy hidden" id="editUserRoleNote">This bootstrap account always keeps admin and wager access.</p>
+          <label class="checkbox-field">
+            <input type="checkbox" name="inventoryAccess">
+            <span>Can use Inventory tools</span>
+          </label>
+
+          <p class="helper-copy hidden" id="editUserRoleNote">This bootstrap account always keeps all system access.</p>
           <p class="helper-copy hidden" id="editCurrentUserNote">You are editing the account currently in use.</p>
 
           <button class="topbar-button accent wide" id="editUserSubmitButton" type="submit">Save changes</button>

@@ -213,19 +213,24 @@ model UserPermission {
 }
 
 model InventoryItem {
-  id           String              @id @default(cuid())
-  name         String
-  sku          String?             @unique
-  category     String?
-  unit         String              @default("unit")
-  quantity     Int                 @default(0)
-  reorderLevel Int                 @default(0)
-  notes        String?
-  movements    InventoryMovement[]
+  id            String               @id @default(cuid())
+  name          String
+  sku           String?              @unique
+  category      String?
+  unit          String               @default("unit")
+  quantity      Int                  @default(0)
+  reorderLevel  Int                  @default(0)
+  internalPrice Decimal              @default(0) @db.Decimal(14, 2)
+  externalPrice Decimal              @default(0) @db.Decimal(14, 2)
+  notes         String?
+  archived      Boolean              @default(false)
+  movements     InventoryMovement[]
   distributions Distribution[]
   runnerDistributions RunnerDistribution[] @relation("RunnerDistributionItem")
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([archived, name])
 }
 
 model InventoryMovement {
@@ -236,6 +241,39 @@ model InventoryMovement {
   reason        String?
   item          InventoryItem           @relation(fields: [itemId], references: [id], onDelete: Cascade)
   createdAt     DateTime                @default(now())
+}
+
+model InventoryDirtyMoneyAccount {
+  id        String   @id @default("dirty-money")
+  amount    Decimal  @default(0) @db.Decimal(14, 2)
+  updatedAt DateTime @updatedAt
+}
+
+model InventoryAuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actorName String?
+  action    String
+  entityType String
+  entityId  String?
+  summary   String
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}
+
+model InventoryRestorePoint {
+  id            String   @id @default(cuid())
+  label         String
+  snapshot      Json
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model PriceListItem {

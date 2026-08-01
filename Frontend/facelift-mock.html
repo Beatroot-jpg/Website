@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Facelift Mock</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&display=swap");
+
+      :root {
+        --ink: #ffffff;
+        --muted: #ddd6c7;
+        --soft: #bcb7ad;
+        --line: rgba(244, 190, 74, 0.3);
+        --line-hard: rgba(244, 190, 74, 0.62);
+        --gold: #f4be4a;
+        --gold-bright: #ffd978;
+        --black: #070706;
+        --panel: rgba(38, 39, 38, 0.9);
+        --panel-strong: rgba(48, 49, 47, 0.94);
+        --panel-soft: rgba(72, 73, 70, 0.66);
+        --danger: #ff7777;
+        --good: #77d994;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family: Arial, Helvetica, sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(244, 190, 74, 0.16), transparent 0 26rem),
+          linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 22px),
+          #0b0b0a;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(90deg, transparent 0 49.8%, rgba(244, 190, 74, 0.08) 50%, transparent 50.2%),
+          radial-gradient(circle at 50% 0%, rgba(255, 217, 120, 0.08), transparent 0 32rem);
+        opacity: 0.9;
+      }
+
+      .mock-shell {
+        position: relative;
+        width: min(1280px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 24px 0 52px;
+      }
+
+      .mock-topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 22px;
+      }
+
+      .seal-text {
+        display: grid;
+        gap: 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      .seal-text strong,
+      h1,
+      h2,
+      .number,
+      .nav-card strong {
+        font-family: "Cinzel", Georgia, serif;
+      }
+
+      .seal-text strong {
+        color: var(--gold-bright);
+        font-size: clamp(1rem, 2vw, 1.2rem);
+      }
+
+      .seal-text span {
+        color: var(--soft);
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+
+      .top-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      button,
+      .button {
+        min-height: 40px;
+        padding: 0 16px;
+        border: 1px solid var(--line-hard);
+        border-radius: 6px;
+        color: var(--ink);
+        background: linear-gradient(180deg, rgba(98, 98, 94, 0.9), rgba(50, 51, 49, 0.92));
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 0.74rem;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 14px 30px rgba(0, 0, 0, 0.22);
+        cursor: pointer;
+      }
+
+      button.primary,
+      .button.primary {
+        color: #1b1302;
+        background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+      }
+
+      .hero-card {
+        display: grid;
+        grid-template-columns: minmax(220px, 0.86fr) minmax(0, 1.14fr);
+        gap: clamp(18px, 3vw, 34px);
+        align-items: center;
+        min-height: 480px;
+        padding: clamp(22px, 4vw, 44px);
+        border: 2px solid var(--line-hard);
+        border-radius: 10px;
+        background:
+          radial-gradient(circle at 20% 20%, rgba(244, 190, 74, 0.18), transparent 0 20rem),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025)),
+          var(--panel);
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.42);
+      }
+
+      .logo-wrap {
+        display: grid;
+        place-items: center;
+        min-height: 360px;
+      }
+
+      .logo-wrap img {
+        width: min(430px, 100%);
+        filter: drop-shadow(0 0 34px rgba(244, 190, 74, 0.18));
+      }
+
+      .hero-copy {
+        display: grid;
+        gap: 18px;
+      }
+
+      .eyebrow {
+        width: max-content;
+        max-width: 100%;
+        padding: 8px 12px;
+        border: 1px solid var(--line-hard);
+        border-radius: 4px;
+        color: var(--gold-bright);
+        background: rgba(244, 190, 74, 0.1);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 0.72rem;
+        font-weight: 900;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 760px;
+        font-size: clamp(2.35rem, 6vw, 5.6rem);
+        line-height: 0.92;
+        letter-spacing: -0.04em;
+        text-transform: uppercase;
+      }
+
+      h1 span,
+      .gold {
+        color: var(--gold-bright);
+        text-shadow: 0 0 24px rgba(244, 190, 74, 0.22);
+      }
+
+      .hero-copy p {
+        margin: 0;
+        max-width: 680px;
+        color: var(--ink);
+        font-size: clamp(0.95rem, 1.2vw, 1.08rem);
+        font-weight: 750;
+        line-height: 1.65;
+      }
+
+      .nav-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .nav-card,
+      .metric-card,
+      .activity-card,
+      .table-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-strong);
+        box-shadow: 0 20px 44px rgba(0, 0, 0, 0.28);
+      }
+
+      .nav-card {
+        display: grid;
+        gap: 8px;
+        min-height: 118px;
+        padding: 18px;
+        text-decoration: none;
+        color: var(--ink);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012)),
+          var(--panel-soft);
+      }
+
+      .nav-card strong {
+        color: var(--gold-bright);
+        font-size: 1.05rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      .nav-card p {
+        margin: 0;
+        color: var(--ink);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 0.84rem;
+        font-weight: 800;
+        line-height: 1.45;
+      }
+
+      .dashboard-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 22px;
+      }
+
+      .metric-card {
+        min-width: 0;
+        padding: 16px;
+      }
+
+      .metric-card span {
+        display: block;
+        color: var(--gold-bright);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 0.68rem;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .metric-card .number {
+        display: block;
+        margin-top: 10px;
+        color: var(--gold-bright);
+        font-size: clamp(1.5rem, 3vw, 2.6rem);
+        line-height: 1;
+        overflow-wrap: anywhere;
+      }
+
+      .workspace-grid {
+        display: grid;
+        grid-template-columns: 0.9fr 1.1fr;
+        gap: 16px;
+        margin-top: 16px;
+      }
+
+      .activity-card,
+      .table-card {
+        padding: 18px;
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+
+      h2 {
+        margin: 0;
+        color: var(--gold-bright);
+        font-size: 1.22rem;
+        font-weight: 900;
+        letter-spacing: 0.055em;
+        text-shadow: 0 0 18px rgba(244, 190, 74, 0.18);
+        text-transform: uppercase;
+      }
+
+      .status-pill {
+        padding: 6px 9px;
+        border: 1px solid rgba(244, 190, 74, 0.34);
+        border-radius: 4px;
+        color: var(--gold-bright);
+        background: rgba(244, 190, 74, 0.1);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 0.68rem;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .compact-list {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .compact-list li {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: center;
+        padding: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.055);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 0.88rem;
+        font-weight: 800;
+      }
+
+      .compact-list small {
+        color: var(--soft);
+        font-weight: 700;
+      }
+
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .data-table th,
+      .data-table td {
+        padding: 11px 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      .data-table th {
+        color: var(--gold-bright);
+        font-size: 0.68rem;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        text-shadow: 0 0 14px rgba(244, 190, 74, 0.14);
+        text-transform: uppercase;
+      }
+
+      .data-table td {
+        color: var(--ink);
+        font-size: 0.86rem;
+        font-weight: 800;
+      }
+
+      .data-table td:last-child,
+      .data-table th:last-child {
+        text-align: right;
+      }
+
+      .low {
+        color: var(--danger);
+      }
+
+      .good {
+        color: var(--good);
+      }
+
+      @media (max-width: 960px) {
+        .hero-card,
+        .workspace-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .nav-grid,
+        .dashboard-strip {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 620px) {
+        .mock-shell {
+          width: min(100% - 20px, 1240px);
+          padding-top: 14px;
+        }
+
+        .mock-topbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .hero-card {
+          padding: 18px;
+          border-radius: 10px;
+        }
+
+        .logo-wrap {
+          min-height: 240px;
+        }
+
+        .nav-grid,
+        .dashboard-strip {
+          grid-template-columns: 1fr;
+        }
+
+        .table-card {
+          overflow-x: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mock-shell">
+      <header class="mock-topbar">
+        <div class="seal-text">
+          <strong>Inventory Sanctum</strong>
+          <span>Compact control system mock</span>
+        </div>
+
+        <div class="top-actions">
+          <button type="button">Light Mode</button>
+          <button class="primary" type="button">Login</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero-card">
+          <div class="logo-wrap">
+            <img src="./assets/images/Main Logo.png" alt="Main logo">
+          </div>
+
+          <div class="hero-copy">
+            <span class="eyebrow">Inventory Management</span>
+            <h1>Control the <span>stock</span>. Read the <span>money</span>. Move fast.</h1>
+            <p>
+              This mock keeps the cinematic landing-page feel, then tightens every panel so important numbers,
+              low stock warnings, and daily movement are obvious at a glance.
+            </p>
+            <div class="top-actions">
+              <a class="button primary" href="#dashboard">View mock dashboard</a>
+              <a class="button" href="./index.html">Back to current home</a>
+            </div>
+          </div>
+        </section>
+
+        <nav class="nav-grid" aria-label="Mock navigation">
+          <a class="nav-card" href="#dashboard">
+            <strong>Dashboard</strong>
+            <p>Fast read of stock, money, alerts, and latest action.</p>
+          </a>
+          <a class="nav-card" href="#inventory">
+            <strong>Inventory</strong>
+            <p>Add, subtract, correct, delete, and watch low points.</p>
+          </a>
+          <a class="nav-card" href="#ledger">
+            <strong>Ledger</strong>
+            <p>Clean money, dirty money, deposits, and corrections.</p>
+          </a>
+          <a class="nav-card" href="#admin">
+            <strong>Admin</strong>
+            <p>Users, permissions, audit, and lock-down controls.</p>
+          </a>
+        </nav>
+
+        <section class="dashboard-strip" id="dashboard" aria-label="Live dashboard sample">
+          <article class="metric-card">
+            <span>Current stock</span>
+            <strong class="number">18,420</strong>
+          </article>
+          <article class="metric-card">
+            <span>Clean money</span>
+            <strong class="number">$2.4M</strong>
+          </article>
+          <article class="metric-card">
+            <span>Dirty money</span>
+            <strong class="number">$860K</strong>
+          </article>
+          <article class="metric-card">
+            <span>Needs attention</span>
+            <strong class="number low">3</strong>
+          </article>
+        </section>
+
+        <section class="workspace-grid">
+          <article class="activity-card">
+            <div class="card-header">
+              <h2>Priority Stock</h2>
+              <span class="status-pill">Live</span>
+            </div>
+            <ul class="compact-list">
+              <li>
+                <span>Copper Wire <small>below low point</small></span>
+                <strong class="low">920</strong>
+              </li>
+              <li>
+                <span>Steel Bars <small>healthy supply</small></span>
+                <strong class="good">4,800</strong>
+              </li>
+              <li>
+                <span>Battery Packs <small>watch this week</small></span>
+                <strong class="gold">1,420</strong>
+              </li>
+            </ul>
+          </article>
+
+          <article class="table-card" id="inventory">
+            <div class="card-header">
+              <h2>Recent Movement</h2>
+              <span class="status-pill">Last 25</span>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Action</th>
+                  <th>Qty</th>
+                  <th>By</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Copper Wire</td>
+                  <td><span class="gold">Subtract</span></td>
+                  <td>500</td>
+                  <td>Rien</td>
+                </tr>
+                <tr>
+                  <td>Steel Bars</td>
+                  <td><span class="good">Add</span></td>
+                  <td>1,200</td>
+                  <td>Admin</td>
+                </tr>
+                <tr>
+                  <td>Battery Packs</td>
+                  <td><span class="gold">Correction</span></td>
+                  <td>1,420</td>
+                  <td>Treasurer</td>
+                </tr>
+              </tbody>
+            </table>
+          </article>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
