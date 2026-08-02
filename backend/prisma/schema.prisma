@@ -297,6 +297,16 @@ model InventoryRestorePoint {
   @@index([createdAt])
 }
 
+model QuotaMember {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  quotaCompleted Boolean  @default(false)
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([quotaCompleted, name])
+}
 model DispatchContact {
   id          String   @id @default(cuid())
   name        String

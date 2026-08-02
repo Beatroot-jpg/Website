@@ -1,0 +1,90 @@
+.quota-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.quota-summary {
+  display: grid;
+  gap: 2px;
+  min-width: 110px;
+  padding: 8px 12px;
+  border: 1px solid var(--inventory-line);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.quota-summary span {
+  color: var(--inventory-soft);
+  font-size: 0.61rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.quota-summary strong {
+  color: var(--inventory-gold-bright);
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 1.2rem;
+  letter-spacing: 0.05em;
+}
+
+.quota-member-name {
+  color: var(--inventory-gold-bright) !important;
+  font-size: 0.98rem !important;
+  letter-spacing: 0.025em;
+}
+
+.quota-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--inventory-line);
+  font-size: 0.67rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.quota-status.is-complete {
+  color: #a9e5b2;
+  border-color: rgba(117, 218, 139, 0.68);
+  background: rgba(117, 218, 139, 0.09);
+}
+
+.quota-status.is-pending {
+  color: var(--inventory-gold-bright);
+  border-color: rgba(244, 190, 74, 0.46);
+  background: rgba(244, 190, 74, 0.07);
+}
+
+.quota-quick-select {
+  width: auto !important;
+  min-width: 150px;
+  min-height: 36px !important;
+  padding-block: 4px !important;
+  font-size: 0.72rem !important;
+}
+
+.quota-completion-cell .inventory-check-field {
+  justify-content: flex-end;
+  margin: 0;
+}
+
+.quota-completion-cell .inventory-check-field input {
+  width: 20px;
+  min-height: 20px;
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .quota-heading-actions {
+    justify-content: flex-start;
+  }
+
+  .quota-heading-actions > .inventory-button {
+    width: 100%;
+  }
+}
