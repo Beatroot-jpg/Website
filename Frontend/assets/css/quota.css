@@ -60,14 +60,6 @@
   background: rgba(244, 190, 74, 0.07);
 }
 
-.quota-quick-select {
-  width: auto !important;
-  min-width: 150px;
-  min-height: 36px !important;
-  padding-block: 4px !important;
-  font-size: 0.72rem !important;
-}
-
 .quota-completion-cell .inventory-check-field {
   justify-content: flex-end;
   margin: 0;
@@ -79,12 +71,14 @@
   margin: 0;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 860px) {
   .quota-heading-actions {
     justify-content: flex-start;
   }
+}
 
+@media (max-width: 560px) {
   .quota-heading-actions > .inventory-button {
-    width: 100%;
+    width: 100% !important;
   }
 }

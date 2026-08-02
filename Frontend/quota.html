@@ -39,7 +39,7 @@
                 <strong id="quotaSummaryValue">0 / 0</strong>
               </div>
               <p class="inventory-access-status" id="quotaAccessStatus">Public view</p>
-              <button class="inventory-button gold" id="openMemberModalButton" type="button" hidden>Manage members</button>
+              <button class="inventory-button gold" id="openMemberModalButton" type="button" hidden>Add member</button>
             </div>
           </header>
 
@@ -58,7 +58,7 @@
                   <th scope="col">Member</th>
                   <th scope="col">Status</th>
                   <th scope="col">Last updated</th>
-                  <th class="quota-admin-column" scope="col" hidden>Quick edit</th>
+                  <th class="quota-admin-column" scope="col" hidden>Manage</th>
                   <th scope="col">Quota completed</th>
                 </tr>
               </thead>
@@ -100,6 +100,7 @@
           <label class="inventory-field"><span>Member name</span><input name="name" maxlength="100" required></label>
           <label class="inventory-field"><span>Quota status</span><select name="quotaCompleted"><option value="false">Not completed</option><option value="true">Quota completed</option></select></label>
           <button class="inventory-button gold full" id="memberSubmitButton" type="submit">Add member</button>
+          <button class="inventory-button danger full" id="deleteMemberFromFormButton" type="button" hidden>Remove member</button>
           <p class="inventory-form-message hidden" id="memberFormMessage"></p>
         </form>
       </section>

@@ -3,7 +3,6 @@ import { clearSession, getSession, saveSession } from "./session.js";
 import { initThemeToggle } from "./theme.js";
 
 const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => [...document.querySelectorAll(selector)];
 
 const themeToggleButton = $("#themeToggleButton");
 const sessionButton = $("#sessionButton");
@@ -12,6 +11,7 @@ const quotaSummaryValue = $("#quotaSummaryValue");
 const quotaTableHint = $("#quotaTableHint");
 const quotaTableBody = $("#quotaTableBody");
 const quotaTableMeta = $("#quotaTableMeta");
+const quotaAdminColumn = $(".quota-admin-column");
 const openMemberModalButton = $("#openMemberModalButton");
 const loginModal = $("#loginModal");
 const loginForm = $("#loginForm");
@@ -22,6 +22,7 @@ const memberModalTitle = $("#memberModalTitle");
 const memberForm = $("#memberForm");
 const memberFormMessage = $("#memberFormMessage");
 const memberSubmitButton = $("#memberSubmitButton");
+const deleteMemberFromFormButton = $("#deleteMemberFromFormButton");
 const deleteMemberModal = $("#deleteMemberModal");
 const deleteMemberName = $("#deleteMemberName");
 const confirmDeleteMemberButton = $("#confirmDeleteMemberButton");
@@ -75,7 +76,7 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("en-AU", {
     dateStyle: "medium",
     timeStyle: "short",
-    timeZone: "Australia/Sydney"
+    timeZone: "Australia/Melbourne"
   }).format(date);
 }
 
@@ -109,57 +110,76 @@ function syncAccess() {
   quotaAccessStatus.textContent = admin ? "Admin controls enabled" : "Public view";
   quotaAccessStatus.classList.toggle("is-live", admin);
   quotaTableHint.textContent = admin
-    ? "Use the checkbox for the fastest update, or the quick-edit menu for member changes."
+    ? "Double-click a member name or status to edit it inline. The checkbox is the fastest completion update."
     : "View each member's current quota status.";
+  quotaAdminColumn.hidden = !admin;
   openMemberModalButton.hidden = !admin;
-  $$(".quota-admin-column").forEach((column) => { column.hidden = !admin; });
+}
+
+function createEditableCell(member, field, value, displayValue, className = "") {
+  const cell = createCell(displayValue, className);
+  cell.dataset.editField = field;
+  cell.dataset.memberId = member.id;
+  cell.dataset.rawValue = String(value ?? "");
+  cell.title = canManage() ? "Double-click to edit" : "Read-only register";
+  return cell;
+}
+
+function createStatusCell(member) {
+  const cell = document.createElement("td");
+  cell.dataset.editField = "quotaCompleted";
+  cell.dataset.memberId = member.id;
+  cell.dataset.rawValue = String(member.quotaCompleted);
+  cell.title = canManage() ? "Double-click to edit" : "Read-only register";
+
+  const statusLabel = document.createElement("span");
+  statusLabel.className = "quota-status " + (member.quotaCompleted ? "is-complete" : "is-pending");
+  statusLabel.textContent = member.quotaCompleted ? "Completed" : "Not completed";
+  cell.appendChild(statusLabel);
+  return cell;
+}
+
+function createManageCell(member) {
+  const cell = document.createElement("td");
+  cell.className = "quota-manage-cell";
+  const button = document.createElement("button");
+  button.className = "inventory-button ghost compact";
+  button.type = "button";
+  button.dataset.memberAction = "manage";
+  button.dataset.memberId = member.id;
+  button.textContent = "Update member";
+  cell.appendChild(button);
+  return cell;
 }
 
 function renderQuotaTable() {
   quotaTableBody.replaceChildren();
-  const columns = canManage() ? 5 : 4;
   const completedCount = state.members.filter((member) => member.quotaCompleted).length;
-  quotaSummaryValue.textContent = `${completedCount} / ${state.members.length}`;
+  quotaSummaryValue.textContent = completedCount + " / " + state.members.length;
+  const columnCount = canManage() ? 5 : 4;
 
   if (state.loading) {
-    quotaTableBody.appendChild(createMessageRow("Loading quota members...", columns));
+    quotaTableBody.appendChild(createMessageRow("Loading quota members...", columnCount));
     quotaTableMeta.textContent = "Loading members...";
     return;
   }
 
   if (!state.members.length) {
-    quotaTableBody.appendChild(createMessageRow("No quota members yet.", columns));
-    quotaTableMeta.textContent = canManage() ? "Use Manage members to add the first person." : "0 members";
+    quotaTableBody.appendChild(createMessageRow("No quota members yet.", columnCount));
+    quotaTableMeta.textContent = canManage() ? "Use Add member to create the first person." : "0 members";
     return;
   }
 
   state.members.forEach((member) => {
     const row = document.createElement("tr");
-    row.appendChild(createCell(member.name, "quota-member-name"));
-
-    const status = document.createElement("td");
-    const statusLabel = document.createElement("span");
-    statusLabel.className = `quota-status ${member.quotaCompleted ? "is-complete" : "is-pending"}`;
-    statusLabel.textContent = member.quotaCompleted ? "Completed" : "Not completed";
-    status.appendChild(statusLabel);
-    row.appendChild(status);
-    row.appendChild(createCell(formatDate(member.updatedAt), "quota-updated-cell"));
+    row.append(
+      createEditableCell(member, "name", member.name, member.name, "quota-member-name"),
+      createStatusCell(member),
+      createCell(formatDate(member.updatedAt), "quota-updated-cell")
+    );
 
     if (canManage()) {
-      const quickEdit = document.createElement("td");
-      const select = document.createElement("select");
-      select.className = "quota-quick-select";
-      select.dataset.memberId = member.id;
-      select.innerHTML = [
-        '<option value="">Quick edit</option>',
-        '<option value="edit">Edit member</option>',
-        member.quotaCompleted
-          ? '<option value="incomplete">Mark not completed</option>'
-          : '<option value="complete">Mark completed</option>',
-        '<option value="delete">Remove member</option>'
-      ].join("");
-      quickEdit.appendChild(select);
-      row.appendChild(quickEdit);
+      row.appendChild(createManageCell(member));
     }
 
     const completed = document.createElement("td");
@@ -171,7 +191,7 @@ function renderQuotaTable() {
     checkbox.checked = member.quotaCompleted;
     checkbox.disabled = !canManage();
     checkbox.dataset.memberId = member.id;
-    checkbox.setAttribute("aria-label", `Mark ${member.name}'s quota as completed`);
+    checkbox.setAttribute("aria-label", "Mark " + member.name + "'s quota as completed");
     const helper = document.createElement("span");
     helper.className = "sr-only";
     helper.textContent = member.quotaCompleted ? "Completed" : "Not completed";
@@ -181,7 +201,14 @@ function renderQuotaTable() {
     quotaTableBody.appendChild(row);
   });
 
-  quotaTableMeta.textContent = `${state.members.length} ${state.members.length === 1 ? "member" : "members"} in the current quota checklist.`;
+  quotaTableMeta.textContent = state.members.length + " " + (state.members.length === 1 ? "member" : "members") + " in the current quota checklist.";
+}
+
+function sortMembers(members) {
+  return [...members].sort((left, right) => {
+    if (left.quotaCompleted !== right.quotaCompleted) return Number(left.quotaCompleted) - Number(right.quotaCompleted);
+    return left.name.localeCompare(right.name);
+  });
 }
 
 function hydrateSession() {
@@ -214,26 +241,135 @@ async function loadQuota() {
   }
 }
 
-function sortMembers(members) {
-  return [...members].sort((left, right) => {
-    if (left.quotaCompleted !== right.quotaCompleted) return Number(left.quotaCompleted) - Number(right.quotaCompleted);
-    return left.name.localeCompare(right.name);
-  });
-}
-
 function selectedMember(id) {
   return state.members.find((member) => member.id === id) || null;
+}
+
+function normalizeInlineValue(field, value) {
+  if (field === "name") {
+    const name = String(value ?? "").trim();
+    if (!name) {
+      throw new Error("Member name cannot be empty.");
+    }
+    return name;
+  }
+
+  if (field === "quotaCompleted") {
+    if (value !== "true" && value !== "false") {
+      throw new Error("Choose a quota status.");
+    }
+    return value === "true";
+  }
+
+  throw new Error("This value cannot be edited here.");
+}
+
+function openInlineEditor(cell) {
+  if (!canManage() || cell.querySelector("input, select")) {
+    return;
+  }
+
+  const member = selectedMember(cell.dataset.memberId);
+  const field = cell.dataset.editField;
+  if (!member || !field) {
+    return;
+  }
+
+  const originalValue = cell.dataset.rawValue;
+  const editor = document.createElement(field === "quotaCompleted" ? "select" : "input");
+  editor.className = "inventory-inline-editor";
+
+  if (field === "quotaCompleted") {
+    const pending = document.createElement("option");
+    pending.value = "false";
+    pending.textContent = "Not completed";
+    const complete = document.createElement("option");
+    complete.value = "true";
+    complete.textContent = "Completed";
+    editor.append(pending, complete);
+  } else {
+    editor.type = "text";
+  }
+
+  editor.value = originalValue;
+  let completed = false;
+
+  const restore = () => {
+    if (completed) {
+      return;
+    }
+    completed = true;
+    renderQuotaTable();
+  };
+
+  const save = async () => {
+    if (completed) {
+      return;
+    }
+
+    let nextValue;
+    try {
+      nextValue = normalizeInlineValue(field, editor.value);
+    } catch (error) {
+      showToast(error.message, "error");
+      editor.focus();
+      return;
+    }
+
+    if (String(nextValue) === String(originalValue)) {
+      restore();
+      return;
+    }
+
+    completed = true;
+    editor.disabled = true;
+
+    try {
+      const successMessage = field === "name"
+        ? "Member name updated."
+        : nextValue ? "Quota marked complete." : "Quota marked incomplete.";
+      await updateMember(member.id, { [field]: nextValue }, successMessage);
+    } catch (error) {
+      renderQuotaTable();
+      showToast(error.message, "error");
+    }
+  };
+
+  editor.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      save();
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      restore();
+    }
+  });
+  editor.addEventListener("change", () => {
+    if (field === "quotaCompleted") {
+      save();
+    }
+  });
+  editor.addEventListener("blur", save, { once: true });
+
+  cell.replaceChildren(editor);
+  editor.focus();
+  if (field === "name") {
+    editor.select();
+  }
 }
 
 function openMemberModal(member = null) {
   state.editingMemberId = member?.id || null;
   memberForm.reset();
   setMessage(memberFormMessage, "");
-  memberModalTitle.textContent = member ? "Edit member" : "Add member";
+  memberModalTitle.textContent = member ? "Update member" : "Add member";
   memberSubmitButton.textContent = member ? "Save member" : "Add member";
+  deleteMemberFromFormButton.hidden = !member;
   if (member) {
     memberForm.elements.name.value = member.name;
-    memberForm.elements.quotaCompleted.value = `${member.quotaCompleted}`;
+    memberForm.elements.quotaCompleted.value = String(member.quotaCompleted);
   }
   toggleModal(memberModal, true);
 }
@@ -303,7 +439,10 @@ memberForm.addEventListener("submit", async (event) => {
   const editing = Boolean(state.editingMemberId);
   setLoading(memberSubmitButton, true, "Saving", editing ? "Save member" : "Add member");
   try {
-    const body = Object.fromEntries(new FormData(memberForm).entries());
+    const body = {
+      name: `${memberForm.elements.name.value || ""}`.trim(),
+      quotaCompleted: memberForm.elements.quotaCompleted.value
+    };
     if (editing) {
       await updateMember(state.editingMemberId, body, "Quota member updated.");
     } else {
@@ -321,34 +460,39 @@ memberForm.addEventListener("submit", async (event) => {
   }
 });
 
-quotaTableBody.addEventListener("change", async (event) => {
-  const checkbox = event.target.closest("input[data-member-id]");
-  if (checkbox) {
-    if (!canManage()) return;
-    const member = selectedMember(checkbox.dataset.memberId);
-    if (!member) return;
-    try {
-      await updateMember(member.id, { quotaCompleted: checkbox.checked }, checkbox.checked ? "Quota marked complete." : "Quota marked incomplete.");
-    } catch (error) {
-      checkbox.checked = member.quotaCompleted;
-      showToast(error.message, "error");
-    }
+deleteMemberFromFormButton.addEventListener("click", () => {
+  const member = selectedMember(state.editingMemberId);
+  if (member) openDeleteModal(member);
+});
+
+quotaTableBody.addEventListener("dblclick", (event) => {
+  const cell = event.target.closest("td[data-edit-field]");
+  if (cell) {
+    openInlineEditor(cell);
+  }
+});
+
+quotaTableBody.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-member-action='manage']");
+  if (!button || !canManage()) {
     return;
   }
 
-  const quickEdit = event.target.closest("select[data-member-id]");
-  if (!quickEdit || !quickEdit.value || !canManage()) return;
-  const member = selectedMember(quickEdit.dataset.memberId);
-  const action = quickEdit.value;
-  quickEdit.value = "";
-  if (!member) return;
+  const member = selectedMember(button.dataset.memberId);
+  if (member) {
+    openMemberModal(member);
+  }
+});
 
+quotaTableBody.addEventListener("change", async (event) => {
+  const checkbox = event.target.closest("input[data-member-id]");
+  if (!checkbox || !canManage()) return;
+  const member = selectedMember(checkbox.dataset.memberId);
+  if (!member) return;
   try {
-    if (action === "edit") openMemberModal(member);
-    else if (action === "complete") await updateMember(member.id, { quotaCompleted: true }, "Quota marked complete.");
-    else if (action === "incomplete") await updateMember(member.id, { quotaCompleted: false }, "Quota marked incomplete.");
-    else if (action === "delete") openDeleteModal(member);
+    await updateMember(member.id, { quotaCompleted: checkbox.checked }, checkbox.checked ? "Quota marked complete." : "Quota marked incomplete.");
   } catch (error) {
+    checkbox.checked = member.quotaCompleted;
     showToast(error.message, "error");
   }
 });
@@ -360,8 +504,11 @@ confirmDeleteMemberButton.addEventListener("click", async () => {
   try {
     const response = await apiWithSession(`/quota/members/${member.id}`, { method: "DELETE" });
     state.members = state.members.filter((entry) => entry.id !== member.id);
+    state.deletingMemberId = null;
+    state.editingMemberId = null;
     renderQuotaTable();
     toggleModal(deleteMemberModal, false);
+    toggleModal(memberModal, false);
     showToast(response.message, "success");
   } catch (error) {
     showToast(error.message, "error");
