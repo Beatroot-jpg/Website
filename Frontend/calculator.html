@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b0b0a">
+    <title>Calculator</title>
+    <script>
+      (() => {
+        const savedTheme = localStorage.getItem("los-santos-fight-club-theme") || "dark";
+        document.documentElement.dataset.theme = savedTheme;
+      })();
+    </script>
+    <link rel="stylesheet" href="./assets/css/styles.css">
+    <link rel="stylesheet" href="./assets/css/inventory.css">
+    <link rel="stylesheet" href="./assets/css/calculator.css">
+    <script src="./assets/js/runtime-config.js"></script>
+  </head>
+  <body class="inventory-body calculator-body">
+    <div class="inventory-shell">
+      <header class="inventory-topbar">
+        <a class="inventory-home-link" href="./index.html">Home</a>
+        <div class="inventory-topbar-actions">
+          <button class="inventory-button ghost" id="themeToggleButton" type="button" aria-pressed="false">Light mode</button>
+          <button class="inventory-button gold" id="sessionButton" type="button">Login</button>
+        </div>
+      </header>
+
+      <main class="inventory-stack">
+        <section class="inventory-overview-card calculator-picker-card" aria-labelledby="calculatorTitle">
+          <header class="inventory-card-heading">
+            <div>
+              <p class="inventory-kicker">Crafting Reference</p>
+              <h1 id="calculatorTitle">Calculator</h1>
+            </div>
+            <div class="calculator-heading-actions">
+              <p class="inventory-access-status" id="calculatorAccessStatus">Public view</p>
+              <button class="inventory-button gold" id="openRecipeModalButton" type="button" hidden>New calculator</button>
+            </div>
+          </header>
+
+          <div class="calculator-selector-row">
+            <label class="inventory-field calculator-select-field">
+              <span>Saved calculator</span>
+              <select id="recipeSelect" aria-describedby="recipeSelectHint"></select>
+            </label>
+            <label class="inventory-field calculator-target-field">
+              <span>Products to craft</span>
+              <input id="targetQuantityInput" type="number" min="0" step="1" value="1" inputmode="numeric">
+            </label>
+            <div class="calculator-batch-readout" aria-live="polite">
+              <span>Craft batches</span>
+              <strong id="batchCountValue">0</strong>
+              <small id="recipeSelectHint">Choose a calculator to work out materials.</small>
+            </div>
+          </div>
+        </section>
+
+        <section class="inventory-overview-card calculator-workspace" aria-labelledby="selectedRecipeTitle">
+          <header class="inventory-card-heading">
+            <div>
+              <p class="inventory-kicker">Selected Recipe</p>
+              <h2 id="selectedRecipeTitle">Choose a calculator</h2>
+              <p class="calculator-output-copy" id="recipeOutputCopy">Material totals appear here once a calculator is selected.</p>
+            </div>
+            <button class="inventory-button ghost" id="updateRecipeButton" type="button" hidden>Update calculator</button>
+          </header>
+
+          <div class="calculator-facts" id="recipeFacts" aria-live="polite"></div>
+
+          <div class="inventory-table-heading calculator-table-heading">
+            <div>
+              <p class="inventory-kicker">Materials Required</p>
+              <h2>Build list</h2>
+              <p id="calculatorTableHint">Enter the number of products you want to make.</p>
+            </div>
+          </div>
+
+          <div class="inventory-table-scroll">
+            <table class="inventory-table calculator-table">
+              <thead>
+                <tr>
+                  <th scope="col">Material</th>
+                  <th scope="col">Per craft</th>
+                  <th scope="col">Required</th>
+                </tr>
+              </thead>
+              <tbody id="calculatorTableBody"></tbody>
+            </table>
+          </div>
+
+          <footer class="inventory-card-footer">
+            <p id="calculatorTableMeta">Loading calculators...</p>
+          </footer>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-shell hidden" id="loginModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeLoginBackdrop" type="button" aria-label="Close login"></button>
+      <section class="modal-card inventory-modal-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+        <header class="inventory-modal-header">
+          <div><p class="inventory-kicker">Private Access</p><h2 id="loginTitle">Log in</h2></div>
+          <button class="inventory-button ghost compact" id="closeLoginButton" type="button">Close</button>
+        </header>
+        <form class="inventory-form" id="loginForm">
+          <label class="inventory-field"><span>Username</span><input name="username" autocomplete="username" required></label>
+          <label class="inventory-field"><span>Password</span><input type="password" name="password" autocomplete="current-password" required></label>
+          <button class="inventory-button gold full" id="loginSubmitButton" type="submit">Enter</button>
+          <p class="inventory-form-message hidden" id="loginError"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="recipeModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeRecipeBackdrop" type="button" aria-label="Close calculator form"></button>
+      <section class="modal-card inventory-modal-card calculator-modal-card" role="dialog" aria-modal="true" aria-labelledby="recipeModalTitle">
+        <header class="inventory-modal-header">
+          <div><p class="inventory-kicker">Recipe Setup</p><h2 id="recipeModalTitle">New calculator</h2></div>
+          <button class="inventory-button ghost compact" id="closeRecipeButton" type="button">Close</button>
+        </header>
+        <form class="inventory-form" id="recipeForm">
+          <label class="inventory-field"><span>Calculator name</span><input name="name" maxlength="100" placeholder="Example: Heavy Pistol" required></label>
+          <div class="calculator-form-output">
+            <label class="inventory-field"><span>Crafted item</span><input name="outputName" maxlength="100" placeholder="Example: Heavy Pistol" required></label>
+            <label class="inventory-field"><span>Output per craft</span><input name="outputQuantity" type="number" min="1" step="1" value="1" inputmode="numeric" required></label>
+          </div>
+          <div class="calculator-form-materials">
+            <div class="calculator-form-materials-heading">
+              <span>Materials per craft</span>
+              <button class="inventory-button ghost compact" id="addIngredientRowButton" type="button">Add material</button>
+            </div>
+            <div class="calculator-form-ingredient-list" id="ingredientRows"></div>
+          </div>
+          <button class="inventory-button gold full" id="recipeSubmitButton" type="submit">Save calculator</button>
+          <button class="inventory-button danger full" id="deleteRecipeButton" type="button" hidden>Delete calculator</button>
+          <p class="inventory-form-message hidden" id="recipeFormMessage"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="deleteRecipeModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeDeleteRecipeBackdrop" type="button" aria-label="Close delete confirmation"></button>
+      <section class="modal-card inventory-modal-card" role="dialog" aria-modal="true" aria-labelledby="deleteRecipeTitle">
+        <header class="inventory-modal-header">
+          <div><p class="inventory-kicker">Delete Calculator</p><h2 id="deleteRecipeTitle">Delete this recipe?</h2></div>
+          <button class="inventory-button ghost compact" id="closeDeleteRecipeButton" type="button">Close</button>
+        </header>
+        <div class="inventory-warning-note">
+          <strong id="deleteRecipeName">Selected calculator</strong>
+          <span>This permanently removes the recipe and its materials.</span>
+        </div>
+        <div class="inventory-modal-actions">
+          <button class="inventory-button ghost" id="cancelDeleteRecipeButton" type="button">Cancel</button>
+          <button class="inventory-button danger" id="confirmDeleteRecipeButton" type="button">Delete calculator</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast-stack inventory-toast-stack" id="toastStack"></div>
+    <script type="module" src="./assets/js/calculator.js"></script>
+  </body>
+</html>

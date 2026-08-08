@@ -12,6 +12,7 @@ import wagersRoutes from "./routes/wagers.js";
 import inventoryRoutes from "./routes/inventory.js";
 import dispatchRoutes from "./routes/dispatch.js";
 import quotaRoutes from "./routes/quota.js";
+import calculatorRoutes from "./routes/calculator.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -48,6 +49,7 @@ app.use("/api/wagers", wagersRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/dispatch", dispatchRoutes);
 app.use("/api/quota", quotaRoutes);
+app.use("/api/calculator", calculatorRoutes);
 
 app.use((error, _req, res, _next) => {
   console.error(error);

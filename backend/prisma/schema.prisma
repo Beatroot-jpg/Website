@@ -297,6 +297,32 @@ model InventoryRestorePoint {
   @@index([createdAt])
 }
 
+
+model CalculatorRecipe {
+  id             String                 @id @default(cuid())
+  name           String                 @unique
+  outputName     String
+  outputQuantity Int                    @default(1)
+  ingredients    CalculatorIngredient[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([name])
+}
+
+model CalculatorIngredient {
+  id        String           @id @default(cuid())
+  recipeId  String
+  name      String
+  quantity  Int
+  sortOrder Int              @default(0)
+  recipe    CalculatorRecipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([recipeId, name])
+  @@index([recipeId, sortOrder])
+}
 model QuotaMember {
   id             String   @id @default(cuid())
   name           String   @unique
