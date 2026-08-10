@@ -565,6 +565,16 @@ targetQuantityInput.addEventListener("input", () => {
   renderCalculator();
 });
 
+$$("[data-target-step]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const current = Number(targetQuantityInput.value);
+    const step = Number(button.dataset.targetStep);
+    const next = Math.max(0, (Number.isFinite(current) ? current : 0) + step);
+    targetQuantityInput.value = String(next);
+    renderCalculator();
+  });
+});
+
 openRecipeModalButton.addEventListener("click", () => openRecipeModal());
 updateRecipeButton.addEventListener("click", () => {
   const recipe = selectedRecipe();

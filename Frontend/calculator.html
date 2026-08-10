@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#0b0b0a">
-    <title>Calculator</title>
+    <meta name="theme-color" content="#15110d">
+    <title>Recipe Calculator</title>
     <script>
       (() => {
         const savedTheme = localStorage.getItem("los-santos-fight-club-theme") || "dark";
@@ -17,8 +17,8 @@
     <script src="./assets/js/runtime-config.js"></script>
   </head>
   <body class="inventory-body calculator-body">
-    <div class="inventory-shell">
-      <header class="inventory-topbar">
+    <div class="inventory-shell calculator-shell">
+      <header class="inventory-topbar calculator-topbar">
         <a class="inventory-home-link" href="./index.html">Home</a>
         <div class="inventory-topbar-actions">
           <button class="inventory-button ghost" id="themeToggleButton" type="button" aria-pressed="false">Light mode</button>
@@ -26,40 +26,51 @@
         </div>
       </header>
 
-      <main class="inventory-stack">
-        <section class="inventory-overview-card calculator-picker-card" aria-labelledby="calculatorTitle">
-          <header class="inventory-card-heading">
-            <div>
-              <p class="inventory-kicker">Crafting Reference</p>
-              <h1 id="calculatorTitle">Calculator</h1>
-            </div>
-            <div class="calculator-heading-actions">
-              <p class="inventory-access-status" id="calculatorAccessStatus">Public view</p>
-              <button class="inventory-button gold" id="openRecipeModalButton" type="button" hidden>New calculator</button>
-            </div>
-          </header>
+      <main class="calculator-main">
+        <section class="calculator-hero" aria-labelledby="calculatorTitle">
+          <div class="calculator-hero-copy">
+            <p class="calculator-eyebrow">Richman Ultras Workshop</p>
+            <h1 id="calculatorTitle">Recipe<br>Calculator</h1>
+            <p>Set the build target once. The full material run updates instantly.</p>
+          </div>
 
-          <div class="calculator-selector-row">
+          <div class="calculator-hero-actions">
+            <p class="inventory-access-status" id="calculatorAccessStatus">Public view</p>
+            <button class="inventory-button gold" id="openRecipeModalButton" type="button" hidden>New calculator</button>
+          </div>
+
+          <div class="calculator-controls">
             <label class="inventory-field calculator-select-field">
-              <span>Saved calculator</span>
+              <span>Choose recipe</span>
               <select id="recipeSelect" aria-describedby="recipeSelectHint"></select>
+              <small id="recipeSelectHint">Saved recipes stay ready for the next run.</small>
             </label>
-            <label class="inventory-field calculator-target-field">
-              <span>Products to craft</span>
-              <input id="targetQuantityInput" type="number" min="0" step="1" value="1" inputmode="numeric">
-            </label>
+
+            <div class="calculator-target-panel">
+              <label class="inventory-field calculator-target-field">
+                <span>Products to craft</span>
+                <input id="targetQuantityInput" type="number" min="0" step="1" value="1" inputmode="numeric">
+              </label>
+              <div class="calculator-stepper" aria-label="Quick product amount controls">
+                <button type="button" class="calculator-step-button" data-target-step="-10">-10</button>
+                <button type="button" class="calculator-step-button" data-target-step="-1">-1</button>
+                <button type="button" class="calculator-step-button" data-target-step="1">+1</button>
+                <button type="button" class="calculator-step-button" data-target-step="10">+10</button>
+              </div>
+            </div>
+
             <div class="calculator-batch-readout" aria-live="polite">
               <span>Craft batches</span>
               <strong id="batchCountValue">0</strong>
-              <small id="recipeSelectHint">Choose a calculator to work out materials.</small>
+              <small>Rounded up to cover the requested output.</small>
             </div>
           </div>
         </section>
 
-        <section class="inventory-overview-card calculator-workspace" aria-labelledby="selectedRecipeTitle">
-          <header class="inventory-card-heading">
+        <section class="calculator-workbench" aria-labelledby="selectedRecipeTitle">
+          <header class="calculator-workbench-header">
             <div>
-              <p class="inventory-kicker">Selected Recipe</p>
+              <p class="calculator-eyebrow">Current Build</p>
               <h2 id="selectedRecipeTitle">Choose a calculator</h2>
               <p class="calculator-output-copy" id="recipeOutputCopy">Material totals appear here once a calculator is selected.</p>
             </div>
@@ -68,15 +79,15 @@
 
           <div class="calculator-facts" id="recipeFacts" aria-live="polite"></div>
 
-          <div class="inventory-table-heading calculator-table-heading">
+          <div class="calculator-materials-header">
             <div>
-              <p class="inventory-kicker">Materials Required</p>
-              <h2>Build list</h2>
-              <p id="calculatorTableHint">Enter the number of products you want to make.</p>
+              <p class="calculator-eyebrow">Materials Required</p>
+              <h3>Take this list to the bench.</h3>
             </div>
+            <p id="calculatorTableHint">Enter the number of products you want to make.</p>
           </div>
 
-          <div class="inventory-table-scroll">
+          <div class="inventory-table-scroll calculator-table-scroll">
             <table class="inventory-table calculator-table">
               <thead>
                 <tr>
@@ -89,7 +100,7 @@
             </table>
           </div>
 
-          <footer class="inventory-card-footer">
+          <footer class="calculator-workbench-footer">
             <p id="calculatorTableMeta">Loading calculators...</p>
           </footer>
         </section>
