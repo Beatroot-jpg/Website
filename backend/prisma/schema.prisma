@@ -298,6 +298,18 @@ model InventoryRestorePoint {
 }
 
 
+
+model HallOfFameEntry {
+  id        String   @id @default(cuid())
+  name      String
+  category  String
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, category])
+  @@index([category, name])
+}
 model CalculatorRecipe {
   id             String                 @id @default(cuid())
   name           String                 @unique
