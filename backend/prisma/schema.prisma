@@ -165,6 +165,16 @@ enum TrustFundTransactionType {
   PURCHASE
 }
 
+enum TrackerActivityType {
+  EARN
+  SPEND
+  PURCHASE
+  ITEM_ADDED
+  ITEM_REMOVED
+  BALANCE_CORRECTION
+  ITEM_CORRECTION
+}
+
 enum FightScoreEntryType {
   BOUT
   CORRECTION
@@ -334,6 +344,42 @@ model CalculatorIngredient {
 
   @@unique([recipeId, name])
   @@index([recipeId, sortOrder])
+}
+
+model TrackerSession {
+  id          String            @id @default(cuid())
+  label       String?
+  startedAt   DateTime          @default(now())
+  endedAt     DateTime?
+  createdById String?
+  createdByName String?
+  activities  TrackerActivity[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([endedAt, startedAt])
+}
+
+model TrackerActivity {
+  id             String              @id @default(cuid())
+  sessionId      String?
+  type           TrackerActivityType
+  moneyDelta     Decimal             @default(0) @db.Decimal(14, 2)
+  itemName       String?
+  itemQuantityDelta Int               @default(0)
+  description    String?
+  createdById    String?
+  createdByName  String?
+  revertedAt     DateTime?
+  revertedById   String?
+  revertedByName String?
+  session        TrackerSession?     @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([sessionId, createdAt])
+  @@index([revertedAt, createdAt])
+  @@index([itemName])
 }
 model QuotaMember {
   id             String   @id @default(cuid())

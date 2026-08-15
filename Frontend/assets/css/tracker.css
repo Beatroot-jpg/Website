@@ -1,0 +1,381 @@
+.tracker-shell {
+  width: min(1320px, 100%);
+}
+
+.tracker-main {
+  display: grid;
+  gap: clamp(24px, 3.4vw, 46px);
+}
+
+.tracker-hero,
+.tracker-card {
+  overflow: hidden;
+  border: 1px solid var(--inventory-line);
+  border-radius: 8px;
+  background: var(--inventory-panel);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.34);
+}
+
+.tracker-hero {
+  border-top: 2px solid var(--inventory-line-strong);
+  background:
+    radial-gradient(circle at 88% 8%, rgba(244, 190, 74, 0.2), transparent 0 20rem),
+    linear-gradient(132deg, rgba(255, 255, 255, 0.05), transparent 52%),
+    var(--inventory-panel);
+}
+
+.tracker-hero-header,
+.tracker-card-header,
+.tracker-ledger-footer,
+.tracker-session-actions {
+  display: flex;
+  align-items: center;
+}
+
+.tracker-hero-header {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 28px;
+  padding: clamp(24px, 4vw, 52px) clamp(22px, 5vw, 62px) 30px;
+}
+
+.tracker-eyebrow,
+.tracker-session-status,
+.tracker-metric span,
+.tracker-balance-panel > span,
+.tracker-balance-panel small,
+.tracker-card-header > p,
+.tracker-form-hint {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.tracker-eyebrow,
+.tracker-balance-panel > span,
+.tracker-metric span {
+  color: var(--inventory-gold-bright);
+}
+
+.tracker-hero h1,
+.tracker-card h2 {
+  margin: 8px 0 0;
+  color: var(--inventory-gold-bright);
+  font-family: "Cinzel", Georgia, serif;
+  font-weight: 900;
+  letter-spacing: 0.045em;
+  line-height: 0.87;
+  text-transform: uppercase;
+  text-shadow: 0 0 20px rgba(244, 190, 74, 0.18);
+}
+
+.tracker-hero h1 {
+  font-size: clamp(2.55rem, 6.8vw, 6.5rem);
+}
+
+.tracker-card h2 {
+  font-size: clamp(1.25rem, 2.5vw, 1.85rem);
+}
+
+.tracker-hero-header > div:first-child > p:last-child {
+  max-width: 520px;
+  margin: 20px 0 0;
+  color: var(--inventory-muted);
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.tracker-session-control {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+  min-width: min(280px, 100%);
+  padding-top: 4px;
+}
+
+.tracker-session-status {
+  color: var(--inventory-muted);
+  letter-spacing: 0.1em;
+}
+
+.tracker-session-status.is-active {
+  color: var(--inventory-good);
+}
+
+.tracker-session-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tracker-balance-panel {
+  display: grid;
+  gap: 8px;
+  padding: clamp(30px, 5vw, 58px) clamp(22px, 5vw, 62px);
+  border-top: 1px solid var(--inventory-line);
+  border-bottom: 1px solid var(--inventory-line);
+  background:
+    linear-gradient(90deg, rgba(244, 190, 74, 0.11), transparent 57%),
+    rgba(255, 255, 255, 0.025);
+}
+
+.tracker-balance-panel strong {
+  color: var(--inventory-ink);
+  font-family: "Cinzel", Georgia, serif;
+  font-size: clamp(3.5rem, 9.8vw, 9rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.075em;
+  line-height: 0.76;
+  text-shadow: 0 0 34px rgba(255, 255, 255, 0.13);
+}
+
+.tracker-balance-panel small {
+  color: var(--inventory-soft);
+  letter-spacing: 0.08em;
+}
+
+.tracker-balance-panel .inventory-button {
+  justify-self: start;
+  margin-top: 13px;
+}
+
+.tracker-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.tracker-metric {
+  display: grid;
+  gap: 10px;
+  min-height: 122px;
+  padding: 22px clamp(16px, 2vw, 28px);
+  border-right: 1px solid var(--inventory-line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.tracker-metric:last-child {
+  border-right: 0;
+}
+
+.tracker-metric strong {
+  color: var(--inventory-ink);
+  font-family: "Cinzel", Georgia, serif;
+  font-size: clamp(1.25rem, 2.2vw, 2rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.tracker-metric.earned strong { color: var(--inventory-good); }
+.tracker-metric.spent strong { color: var(--inventory-danger); }
+.tracker-metric.net strong { color: var(--inventory-gold-bright); }
+
+.tracker-card-header {
+  justify-content: space-between;
+  gap: 22px;
+  padding: clamp(22px, 3vw, 34px) clamp(22px, 4vw, 46px);
+  border-bottom: 1px solid var(--inventory-line);
+}
+
+.tracker-card-header > p {
+  max-width: 240px;
+  color: var(--inventory-soft);
+  letter-spacing: 0.08em;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.tracker-table {
+  min-width: 680px;
+}
+
+.tracker-table td:first-child {
+  color: var(--inventory-gold-bright);
+  font-family: "Cinzel", Georgia, serif;
+  font-weight: 900;
+  letter-spacing: 0.025em;
+}
+
+.tracker-table td:nth-child(2) {
+  font-variant-numeric: tabular-nums;
+}
+
+.tracker-holding-quantity {
+  color: var(--inventory-good) !important;
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 1.25rem !important;
+}
+
+.tracker-ledger-table {
+  min-width: 940px;
+}
+
+.tracker-ledger-table tr.is-reverted {
+  opacity: 0.5;
+}
+
+.tracker-ledger-table tr.is-reverted td:not(:last-child) {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.tracker-activity-title {
+  display: grid;
+  gap: 4px;
+}
+
+.tracker-activity-title strong {
+  color: var(--inventory-ink);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.tracker-activity-title small,
+.tracker-item-cell,
+.tracker-date-cell {
+  color: var(--inventory-soft);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.tracker-delta {
+  display: grid;
+  gap: 4px;
+  color: var(--inventory-soft);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.tracker-delta strong {
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 1.02rem;
+  letter-spacing: 0;
+}
+
+.tracker-delta.positive strong { color: var(--inventory-good); }
+.tracker-delta.negative strong { color: var(--inventory-danger); }
+.tracker-delta.adjustment strong { color: var(--inventory-gold-bright); }
+
+.tracker-item-cell strong {
+  color: var(--inventory-ink);
+  font-size: 0.88rem;
+}
+
+.tracker-reverted-label {
+  color: var(--inventory-danger);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.tracker-ledger-footer {
+  justify-content: space-between;
+}
+
+.tracker-ledger-footer > p {
+  max-width: 540px;
+  line-height: 1.5;
+}
+
+.tracker-form-hint {
+  min-height: 1.5em;
+  color: var(--inventory-muted);
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+}
+
+.tracker-modal-card {
+  width: min(680px, calc(100vw - 28px)) !important;
+}
+
+@media (max-width: 1050px) {
+  .tracker-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .tracker-metric:nth-child(3) {
+    border-right: 0;
+  }
+
+  .tracker-metric:nth-child(-n + 3) {
+    border-bottom: 1px solid var(--inventory-line);
+  }
+}
+
+@media (max-width: 760px) {
+  .tracker-hero-header,
+  .tracker-card-header,
+  .tracker-ledger-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tracker-session-control {
+    justify-items: stretch;
+  }
+
+  .tracker-session-actions {
+    justify-content: stretch;
+  }
+
+  .tracker-session-actions .inventory-button,
+  .tracker-balance-panel .inventory-button {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .tracker-card-header > p {
+    max-width: none;
+    text-align: left;
+  }
+
+  .tracker-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tracker-metric,
+  .tracker-metric:nth-child(3) {
+    min-height: 104px;
+    border-right: 1px solid var(--inventory-line);
+    border-bottom: 1px solid var(--inventory-line);
+  }
+
+  .tracker-metric:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .tracker-metric:last-child {
+    border-bottom: 0;
+  }
+
+  .tracker-ledger-footer .inventory-pagination {
+    justify-content: stretch;
+  }
+}
+
+@media (max-width: 450px) {
+  .tracker-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .tracker-metric,
+  .tracker-metric:nth-child(3) {
+    min-height: auto;
+    border-right: 0;
+  }
+
+  .tracker-metric:last-child {
+    border-bottom: 0;
+  }
+}

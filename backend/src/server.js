@@ -14,6 +14,7 @@ import dispatchRoutes from "./routes/dispatch.js";
 import quotaRoutes from "./routes/quota.js";
 import calculatorRoutes from "./routes/calculator.js";
 import hallOfFameRoutes from "./routes/hall-of-fame.js";
+import trackerRoutes from "./routes/tracker.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -52,6 +53,7 @@ app.use("/api/dispatch", dispatchRoutes);
 app.use("/api/quota", quotaRoutes);
 app.use("/api/calculator", calculatorRoutes);
 app.use("/api/hall-of-fame", hallOfFameRoutes);
+app.use("/api/tracker", trackerRoutes);
 
 app.use((error, _req, res, _next) => {
   console.error(error);

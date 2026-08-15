@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#15110d">
+    <title>Live Tracker</title>
+    <script>
+      (() => {
+        const savedTheme = localStorage.getItem("los-santos-fight-club-theme") || "dark";
+        document.documentElement.dataset.theme = savedTheme;
+      })();
+    </script>
+    <link rel="stylesheet" href="./assets/css/styles.css">
+    <link rel="stylesheet" href="./assets/css/inventory.css">
+    <link rel="stylesheet" href="./assets/css/tracker.css">
+    <script src="./assets/js/runtime-config.js"></script>
+  </head>
+  <body class="inventory-body tracker-body">
+    <div class="inventory-shell tracker-shell">
+      <header class="inventory-topbar tracker-topbar">
+        <a class="inventory-home-link" href="./index.html">Home</a>
+        <div class="inventory-topbar-actions">
+          <button class="inventory-button ghost" id="themeToggleButton" type="button" aria-pressed="false">Light mode</button>
+          <button class="inventory-button gold" id="sessionButton" type="button">Login</button>
+        </div>
+      </header>
+
+      <main class="tracker-main">
+        <section class="tracker-hero" aria-labelledby="trackerTitle">
+          <header class="tracker-hero-header">
+            <div>
+              <p class="tracker-eyebrow">Personal game ledger</p>
+              <h1 id="trackerTitle">Live<br>Tracker</h1>
+              <p>Log the money, purchases, and items from each play session in one clean place.</p>
+            </div>
+            <div class="tracker-session-control">
+              <p class="inventory-access-status" id="trackerAccessStatus">Public view</p>
+              <p class="tracker-session-status" id="sessionStatus">No active session</p>
+              <div class="tracker-session-actions" id="sessionActions" hidden>
+                <button class="inventory-button ghost" id="startSessionButton" type="button">Start session</button>
+                <button class="inventory-button danger" id="endSessionButton" type="button" hidden>End session</button>
+              </div>
+            </div>
+          </header>
+
+          <div class="tracker-balance-panel" aria-live="polite">
+            <span>Cash on hand</span>
+            <strong id="currentBalanceValue">$0</strong>
+            <small id="currentBalanceMeta">All active entries combined</small>
+            <button class="inventory-button gold" id="openActivityModalButton" type="button" hidden>Log activity</button>
+          </div>
+
+          <div class="tracker-metrics" aria-label="Money totals">
+            <article class="tracker-metric earned">
+              <span>This session earned</span>
+              <strong id="sessionEarnedValue">$0</strong>
+            </article>
+            <article class="tracker-metric spent">
+              <span>This session spent</span>
+              <strong id="sessionSpentValue">$0</strong>
+            </article>
+            <article class="tracker-metric net">
+              <span>This session net</span>
+              <strong id="sessionNetValue">$0</strong>
+            </article>
+            <article class="tracker-metric earned">
+              <span>All-time earned</span>
+              <strong id="allTimeEarnedValue">$0</strong>
+            </article>
+            <article class="tracker-metric spent">
+              <span>All-time spent</span>
+              <strong id="allTimeSpentValue">$0</strong>
+            </article>
+          </div>
+        </section>
+
+        <section class="tracker-card" aria-labelledby="holdingsTitle">
+          <header class="tracker-card-header">
+            <div>
+              <p class="tracker-eyebrow">Current inventory</p>
+              <h2 id="holdingsTitle">What you have</h2>
+            </div>
+            <p id="holdingsMeta">Loading holdings...</p>
+          </header>
+          <div class="inventory-table-scroll tracker-table-scroll">
+            <table class="inventory-table tracker-table">
+              <thead>
+                <tr>
+                  <th scope="col">Item</th>
+                  <th scope="col">On hand</th>
+                </tr>
+              </thead>
+              <tbody id="holdingsTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="tracker-card tracker-ledger-card" aria-labelledby="ledgerTitle">
+          <header class="tracker-card-header">
+            <div>
+              <p class="tracker-eyebrow">Activity history</p>
+              <h2 id="ledgerTitle">Live ledger</h2>
+            </div>
+            <p id="ledgerMeta">Latest 10 entries</p>
+          </header>
+          <div class="inventory-table-scroll tracker-table-scroll">
+            <table class="inventory-table tracker-table tracker-ledger-table">
+              <thead>
+                <tr>
+                  <th scope="col">Activity</th>
+                  <th scope="col">Change</th>
+                  <th scope="col">Item</th>
+                  <th scope="col">Logged</th>
+                  <th scope="col" class="tracker-admin-column" hidden>Action</th>
+                </tr>
+              </thead>
+              <tbody id="activityTableBody"></tbody>
+            </table>
+          </div>
+          <footer class="inventory-card-footer tracker-ledger-footer">
+            <p id="ledgerFooter">Every entry remains in the ledger, including reverted actions.</p>
+            <div class="inventory-pagination" id="activityPagination">
+              <button class="inventory-button ghost compact" id="previousActivityPage" type="button">Previous</button>
+              <span id="activityPageLabel">Page 1 of 1</span>
+              <button class="inventory-button ghost compact" id="nextActivityPage" type="button">Next</button>
+            </div>
+          </footer>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-shell hidden" id="loginModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeLoginBackdrop" type="button" aria-label="Close login"></button>
+      <section class="modal-card inventory-modal-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+        <header class="inventory-modal-header">
+          <div><p class="inventory-kicker">Private Access</p><h2 id="loginTitle">Log in</h2></div>
+          <button class="inventory-button ghost compact" id="closeLoginButton" type="button">Close</button>
+        </header>
+        <form class="inventory-form" id="loginForm">
+          <label class="inventory-field"><span>Username</span><input name="username" autocomplete="username" required></label>
+          <label class="inventory-field"><span>Password</span><input type="password" name="password" autocomplete="current-password" required></label>
+          <button class="inventory-button gold full" id="loginSubmitButton" type="submit">Enter</button>
+          <p class="inventory-form-message hidden" id="loginError"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="startSessionModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeStartSessionBackdrop" type="button" aria-label="Close session form"></button>
+      <section class="modal-card inventory-modal-card" role="dialog" aria-modal="true" aria-labelledby="startSessionTitle">
+        <header class="inventory-modal-header">
+          <div><p class="inventory-kicker">Session control</p><h2 id="startSessionTitle">Start a session</h2></div>
+          <button class="inventory-button ghost compact" id="closeStartSessionButton" type="button">Close</button>
+        </header>
+        <form class="inventory-form" id="startSessionForm">
+          <label class="inventory-field"><span>Session label</span><input name="label" maxlength="100" placeholder="Optional: Friday night run"></label>
+          <p class="inventory-form-note">New money and item activity will be grouped into this session until you end it.</p>
+          <button class="inventory-button gold full" id="startSessionSubmitButton" type="submit">Start session</button>
+          <p class="inventory-form-message hidden" id="startSessionError"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="activityModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeActivityBackdrop" type="button" aria-label="Close activity form"></button>
+      <section class="modal-card inventory-modal-card tracker-modal-card" role="dialog" aria-modal="true" aria-labelledby="activityModalTitle">
+        <header class="inventory-modal-header">
+          <div><p class="inventory-kicker">Live entry</p><h2 id="activityModalTitle">Log activity</h2></div>
+          <button class="inventory-button ghost compact" id="closeActivityButton" type="button">Close</button>
+        </header>
+        <form class="inventory-form" id="activityForm">
+          <label class="inventory-field">
+            <span>What happened?</span>
+            <select name="type" id="activityTypeSelect">
+              <option value="EARN">Earn money</option>
+              <option value="SPEND">Spend money</option>
+              <option value="PURCHASE">Buy item</option>
+              <option value="ITEM_ADDED">Receive item</option>
+              <option value="ITEM_REMOVED">Use or lose item</option>
+              <option value="BALANCE_CORRECTION">Set cash on hand</option>
+              <option value="ITEM_CORRECTION">Set item total</option>
+            </select>
+          </label>
+          <p class="tracker-form-hint" id="activityFormHint"></p>
+          <div class="inventory-form-grid">
+            <label class="inventory-field" id="moneyField"><span id="moneyFieldLabel">Amount</span><input name="amount" type="number" min="0" step="0.01" inputmode="decimal"></label>
+            <label class="inventory-field hidden" id="targetBalanceField"><span>Set cash on hand to</span><input name="targetBalance" type="number" min="0" step="0.01" inputmode="decimal"></label>
+            <label class="inventory-field hidden" id="itemNameField"><span>Item name</span><input name="itemName" maxlength="100" placeholder="Example: Lockpick"></label>
+            <label class="inventory-field hidden" id="quantityField"><span id="quantityFieldLabel">Item quantity</span><input name="quantity" type="number" min="1" step="1" inputmode="numeric"></label>
+            <label class="inventory-field hidden" id="targetQuantityField"><span>Set item total to</span><input name="targetQuantity" type="number" min="0" step="1" inputmode="numeric"></label>
+          </div>
+          <label class="inventory-field"><span>Note</span><input name="description" maxlength="240" placeholder="Optional details for the ledger"></label>
+          <button class="inventory-button gold full" id="activitySubmitButton" type="submit">Save activity</button>
+          <p class="inventory-form-message hidden" id="activityFormError"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-shell hidden" id="revertActivityModal" aria-hidden="true">
+      <button class="modal-backdrop" id="closeRevertActivityBackdrop" type="button" aria-label="Close revert confirmation"></button>
+      <section class="modal-card inventory-modal-card" role="dialog" aria-modal="true" aria-labelledby="revertActivityTitle">
+        <header class="inventory-modal-header">
+          <div><p class="inventory-kicker">Ledger safety</p><h2 id="revertActivityTitle">Revert this activity?</h2></div>
+          <button class="inventory-button ghost compact" id="closeRevertActivityButton" type="button">Close</button>
+        </header>
+        <div class="inventory-warning-note">
+          <strong id="revertActivityName">Selected activity</strong>
+          <span>The entry stays visible for audit history, but its money and item changes will no longer count in the totals.</span>
+        </div>
+        <div class="inventory-modal-actions">
+          <button class="inventory-button ghost" id="cancelRevertActivityButton" type="button">Keep activity</button>
+          <button class="inventory-button danger" id="confirmRevertActivityButton" type="button">Revert activity</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast-stack inventory-toast-stack" id="toastStack"></div>
+    <script type="module" src="./assets/js/tracker.js"></script>
+  </body>
+</html>
