@@ -1,103 +1,10 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Richman Ultras</title>
-    <script>
-      try {
-        const savedTheme = window.localStorage.getItem("los-santos-fight-club-theme");
-        if (savedTheme === "light" || savedTheme === "dark") {
-          document.documentElement.dataset.theme = savedTheme;
-        }
-      } catch (_error) {}
-    </script>
-    <link rel="stylesheet" href="./assets/css/styles.css">
-    <link rel="stylesheet" href="./assets/css/dashboard.css">
-    <script src="./assets/js/runtime-config.js"></script>
-    <script src="./assets/js/config.js"></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>New Workspace</title>
   </head>
-  <body class="dashboard-body is-loading">
-    <div class="dashboard-shell">
-      <header class="dashboard-topbar">
-        <span class="dashboard-wordmark">Richman Ultras</span>
-        <div class="dashboard-topbar-actions">
-          <button class="dashboard-button ghost" id="themeToggleButton" type="button" aria-pressed="false">Light mode</button>
-          <button class="dashboard-button gold" id="loginButton" type="button">Login</button>
-        </div>
-      </header>
-
-      <main>
-        <section class="dashboard-hero" aria-labelledby="dashboardTitle">
-          <div class="dashboard-hero-glow" aria-hidden="true"></div>
-          <div class="dashboard-logo-gallery">
-            <img class="dashboard-logo" src="./assets/images/Richman Ultras.png" alt="Richman Ultras crest">
-          </div>
-          <div class="dashboard-title-block">
-            <p class="dashboard-kicker">Private workspace</p>
-            <h1 id="dashboardTitle">Dashboard</h1>
-          </div>
-        </section>
-
-        <section class="available-pages" id="availablePages" aria-labelledby="availablePagesTitle">
-          <header class="available-pages-header">
-            <p class="dashboard-kicker">Navigation</p>
-            <h2 id="availablePagesTitle">Available pages</h2>
-          </header>
-
-          <nav class="available-page-list" aria-label="Available pages">
-            <a class="available-page-card" href="./tracker.html">
-              <span>
-                <strong>Tracker</strong>
-                <small>Live cash, session earnings, purchases, and current items.</small>
-              </span>
-              <span class="available-page-arrow" aria-hidden="true">Open</span>
-            </a>
-            <a class="available-page-card" href="./calculator.html">
-              <span>
-                <strong>Calculator</strong>
-                <small>Saved recipes, craft batches, and material totals.</small>
-              </span>
-              <span class="available-page-arrow" aria-hidden="true">Open</span>
-            </a>
-          </nav>
-        </section>
-      </main>
-    </div>
-
-    <button class="dashboard-scroll-cue" id="scrollCue" type="button" aria-label="Scroll to available pages">
-      <span>Scroll</span>
-      <i aria-hidden="true"></i>
-      <i aria-hidden="true"></i>
-    </button>
-
-    <div class="modal-shell hidden" id="loginModal" aria-hidden="true">
-      <button class="modal-backdrop" id="closeLoginBackdrop" type="button" aria-label="Close login"></button>
-      <section class="modal-card dashboard-modal-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
-        <header class="dashboard-modal-header">
-          <div>
-            <p class="dashboard-kicker">Member access</p>
-            <h2 id="loginTitle">Log in</h2>
-          </div>
-          <button class="dashboard-button ghost compact" id="closeLoginButton" type="button">Close</button>
-        </header>
-
-        <form class="dashboard-form" id="loginForm">
-          <label class="dashboard-field">
-            <span>Username</span>
-            <input type="text" name="username" autocomplete="username" required>
-          </label>
-          <label class="dashboard-field">
-            <span>Password</span>
-            <input type="password" name="password" autocomplete="current-password" required>
-          </label>
-          <button class="dashboard-button gold full" id="loginSubmitButton" type="submit">Enter</button>
-          <p class="dashboard-form-message hidden" id="loginError"></p>
-        </form>
-      </section>
-    </div>
-
-    <div class="toast-stack dashboard-toast-stack" id="toastStack"></div>
-    <script type="module" src="./assets/js/home.js"></script>
+  <body>
   </body>
 </html>
